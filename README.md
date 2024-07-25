@@ -2,9 +2,6 @@ Executar as migrations:
 
     docker exec -it uniselec-api bash -c "php artisan migrate"
 
-
-
-
 Ideal:
 
 uniselec.unilab.edu.br
