@@ -1,3 +1,7 @@
+Executar as migrations:
+
+    docker exec -it uniselec-api bash -c "php artisan migrate"
+
 
 
 
@@ -12,9 +16,10 @@ uniselec-bo-staging.unilab.edu.br
 uniselec-api.unilab.edu.br
 uniselec-api-staging.unilab.edu.br
 
+(Demandas do tipo demoram 3 meses na disir)
 
 
-Real:
+O que eu consigo fazer em pouco tempo:
 
 uniselec.jefponte.com
 uniselec-staging.jefponte.com

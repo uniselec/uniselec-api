@@ -5,8 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: laravel-app
-    container_name: laravel-app
+    image: uniselec-api
+    container_name: uniselec-api
     ports:
       - "8080:80"
     volumes:
