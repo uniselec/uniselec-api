@@ -29,5 +29,5 @@ jobs:
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
         server: jefponte.com
-        username: uniselec-api-staging@jefponte.com
+        username: uniselec-api@jefponte.com
         password: ${{ secrets.FTP_PASSWORD_PRODUCTION }}

@@ -833,7 +833,7 @@
 <body class="antialiased">
     <div class="relative sm:flex sm:justify-center sm:items-center min-h-screen bg-dots-darker bg-center bg-gray-100 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white">
         <div>
-            <h2 class="mt-6 text-xl font-semibold text-gray-900 dark:text-white">Sistema de Seleção de Candidatos em Construção</h2>
+            <h2 class="mt-6 text-xl font-semibold text-gray-900 dark:text-white">Sistema de Seleção de Candidatos em Construção.</h2>
         </div>
     </div>
 </body>
