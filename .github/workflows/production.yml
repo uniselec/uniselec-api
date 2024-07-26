@@ -6,13 +6,28 @@ jobs:
   web-deploy:
     name: 🎉 Deploy
     runs-on: ubuntu-latest
-    steps:
-      - name: 🚚 Get latest code
-        uses: actions/checkout@v4
 
-      - name: 📂 Sync files
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: jefponte.com
-          username: uniselec-api-staging@jefponte.com
-          password: ${{ secrets.FTP_PASSWORD_PRODUCTION }}
+    steps:
+    - name: 🚚 Get latest code
+      uses: actions/checkout@v4
+
+    - name: 📦 Set up PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.1'
+
+    - name: 🛠️ Install Composer
+      run: |
+        curl -sS https://getcomposer.org/installer | php
+        sudo mv composer.phar /usr/local/bin/composer
+        composer --version
+
+    - name: 📂 Install Dependencies
+      run: composer install --no-dev --optimize-autoloader
+
+    - name: 📂 Sync files
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      with:
+        server: jefponte.com
+        username: uniselec-api-staging@jefponte.com
+        password: ${{ secrets.FTP_PASSWORD_PRODUCTION }}

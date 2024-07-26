@@ -16,7 +16,7 @@ jobs:
     - name: 📦 Set up PHP
       uses: shivammathur/setup-php@v2
       with:
-        php-version: '8.1' # Ajuste a versão do PHP conforme necessário
+        php-version: '8.1'
 
     - name: 🛠️ Install Composer
       run: |
