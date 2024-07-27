@@ -44,30 +44,36 @@ O que eu consigo fazer em pouco tempo:
 
 
 
-Página do Candidato:
+    Página do Candidato:
+        Produção:
 
-        https://uniselec.jefponte.com
-        https://uniselec-staging.jefponte.com
+            https://uniselec.jefponte.com
 
-Página do candidato, Link alternativo(Serviço em Nuvem Gratuito do Firebase):
+        Homologação:
 
-        https://uniselec.web.app
-        https://uniselec-staging.web.app
+            https://uniselec-staging.jefponte.com
 
+        Produção (Link alternativo, serviço gratuito do Firebase):
 
-uniselec-bo.jefponte.com
-uniselec-bo-staging.jefponte.com
-
-uniselec-unilab.web.app
-uniselec-unilab-staging.web.app
-
-uniselec-unilab-bo.web.app
-uniselec-unilab-bo-staging.web.app
-
-uniselec-api.jefponte.com
-uniselec-api-staging.jefponte.com
+            https://uniselec.web.app
 
 
-uniselec-api.jefponte.com
-uniselec-api-staging.jefponte.com
+    Página do administrador:
 
+        Produção:
+            https://uniselec-bo.jefponte.com
+
+        Homologação:
+
+            https://uniselec-bo-staging.jefponte.com
+
+        Produção (Link alternativo, serviço gratuito do Firebase):
+
+
+            https://uniselec-unilab-bo.web.app
+
+    API:
+
+            https://uniselec-api.jefponte.com
+
+            https://uniselec-api-staging.jefponte.com
