@@ -1,6 +1,11 @@
 <?php
 
-use Illuminate\Http\Request;
+use App\Http\Controllers\Api\AttachmentController;
+use App\Http\Controllers\Api\Auth\AuthController;
+use App\Http\Controllers\Api\Auth\RegisterController;
+use App\Http\Controllers\Api\TicketController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\DSGoDataExtraction;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -14,6 +19,11 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/me', [AuthController::class, 'me'])->name('user.profile');
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::apiResource('users', UserController::class)->names('users');
+    Route::post('/register', [RegisterController::class, 'register'])->name('register');
 });
+
+Route::post('/login', [AuthController::class, 'auth'])->name('user.login');
