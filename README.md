@@ -3,6 +3,22 @@ Executar as migrations:
     docker exec -it uniselec-api bash -c "php artisan migrate"
 
 
+Repositórios no gitlab:
+
+    API:
+
+        git clone http://dti-gitlab.unilab.edu.br/dti/uniselecapi.git
+
+    Página do Candidato:
+
+        git clone http://dti-gitlab.unilab.edu.br/dti/uniselecwebsite.git
+
+    Página do administrador:
+
+        http://dti-gitlab.unilab.edu.br/dti/uniselecadminpage.git
+
+
+
 Links:
 
     Ideal:
