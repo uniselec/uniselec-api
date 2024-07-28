@@ -1,6 +1,4 @@
-Executar as migrations:
 
-    docker exec -it uniselec-api bash -c "php artisan migrate"
 
 
 Repositórios no gitlab:
@@ -93,3 +91,25 @@ O que eu consigo fazer em pouco tempo:
             https://uniselec-api.jefponte.com
 
             https://uniselec-api-staging.jefponte.com
+
+
+
+Iniciar Ambiente de desenvolvimento:
+
+        composer install
+
+        docker compose up -d
+
+        sudo chmod -R 777 storage
+
+        sudo chmod -R 777 bootstrap/cache
+
+
+    Docker compose:
+
+        docker compose up -d
+
+    Executar migrations e seeds:
+
+        docker exec -it uniselec-api bash -c "php artisan migrate"
+        docker exec -it uniselec-api bash -c "php artisan db:seed"
