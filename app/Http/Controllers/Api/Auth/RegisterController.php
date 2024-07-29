@@ -19,8 +19,9 @@ class RegisterController extends Controller
      *         required=true,
      *         @OA\JsonContent(
      *             @OA\Property(property="name", type="string", example="John Doe"),
-     *             @OA\Property(property="email", type="string", format="email", example="john.doe@example.com"),
-     *             @OA\Property(property="password", type="string", format="password", example="password123")
+     *             @OA\Property(property="email", type="string", format="email", example="root4@dsgoextractor.com"),
+     *             @OA\Property(property="cpf", type="string", format="cpf", example="25787968409"),
+     *             @OA\Property(property="password", type="string", format="password", example="root")
      *         )
      *     ),
      *     @OA\Response(
@@ -44,6 +45,7 @@ class RegisterController extends Controller
         $validation = Validator::make($input, [
             'email' => 'required|email',
             'password' => 'required',
+            'cpf' => 'required',
         ]);
 
         if ($validation->fails()) {

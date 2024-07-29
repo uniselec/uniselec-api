@@ -286,6 +286,11 @@
                                         "format": "email",
                                         "example": "john.doe@example.com"
                                     },
+                                    "cpf": {
+                                        "type": "string",
+                                        "format": "cpf",
+                                        "example": "03519017369"
+                                    },
                                     "password": {
                                         "type": "string",
                                         "format": "password",
@@ -476,6 +481,36 @@
                         "sanctum": []
                     }
                 ]
+            },
+            "delete": {
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Delete a user",
+                "operationId": "0b4133ed462528a5e648b88ead11e929",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "User deleted successfully"
+                    },
+                    "404": {
+                        "description": "User not found"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
             }
         }
     },
@@ -531,6 +566,10 @@
                     },
                     "email": {
                         "description": "User email",
+                        "type": "string"
+                    },
+                    "cpf": {
+                        "description": "User cpf",
                         "type": "string"
                     },
                     "password": {
