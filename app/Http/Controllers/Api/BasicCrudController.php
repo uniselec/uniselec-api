@@ -34,7 +34,7 @@ abstract class BasicCrudController extends Controller
 
         $query = $this->queryBuilder();
 
-        if($hasFilter){
+        if ($hasFilter) {
             $query = $query->filter($request->all());
         }
 
@@ -48,6 +48,8 @@ abstract class BasicCrudController extends Controller
             ? new $resourceCollectionClass($data)
             : $resourceCollectionClass::collection($data);
     }
+
+
 
     public function store(Request $request)
     {
@@ -63,7 +65,6 @@ abstract class BasicCrudController extends Controller
         $model = $this->model();
         $keyName = (new $model)->getRouteKeyName();
         return $this->queryBuilder()->where($keyName, $id)->firstOrFail();
-
     }
 
     public function show($id)
@@ -129,7 +130,8 @@ abstract class BasicCrudController extends Controller
         return $validator->validate();
     }
 
-    protected function queryBuilder(): Builder{
+    protected function queryBuilder(): Builder
+    {
         return $this->model()::query();
     }
 }

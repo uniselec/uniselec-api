@@ -55,7 +55,7 @@ Links:
 
 O que eu consigo fazer em pouco tempo:
 
-
+ php artisan l5-swagger:generate
 
 
     Página do Candidato:
