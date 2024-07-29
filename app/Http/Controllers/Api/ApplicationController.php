@@ -33,34 +33,34 @@ class ApplicationController extends BasicCrudController
      * )
      */
     public function index(Request $request)
-{
-    $perPage = (int) $request->get('per_page', $this->defaultPerPage);
-    $hasFilter = in_array(Filterable::class, class_uses($this->model()));
+    {
+        $perPage = (int) $request->get('per_page', $this->defaultPerPage);
+        $hasFilter = in_array(Filterable::class, class_uses($this->model()));
 
-    $query = $this->queryBuilder();
+        $query = $this->queryBuilder();
 
-    if ($hasFilter) {
-        $query = $query->filter($request->all());
+        if ($hasFilter) {
+            $query = $query->filter($request->all());
+        }
+        $query->whereNotNull('created_at');
+        $data = $request->has('all') || !$this->defaultPerPage
+            ? $query->get()
+            : $query->paginate($perPage);
+
+        // Verifica se o retorno é um LengthAwarePaginator
+        if ($data instanceof \Illuminate\Pagination\LengthAwarePaginator) {
+            return ApplicationResource::collection($data->items())->additional([
+                'meta' => [
+                    'current_page' => $data->currentPage(),
+                    'per_page' => $data->perPage(),
+                    'total' => $data->total(),
+                    'last_page' => $data->lastPage(),
+                ],
+            ]);
+        }
+
+        return ApplicationResource::collection($data);
     }
-    $query->whereNotNull('created_at');
-    $data = $request->has('all') || !$this->defaultPerPage
-        ? $query->get()
-        : $query->paginate($perPage);
-
-    // Verifica se o retorno é um LengthAwarePaginator
-    if ($data instanceof \Illuminate\Pagination\LengthAwarePaginator) {
-        return ApplicationResource::collection($data->items())->additional([
-            'meta' => [
-                'current_page' => $data->currentPage(),
-                'per_page' => $data->perPage(),
-                'total' => $data->total(),
-                'last_page' => $data->lastPage(),
-            ],
-        ]);
-    }
-
-    return ApplicationResource::collection($data);
-}
 
     /**
      * @OA\Post(
@@ -81,6 +81,10 @@ class ApplicationController extends BasicCrudController
      */
     public function store(Request $request)
     {
+        $userId = $request->user()->id;
+
+        $request->merge(['user_id' => $userId]);
+
         return parent::store($request);
     }
 
