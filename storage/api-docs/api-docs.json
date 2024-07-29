@@ -105,7 +105,7 @@
                         }
                     },
                     "404": {
-                        "description": "Application not found"
+                        "description": "Application not found or not authorized"
                     }
                 },
                 "security": [
@@ -150,36 +150,6 @@
                                 }
                             }
                         }
-                    },
-                    "404": {
-                        "description": "Application not found"
-                    }
-                },
-                "security": [
-                    {
-                        "sanctum": []
-                    }
-                ]
-            },
-            "delete": {
-                "tags": [
-                    "Application"
-                ],
-                "summary": "Delete an application",
-                "operationId": "45bc43746912d036435136a505aa1ffc",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "Application deleted successfully"
                     },
                     "404": {
                         "description": "Application not found"
@@ -496,36 +466,6 @@
                                 }
                             }
                         }
-                    },
-                    "404": {
-                        "description": "User not found"
-                    }
-                },
-                "security": [
-                    {
-                        "sanctum": []
-                    }
-                ]
-            },
-            "delete": {
-                "tags": [
-                    "Users"
-                ],
-                "summary": "Delete a user",
-                "operationId": "0b4133ed462528a5e648b88ead11e929",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "User deleted successfully"
                     },
                     "404": {
                         "description": "User not found"

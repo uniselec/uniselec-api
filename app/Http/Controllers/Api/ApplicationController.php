@@ -34,6 +34,7 @@ class ApplicationController extends BasicCrudController
      */
     public function index(Request $request)
     {
+        $userId = $request->user()->id;
         $perPage = (int) $request->get('per_page', $this->defaultPerPage);
         $hasFilter = in_array(Filterable::class, class_uses($this->model()));
 
@@ -42,12 +43,9 @@ class ApplicationController extends BasicCrudController
         if ($hasFilter) {
             $query = $query->filter($request->all());
         }
-        $query->whereNotNull('created_at');
-        $data = $request->has('all') || !$this->defaultPerPage
-            ? $query->get()
-            : $query->paginate($perPage);
+        $query->where('user_id', $userId);
+        $data = $query->orderBy('id', 'desc')->paginate(1);
 
-        // Verifica se o retorno é um LengthAwarePaginator
         if ($data instanceof \Illuminate\Pagination\LengthAwarePaginator) {
             return ApplicationResource::collection($data->items())->additional([
                 'meta' => [
@@ -83,6 +81,15 @@ class ApplicationController extends BasicCrudController
     {
         $userId = $request->user()->id;
 
+        // Verifica se o usuário já tem uma inscrição
+        $existingApplication = Application::where('user_id', $userId)->exists();
+
+        if ($existingApplication) {
+            return response()->json([
+                'message' => 'Você já possui uma inscrição registrada.'
+            ], 400);
+        }
+
         $request->merge(['user_id' => $userId]);
 
         return parent::store($request);
@@ -107,13 +114,21 @@ class ApplicationController extends BasicCrudController
      *     ),
      *     @OA\Response(
      *         response=404,
-     *         description="Application not found"
+     *         description="Application not found or not authorized"
      *     )
      * )
      */
     public function show($id)
     {
-        return parent::show($id);
+
+        $userId = request()->user()->id;
+        $application = $this->model()::where('id', $id)
+            ->where('user_id', $userId)
+            ->first();
+        if (!$application) {
+            return response()->json(['message' => 'Application not found or not authorized'], 404);
+        }
+        return new ApplicationResource($application);
     }
 
     /**
@@ -149,30 +164,11 @@ class ApplicationController extends BasicCrudController
     }
 
     /**
-     * @OA\Delete(
-     *     path="/api/applications/{id}",
-     *     summary="Delete an application",
-     *     tags={"Application"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=204,
-     *         description="Application deleted successfully"
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Application not found"
-     *     )
-     * )
+     * Método `destroy` removido conforme solicitado
      */
     public function destroy($id)
     {
-        return parent::destroy($id);
+        return response()->json(['error' => 'Method not allowed.'], 405);
     }
 
     protected function model()
