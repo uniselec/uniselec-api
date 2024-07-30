@@ -59,10 +59,10 @@ class RegisterController extends Controller
             abort(500, 'Error on create a new user');
         } else {
             $token = $user->createToken('api-web')->plainTextToken;
-            $user['token'] = $token;
             return response()->json([
                 'data' => [
-                    'user' => $user
+                    'user' => $user,
+                    'token' => $token
                 ]
             ], 201);
         }
