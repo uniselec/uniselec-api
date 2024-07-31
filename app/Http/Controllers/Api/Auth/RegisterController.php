@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Auth;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\Controller;
+use App\Models\Admin;
 use App\Models\User;
 use Illuminate\Http\Request;
 use OpenApi\Annotations as OA;
@@ -19,8 +20,9 @@ class RegisterController extends Controller
      *         required=true,
      *         @OA\JsonContent(
      *             @OA\Property(property="name", type="string", example="John Doe"),
-     *             @OA\Property(property="email", type="string", format="email", example="john.doe@example.com"),
-     *             @OA\Property(property="password", type="string", format="password", example="password123")
+     *             @OA\Property(property="email", type="string", format="email", example="root4@dsgoextractor.com"),
+     *             @OA\Property(property="cpf", type="string", format="cpf", example="25787968409"),
+     *             @OA\Property(property="password", type="string", format="password", example="root")
      *         )
      *     ),
      *     @OA\Response(
@@ -41,9 +43,11 @@ class RegisterController extends Controller
     public function register(Request $request, User $user)
     {
         $input = $request->all();
-        $validation = Validator::make($input, [
-            'email' => 'required|email',
-            'password' => 'required',
+        $validation = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'cpf' => 'required|string|unique:users,cpf',
+            'password' => 'required|string|min:6',
         ]);
 
         if ($validation->fails()) {
@@ -51,8 +55,26 @@ class RegisterController extends Controller
         }
 
 
+        $userData = $request->only('name', 'cpf', 'email', 'password');
+        $userData['password'] = bcrypt($userData['password']);
+        if (!$user = $user->create($userData)) {
+            abort(500, 'Error on create a new user');
+        } else {
+            $token = $user->createToken('api-web')->plainTextToken;
+            return response()->json([
+                'data' => [
+                    'user' => $user,
+                    'token' => $token
+                ]
+            ], 201);
+        }
+    }
+    public function registerAdmin(Request $request, Admin $user)
+    {
+
         $userData = $request->only('name', 'email', 'password');
         $userData['password'] = bcrypt($userData['password']);
+
         if (!$user = $user->create($userData)) {
             abort(500, 'Error on create a new user');
         } else {
@@ -62,7 +84,7 @@ class RegisterController extends Controller
                 'data' => [
                     'user' => $user
                 ]
-            ], 201);
+            ]);
         }
     }
 }

@@ -17,15 +17,18 @@ class DatabaseSeeder extends Seeder
         DB::table('users')->insert([
             'name' => 'Francisca Usuario Teste',
             'email' => 'root@dsgoextractor.com',
+            'cpf' => '25982023680',
             'password' => Hash::make('root'),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
         ]);
-        // \App\Models\User::factory(10)->create();
+        DB::table('admins')->insert([
+            'name' => 'Francisco Admin User Root',
+            'email' => 'jefponte@gmail.com',
+            'password' => Hash::make('root'),
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now(),
+        ]);
 
-        // \App\Models\User::factory()->create([
-        //     'name' => 'Test User',
-        //     'email' => 'test@example.com',
-        // ]);
     }
 }
