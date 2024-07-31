@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use OpenApi\Annotations as OA;
+use EloquentFilter\Filterable;
 
 /**
  * @OA\Schema(
@@ -19,7 +20,8 @@ use OpenApi\Annotations as OA;
  */
 class Application extends Model
 {
-    use HasFactory;
+
+    use HasFactory, Filterable;
 
     protected $fillable = [
         'user_id',
