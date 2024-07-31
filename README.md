@@ -120,3 +120,8 @@ Iniciar Ambiente de desenvolvimento:
         docker exec -it uniselec-api bash -c "php artisan route:clear"
 
 
+        docker exec -it uniselec-api bash -c "php artisan storage:link"
+
+
+
+
