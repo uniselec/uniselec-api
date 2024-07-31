@@ -7,8 +7,9 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libjpeg-dev \
     libfreetype6-dev \
+    libpq-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_mysql mbstring zip exif pcntl gd
+    && docker-php-ext-install pdo pdo_pgsql mbstring zip exif pcntl gd
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 RUN a2enmod rewrite
 COPY . /var/www/html
@@ -16,6 +17,7 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache /var/www/html/public
 WORKDIR /var/www/html
 RUN composer install --optimize-autoloader --no-dev
+RUN php artisan storage:link
 RUN echo "<VirtualHost *:80>\n\
     DocumentRoot /var/www/html/public\n\
     <Directory /var/www/html/public>\n\
