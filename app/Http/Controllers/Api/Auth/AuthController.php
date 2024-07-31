@@ -10,6 +10,9 @@ use OpenApi\Annotations as OA;
 
 class AuthController extends Controller
 {
+
+
+
     /**
      * @OA\Post(
      *     path="/api/login",
@@ -66,6 +69,26 @@ class AuthController extends Controller
             'token' => $token,
             'user' => $user,
         ]);
+    }
+    public function authAdmin(Request $request)
+    {
+        $input = $request->all();
+        $validation = Validator::make($input, [
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+        if ($validation->fails()) {
+            return response()->json(['error' => $validation->errors()], 422);
+        }
+        $credentials = $request->only('email', 'password');
+        if (!Auth::guard('admin')->attempt($credentials)) {
+            abort(401, 'Invalid Credentials');
+        }
+        $user = $request->user('admin');
+        $token = $user->createToken('api-web', ['admin'])->plainTextToken;
+        return response()->json(
+            ['token' => $token, 'user' => $user]
+        );
     }
 
     /**
