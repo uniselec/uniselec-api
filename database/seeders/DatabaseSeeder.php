@@ -22,31 +22,13 @@ class DatabaseSeeder extends Seeder
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
         ]);
-
-        DB::table('users')->insert([
-            'name' => 'Francisco4 Usuario Teste',
-            'email' => 'root4@dsgoextractor.com',
-            'cpf' => '25787968409',
+        DB::table('admins')->insert([
+            'name' => 'Francisco Admin User Root',
+            'email' => 'jefponte@gmail.com',
             'password' => Hash::make('root'),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
         ]);
 
-        DB::table('users')->insert([
-            'name' => 'Francisco4 Usuario Teste',
-            'email' => 'root6@dsgoextractor.com',
-            'cpf' => '03519017369',
-            'password' => Hash::make('root'),
-            'created_at' => Carbon::now(),
-            'updated_at' => Carbon::now(),
-        ]);
-
-
-        // \App\Models\User::factory(10)->create();
-
-        // \App\Models\User::factory()->create([
-        //     'name' => 'Test User',
-        //     'email' => 'test@example.com',
-        // ]);
     }
 }
