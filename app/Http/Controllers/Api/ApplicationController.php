@@ -10,7 +10,7 @@ use OpenApi\Annotations as OA;
 use EloquentFilter\Filterable;
 use ReflectionClass;
 use Illuminate\Http\Resources\Json\ResourceCollection;
-
+use Carbon\Carbon;
 
 class ApplicationController extends BasicCrudController
 {
@@ -91,6 +91,17 @@ class ApplicationController extends BasicCrudController
      */
     public function store(Request $request)
     {
+
+        $start = Carbon::create(2024, 8, 2, 8, 0, 0);
+        $end = Carbon::create(2024, 8, 3, 23, 59, 0);
+        $now = now();
+
+        if ($now->lt($start) || $now->gt($end)) {
+            return response()->json([
+                'message' => 'Inscrições estão fechadas. O período de inscrição é de 02/08/2024 a 03/08/2024.',
+            ], 403);
+        }
+
         $userId = $request->user()->id;
 
         $existingApplication = Application::where('user_id', $userId)->first();
@@ -125,6 +136,7 @@ class ApplicationController extends BasicCrudController
             'application' => $application
         ], 201);
     }
+
 
 
     /**
