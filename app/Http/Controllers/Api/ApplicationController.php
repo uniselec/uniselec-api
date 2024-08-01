@@ -92,7 +92,7 @@ class ApplicationController extends BasicCrudController
     public function store(Request $request)
     {
 
-        $start = Carbon::create(2024, 8, 2, 8, 0, 0);
+        $start = Carbon::create(2024, 7, 2, 8, 0, 0);
         $end = Carbon::create(2024, 8, 3, 23, 59, 0);
         $now = now();
 
