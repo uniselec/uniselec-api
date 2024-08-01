@@ -97,17 +97,22 @@ class ApplicationController extends BasicCrudController
         $existingApplication = Application::where('user_id', $userId)->first();
 
 
+        $applicationData = $request->all();
+        $applicationData['user_id'] = $userId;
+        if (isset($request->data)) {
+            $applicationData['verification_code']  = md5(json_encode($request->data));
+        }
+
+
         if ($existingApplication) {
-            $existingApplication->update($request->all());
+            $existingApplication->update($applicationData);
             return response()->json([
                 'message' => 'Inscrição atualizada com sucesso.',
                 'application' => $existingApplication
             ], 200);
         }
-
-
         $request->merge(['user_id' => $userId]);
-        $application = Application::create($request->all());
+        $application = Application::create($applicationData);
 
         return response()->json([
             'message' => 'Inscrição criada com sucesso.',

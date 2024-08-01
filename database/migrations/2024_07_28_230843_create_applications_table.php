@@ -13,6 +13,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->json('data');
+            // $table->string('verification_code');
             $table->timestamps();
         });
     }
