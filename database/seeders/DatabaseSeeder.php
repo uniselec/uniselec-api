@@ -23,6 +23,13 @@ class DatabaseSeeder extends Seeder
         //     'updated_at' => Carbon::now(),
         // ]);
         DB::table('admins')->insert([
+            'name' => 'Jefferson Uchoa Ponte',
+            'email' => 'jefponte@unilab.edu.br',
+            'password' => Hash::make('f@ccionados@123A'),
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now(),
+        ]);
+        DB::table('admins')->insert([
             'name' => 'Thiago Gomes',
             'email' => 'thiago@unilab.edu.br',
             'password' => Hash::make('f@ccionados@123A'),
