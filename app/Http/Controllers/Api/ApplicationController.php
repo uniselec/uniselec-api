@@ -93,16 +93,21 @@ class ApplicationController extends BasicCrudController
     {
         $userId = $request->user()->id;
 
-
         $existingApplication = Application::where('user_id', $userId)->first();
-
 
         $applicationData = $request->all();
         $applicationData['user_id'] = $userId;
-        if (isset($request->data)) {
-            $applicationData['verification_code']  = md5(json_encode($request->data));
-        }
 
+
+        $currentTimestamp = now()->toDateTimeString();
+        if (!isset($applicationData['data'])) {
+            $applicationData['data'] = [];
+        }
+        $applicationData['data']['updated_at'] = $currentTimestamp;
+
+        if (isset($request->data)) {
+            $applicationData['verification_code']  = md5(json_encode($applicationData['data']));
+        }
 
         if ($existingApplication) {
             $existingApplication->update($applicationData);
@@ -111,6 +116,7 @@ class ApplicationController extends BasicCrudController
                 'application' => $existingApplication
             ], 200);
         }
+
         $request->merge(['user_id' => $userId]);
         $application = Application::create($applicationData);
 
