@@ -15,17 +15,17 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         DB::table('users')->insert([
-            'name' => 'Francisca Usuario Teste',
-            'email' => 'root@dsgoextractor.com',
-            'cpf' => '25982023680',
-            'password' => Hash::make('root'),
+            'name' => 'Jefferson Uchoa Ponte',
+            'email' => 'jefponte@gmail.com',
+            'cpf' => '03519017369',
+            'password' => Hash::make('cafe@123A'),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
         ]);
         DB::table('admins')->insert([
-            'name' => 'Francisco Admin User Root',
+            'name' => 'Jefferson Uchoa Ponte',
             'email' => 'jefponte@gmail.com',
-            'password' => Hash::make('root'),
+            'password' => Hash::make('cafe@123A'),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
         ]);

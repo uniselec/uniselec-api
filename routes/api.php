@@ -18,15 +18,18 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::prefix('backoffice')->group(function() {
+Route::prefix('backoffice')->group(function () {
     Route::post('/login', [AuthController::class, 'authAdmin'])->name('backoffice.login');
 });
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/me', [AuthController::class, 'me'])->name('user.profile');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-    // Route::apiResource('users', UserController::class)->names('users');
-    Route::apiResource('applications', ApplicationController::class)->names('applications');
+
+    Route::get('applications', [ApplicationController::class, 'index'])->name('applications.index');
+    Route::get('applications/{application}', [ApplicationController::class, 'show'])->name('applications.show');
+    Route::post('applications', [ApplicationController::class, 'store'])->name('applications.store');
+    Route::put('applications/{application}', [ApplicationController::class, 'update'])->name('applications.update');
 
 });
 
@@ -35,15 +38,13 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->gr
     Route::post('/logout', [AuthController::class, 'logout'])->name('backoffice.logout');
     Route::get('/me', [AuthController::class, 'me'])->name('user.profile');
     Route::post('/register', [RegisterController::class, 'registerAdmin'])->name('backoffice.register');
-    // Route::apiResource('documents', DocumentController::class)->names('documents.organizations');
 
     Route::post('documents', [DocumentController::class, 'store'])->name('documents.store');
     Route::put('documents/{id}', [DocumentController::class, 'update'])->name('documents.update');
     Route::delete('documents/{id}', [DocumentController::class, 'destroy'])->name('documents.destroy');
 
-    Route::get('/sou-admin', function () {
-        echo "sou sim";
-    });
+    Route::apiResource('admins', UserController::class)->names('backoffice.users');
+    Route::apiResource('users', UserController::class)->names('backoffice.users');
 });
 Route::get('documents/{id}', [DocumentController::class, 'show'])->name('documents.show');
 Route::get('documents', [DocumentController::class, 'index'])->name('documents.index');
