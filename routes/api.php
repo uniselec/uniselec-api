@@ -35,6 +35,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->group(function () {
 
+
+    Route::get('applications', [ApplicationController::class, 'index'])->name('applications.index');
+    Route::get('applications/{application}', [ApplicationController::class, 'show'])->name('applications.show');
+
     Route::post('/logout', [AuthController::class, 'logout'])->name('backoffice.logout');
     Route::get('/me', [AuthController::class, 'me'])->name('user.profile');
     Route::post('/register', [RegisterController::class, 'registerAdmin'])->name('backoffice.register');

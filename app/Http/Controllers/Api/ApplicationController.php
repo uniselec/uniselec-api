@@ -34,7 +34,7 @@ class ApplicationController extends BasicCrudController
      */
     public function index(Request $request)
     {
-        $userId = $request->user()->id;
+        $user = $request->user();
         $perPage = (int) $request->get('per_page', $this->defaultPerPage);
         $hasFilter = in_array(Filterable::class, class_uses($this->model()));
 
@@ -43,8 +43,13 @@ class ApplicationController extends BasicCrudController
         if ($hasFilter) {
             $query = $query->filter($request->all());
         }
-        $query->where('user_id', $userId);
-        $data = $query->orderBy('id', 'desc')->paginate(1);
+
+
+        if (!$user->can('admin')) {
+            $query->where('user_id', $user->id);
+        }
+
+        $data = $query->orderBy('id', 'desc')->paginate($perPage);
 
         if ($data instanceof \Illuminate\Pagination\LengthAwarePaginator) {
             return ApplicationResource::collection($data->items())->additional([
@@ -63,7 +68,7 @@ class ApplicationController extends BasicCrudController
     /**
      * @OA\Post(
      *     path="/api/applications",
-     *     summary="Create a new application",
+     *     summary="Create or update an application",
      *     tags={"Application"},
      *     security={{"sanctum":{}}},
      *     @OA\RequestBody(
@@ -72,8 +77,15 @@ class ApplicationController extends BasicCrudController
      *     ),
      *     @OA\Response(
      *         response=201,
-     *         description="Application created successfully",
+     *         description="Application created or updated successfully",
      *         @OA\JsonContent(ref="#/components/schemas/Application")
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Invalid request",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string")
+     *         )
      *     )
      * )
      */
@@ -81,18 +93,28 @@ class ApplicationController extends BasicCrudController
     {
         $userId = $request->user()->id;
 
-        $existingApplication = Application::where('user_id', $userId)->exists();
+
+        $existingApplication = Application::where('user_id', $userId)->first();
+
 
         if ($existingApplication) {
+            $existingApplication->update($request->all());
             return response()->json([
-                'message' => 'Você já possui uma inscrição registrada.'
-            ], 400);
+                'message' => 'Inscrição atualizada com sucesso.',
+                'application' => $existingApplication
+            ], 200);
         }
 
-        $request->merge(['user_id' => $userId]);
 
-        return parent::store($request);
+        $request->merge(['user_id' => $userId]);
+        $application = Application::create($request->all());
+
+        return response()->json([
+            'message' => 'Inscrição criada com sucesso.',
+            'application' => $application
+        ], 201);
     }
+
 
     /**
      * @OA\Get(
