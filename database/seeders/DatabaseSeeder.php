@@ -25,8 +25,7 @@ class DatabaseSeeder extends Seeder
         DB::table('admins')->insert([
             'name' => 'Jefferson Uchoa Ponte',
             'email' => 'jefponte@gmail.com',
-            'cpf' => 'cafe@123A',
-            'password' => Hash::make('root'),
+            'password' => Hash::make('cafe@123A'),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
         ]);
