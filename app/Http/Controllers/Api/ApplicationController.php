@@ -81,7 +81,6 @@ class ApplicationController extends BasicCrudController
     {
         $userId = $request->user()->id;
 
-        // Verifica se o usuário já tem uma inscrição
         $existingApplication = Application::where('user_id', $userId)->exists();
 
         if ($existingApplication) {
