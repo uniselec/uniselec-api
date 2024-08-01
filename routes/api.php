@@ -6,7 +6,7 @@ use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
-
+use Carbon\Carbon;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -32,7 +32,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::put('applications/{application}', [ApplicationController::class, 'update'])->name('applications.update');
 
 });
+Route::get('/inscription-period', function () {
+    $start = Carbon::create(2024, 8, 2, 8, 0, 0);
+    $end = Carbon::create(2024, 8, 3, 23, 59, 0);
 
+    return response()->json([
+        'start' => $start->toDateTimeString(),
+        'end' => $end->toDateTimeString(),
+    ]);
+});
 Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->group(function () {
 
 
