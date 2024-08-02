@@ -6,7 +6,7 @@ use App\Http\Controllers\Api\Auth\RegisterController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
-
+use Illuminate\Support\Carbon;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -40,6 +40,16 @@ Route::get('/inscription-period', function () {
         'end' => env('REGISTRATION_END', '2024-08-03 23:59:00'),
     ]);
 });
+Route::get('/is-inscription-period', function () {
+    $start = Carbon::parse(env('REGISTRATION_START', '2024-08-02 08:00:00'));
+    $end = Carbon::parse(env('REGISTRATION_END', '2024-08-03 23:59:00'));
+    $now = Carbon::now();
+
+    $isInPeriod = $now->between($start, $end);
+
+    return response()->json(['is-in-period' => $isInPeriod]);
+});
+
 Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->group(function () {
 
 
