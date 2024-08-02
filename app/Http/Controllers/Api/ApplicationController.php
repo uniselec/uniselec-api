@@ -91,14 +91,13 @@ class ApplicationController extends BasicCrudController
      */
     public function store(Request $request)
     {
-
-        $start = Carbon::create(2024, 7, 2, 8, 0, 0);
-        $end = Carbon::create(2024, 8, 3, 23, 59, 0);
+        $start = Carbon::parse(env('REGISTRATION_START'));
+        $end = Carbon::parse(env('REGISTRATION_END'));
         $now = now();
 
         if ($now->lt($start) || $now->gt($end)) {
             return response()->json([
-                'message' => 'Inscrições estão fechadas. O período de inscrição é de 02/08/2024 a 03/08/2024.',
+                'message' => 'Inscrições estão fechadas. O período de inscrição é de ' . $start->format('d/m/Y H:i') . ' até ' . $end->format('d/m/Y H:i') . '.',
             ], 403);
         }
 
@@ -109,7 +108,6 @@ class ApplicationController extends BasicCrudController
         $applicationData = $request->all();
         $applicationData['user_id'] = $userId;
 
-
         $currentTimestamp = now()->toDateTimeString();
         if (!isset($applicationData['data'])) {
             $applicationData['data'] = [];
@@ -117,7 +115,7 @@ class ApplicationController extends BasicCrudController
         $applicationData['data']['updated_at'] = $currentTimestamp;
 
         if (isset($request->data)) {
-            $applicationData['verification_code']  = md5(json_encode($applicationData['data']));
+            $applicationData['verification_code'] = md5(json_encode($applicationData['data']));
         }
 
         if ($existingApplication) {
@@ -136,6 +134,7 @@ class ApplicationController extends BasicCrudController
             'application' => $application
         ], 201);
     }
+
 
 
 
