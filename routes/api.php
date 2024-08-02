@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\ApplicationController;
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\RegisterController;
@@ -62,8 +63,8 @@ Route::get('/is-inscription-period', function () {
 
 Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->group(function () {
 
-
-    Route::get('applications', [ApplicationController::class, 'index'])->name('applications.index');
+    Route::put('change-password', [AuthController::class, 'changeAdminPassword'])->name('admin.changePassword');
+    Route::get('applications', [ApplicationController::class, 'indexAll'])->name('applications.index');
     Route::get('applications/{application}', [ApplicationController::class, 'show'])->name('applications.show');
 
     Route::post('/logout', [AuthController::class, 'logout'])->name('backoffice.logout');
@@ -74,8 +75,8 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->gr
     Route::put('documents/{id}', [DocumentController::class, 'update'])->name('documents.update');
     Route::delete('documents/{id}', [DocumentController::class, 'destroy'])->name('documents.destroy');
 
-    Route::apiResource('admins', UserController::class)->names('backoffice.users');
-    Route::apiResource('users', UserController::class)->names('backoffice.users');
+    Route::get('admins', [AdminController::class, 'index'])->name('backoffice.admins.index');
+    Route::get('users', [UserController::class, 'index'])->name('backoffice.users.index');
 });
 Route::get('documents/{id}', [DocumentController::class, 'show'])->name('documents.show');
 Route::get('documents', [DocumentController::class, 'index'])->name('documents.index');

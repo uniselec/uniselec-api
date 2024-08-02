@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\Api;
-
+use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ApplicationResource;
 use App\Models\Application;
@@ -11,6 +11,7 @@ use EloquentFilter\Filterable;
 use ReflectionClass;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Hash;
 
 class ApplicationController extends BasicCrudController
 {
@@ -18,7 +19,70 @@ class ApplicationController extends BasicCrudController
         'user_id' => 'required|integer',
         'data' => 'required|array',
     ];
+    /**
+     * @OA\Get(
+     *     path="/api/all-applications",
+     *     summary="Get list of all applications",
+     *     tags={"Application"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Successful operation",
+     *         @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/Application"))
+     *     )
+     * )
+     */
+    public function allApplications(Request $request)
+    {
+        $perPage = (int) $request->get('per_page', $this->defaultPerPage);
+        $hasFilter = in_array(Filterable::class, class_uses($this->model()));
 
+        $query = $this->queryBuilder();
+
+        if ($hasFilter) {
+            $query = $query->filter($request->all());
+        }
+
+        $data = $query->orderBy('id', 'desc')->paginate($perPage);
+
+        if ($data instanceof \Illuminate\Pagination\LengthAwarePaginator) {
+            return ApplicationResource::collection($data->items())->additional([
+                'meta' => [
+                    'current_page' => $data->currentPage(),
+                    'per_page' => $data->perPage(),
+                    'total' => $data->total(),
+                    'last_page' => $data->lastPage(),
+                ],
+            ]);
+        }
+
+        return ApplicationResource::collection($data);
+    }
+    public function changeAdminPassword(Request $request)
+    {
+        // Validação da senha atual e nova senha
+        $validator = Validator::make($request->all(), [
+            'current_password' => 'required',
+            'new_password' => 'required|string|min:8|confirmed', // O campo new_password_confirmation é esperado
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
+        }
+
+        $admin = $request->user(); // Autenticado como admin
+
+        // Verificação da senha atual
+        if (!Hash::check($request->current_password, $admin->password)) {
+            return response()->json(['error' => 'Senha atual incorreta.'], 403);
+        }
+
+        // Atualização da senha
+        $admin->password = Hash::make($request->new_password);
+        $admin->save();
+
+        return response()->json(['message' => 'Senha alterada com sucesso.'], 200);
+    }
     /**
      * @OA\Get(
      *     path="/api/applications",
