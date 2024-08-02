@@ -40,6 +40,16 @@ Route::get('/inscription-period', function () {
         'end' => env('REGISTRATION_END', '2024-08-03 23:59:00'),
     ]);
 });
+
+Route::get('/is-after-start-period', function () {
+    $start = Carbon::parse(env('REGISTRATION_START', '2024-08-02 08:00:00'));
+    $now = Carbon::now();
+
+    $isAfterStart = $now->greaterThanOrEqualTo($start);
+
+    return response()->json(['is-after-start' => $isAfterStart]);
+});
+
 Route::get('/is-inscription-period', function () {
     $start = Carbon::parse(env('REGISTRATION_START', '2024-08-02 08:00:00'));
     $end = Carbon::parse(env('REGISTRATION_END', '2024-08-03 23:59:00'));
