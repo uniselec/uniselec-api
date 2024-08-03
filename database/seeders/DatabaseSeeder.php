@@ -23,6 +23,5 @@ class DatabaseSeeder extends Seeder
         //     'updated_at' => Carbon::now(),
         // ]);
 
-
     }
 }

@@ -35,30 +35,22 @@ Route::middleware(['auth:sanctum'])->group(function () {
 });
 
 
-Route::get('/inscription-period', function () {
-    return response()->json([
-        'start' => env('REGISTRATION_START', '2024-08-01 20:50:00'),
-        'end' => env('REGISTRATION_END', '2024-08-03 23:59:00'),
-    ]);
-});
-
-Route::get('/is-after-start-period', function () {
-    $start = Carbon::parse(env('REGISTRATION_START', '2024-08-02 08:00:00'));
-    $now = Carbon::now();
-
-    $isAfterStart = $now->greaterThanOrEqualTo($start);
-
-    return response()->json(['is-after-start' => $isAfterStart]);
-});
-
-Route::get('/is-inscription-period', function () {
+Route::get('/student-selection', function () {
     $start = Carbon::parse(env('REGISTRATION_START', '2024-08-02 08:00:00'));
     $end = Carbon::parse(env('REGISTRATION_END', '2024-08-03 23:59:00'));
     $now = Carbon::now();
 
+    $isAfterStart = $now->greaterThanOrEqualTo($start);
     $isInPeriod = $now->between($start, $end);
 
-    return response()->json(['is-in-period' => $isInPeriod]);
+    return response()->json([
+        'studentSelection' => [
+            'start' => $start->toDateTimeString(),
+            'end' => $end->toDateTimeString(),
+            'isAfterStart' => $isAfterStart,
+            'isInPeriod' => $isInPeriod,
+        ]
+    ]);
 });
 
 Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->group(function () {
@@ -75,7 +67,6 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->gr
     Route::put('documents/{id}', [DocumentController::class, 'update'])->name('documents.update');
     Route::delete('documents/{id}', [DocumentController::class, 'destroy'])->name('documents.destroy');
 
-    Route::get('admins', [AdminController::class, 'index'])->name('backoffice.admins.index');
     Route::get('users', [UserController::class, 'index'])->name('backoffice.users.index');
 });
 Route::get('documents/{id}', [DocumentController::class, 'show'])->name('documents.show');
