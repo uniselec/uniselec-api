@@ -26,11 +26,9 @@ Route::prefix('backoffice')->group(function () {
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/me', [AuthController::class, 'me'])->name('user.profile');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-
     Route::get('applications', [ApplicationController::class, 'index'])->name('applications.index');
     Route::get('applications/{application}', [ApplicationController::class, 'show'])->name('applications.show');
     Route::post('applications', [ApplicationController::class, 'store'])->name('applications.store');
-    Route::put('applications/{application}', [ApplicationController::class, 'update'])->name('applications.update');
 
 });
 
