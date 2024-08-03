@@ -60,19 +60,18 @@ class ApplicationController extends BasicCrudController
     }
     public function changeAdminPassword(Request $request)
     {
-        // Validação da senha atual e nova senha
         $validator = Validator::make($request->all(), [
             'current_password' => 'required',
-            'new_password' => 'required|string|min:8|confirmed', // O campo new_password_confirmation é esperado
+            'new_password' => 'required|string|min:8|confirmed',
         ]);
 
         if ($validator->fails()) {
             return response()->json($validator->errors(), 422);
         }
 
-        $admin = $request->user(); // Autenticado como admin
+        $admin = $request->user();
 
-        // Verificação da senha atual
+
         if (!Hash::check($request->current_password, $admin->password)) {
             return response()->json(['error' => 'Senha atual incorreta.'], 403);
         }
@@ -267,6 +266,15 @@ class ApplicationController extends BasicCrudController
      */
     public function update(Request $request, $id)
     {
+        $start = Carbon::parse(env('REGISTRATION_START', '2024-08-02 08:00:00'));
+        $end = Carbon::parse(env('REGISTRATION_END', '2024-08-03 23:59:00'));
+        $now = now();
+
+        if ($now->lt($start) || $now->gt($end)) {
+            return response()->json([
+                'message' => 'Inscrições estão fechadas. O período de inscrição é de ' . $start->format('d/m/Y H:i') . ' até ' . $end->format('d/m/Y H:i') . '.',
+            ], 403);
+        }
         return parent::update($request, $id);
     }
 
