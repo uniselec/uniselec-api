@@ -63,3 +63,6 @@ Route::get('documents/{id}', [DocumentController::class, 'show'])->name('documen
 Route::get('documents', [DocumentController::class, 'index'])->name('documents.index');
 Route::post('/login', [AuthController::class, 'auth'])->name('user.login');
 Route::post('/register', [RegisterController::class, 'register'])->name('register');
+
+Route::post('/password/forgot', [PasswordResetController::class, 'forgot'])->name('password.forgot');
+Route::post('/reset-password', [PasswordResetController::class, 'reset'])->name('password.reset');
