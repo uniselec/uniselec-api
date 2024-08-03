@@ -155,8 +155,8 @@ class ApplicationController extends BasicCrudController
      */
     public function store(Request $request)
     {
-        $start = Carbon::parse(env('REGISTRATION_START'));
-        $end = Carbon::parse(env('REGISTRATION_END'));
+        $start = Carbon::parse(env('REGISTRATION_START', '2024-08-02 08:00:00'));
+        $end = Carbon::parse(env('REGISTRATION_END', '2024-08-03 23:59:00'));
         $now = now();
 
         if ($now->lt($start) || $now->gt($end)) {
