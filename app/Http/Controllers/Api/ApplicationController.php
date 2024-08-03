@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\Api;
+
 use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ApplicationResource;
@@ -81,6 +82,32 @@ class ApplicationController extends BasicCrudController
         $admin->save();
 
         return response()->json(['message' => 'Senha alterada com sucesso.'], 200);
+    }
+    public function indexAll(Request $request)
+    {
+        $perPage = (int) $request->get('per_page', $this->defaultPerPage);
+        $hasFilter = in_array(Filterable::class, class_uses($this->model()));
+
+        $query = $this->queryBuilder();
+
+        if ($hasFilter) {
+            $query = $query->filter($request->all());
+        }
+
+        $data = $query->orderBy('id', 'desc')->paginate($perPage);
+
+        if ($data instanceof \Illuminate\Pagination\LengthAwarePaginator) {
+            return ApplicationResource::collection($data->items())->additional([
+                'meta' => [
+                    'current_page' => $data->currentPage(),
+                    'per_page' => $data->perPage(),
+                    'total' => $data->total(),
+                    'last_page' => $data->lastPage(),
+                ],
+            ]);
+        }
+
+        return ApplicationResource::collection($data);
     }
     /**
      * @OA\Get(
