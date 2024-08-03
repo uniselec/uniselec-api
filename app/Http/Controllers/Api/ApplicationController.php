@@ -275,6 +275,14 @@ class ApplicationController extends BasicCrudController
                 'message' => 'Inscrições estão fechadas. O período de inscrição é de ' . $start->format('d/m/Y H:i') . ' até ' . $end->format('d/m/Y H:i') . '.',
             ], 403);
         }
+
+        $user = $request->user();
+        $application = Application::find($id);
+
+        if (!$application || $application->user_id !== $user->id) {
+            return response()->json(['error' => 'Você não tem permissão para atualizar esta inscrição.'], 403);
+        }
+
         return parent::update($request, $id);
     }
 
