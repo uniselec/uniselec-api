@@ -23,11 +23,11 @@ class AppServiceProvider extends ServiceProvider
     {
         ResetPassword::toMailUsing(function ($notifiable, $token) {
 
-            $url = env('WEB_APPLICATION_LINK','https://selecoes.unilab.edu.br'). '/reset-password?token=' . $token . '&email=' . urlencode($notifiable->getEmailForPasswordReset());
+            $url = env('WEB_APPLICATION_LINK','https://selecoes.unilab.edu.br'). '/reset-password/' . $token . '/' . urlencode($notifiable->getEmailForPasswordReset());
 
             return (new MailMessage)
                 ->greeting('Olá!')
-                ->subject('Notificação de Recuperação de Password')
+                ->subject('UNILAB: Notificação de Recuperação de Senha')
                 ->line('Você recebeu este e-mail porque nós recebemos uma requisição de redefinição da sua senha.')
                 ->action('Recuperar Senha', $url)
                 ->line('Esse link de recuperação expira em 60 minutos.')
