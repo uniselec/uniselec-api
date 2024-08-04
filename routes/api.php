@@ -66,3 +66,9 @@ Route::post('/register', [RegisterController::class, 'register'])->name('registe
 
 Route::post('/password/forgot', [PasswordResetController::class, 'forgot'])->name('password.forgot');
 Route::post('/reset-password', [PasswordResetController::class, 'reset'])->name('password.reset');
+
+Route::get('/server-time', function () {
+    return response()->json([
+        'serverTime' => now()->toDateTimeString(),
+    ]);
+})->name('server.time');
