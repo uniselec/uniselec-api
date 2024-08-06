@@ -114,6 +114,8 @@ Iniciar Ambiente de desenvolvimento:
         docker exec -it uniselec-api bash -c "php artisan migrate"
         docker exec -it uniselec-api bash -c "php artisan db:seed"
 
+        docker exec -it uniselec-api bash -c "php artisan db:seed --class=UserSeeder"
+
 
         docker exec -it uniselec-api bash -c "php artisan route:cache"
 
