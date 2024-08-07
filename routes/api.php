@@ -58,7 +58,7 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->gr
     Route::put('change-password', [AuthController::class, 'changeAdminPassword'])->name('admin.changePassword');
     Route::get('applications', [AdminApplicationController::class, 'index'])->name('applications.index');
 
-    Route::get('results', [AdminApplicationController::class, 'preliminaryResults'])->name('applications.preliminaryResults');
+    Route::get('application-results', [AdminApplicationController::class, 'preliminaryResults'])->name('applications.preliminaryResults');
 
 
     Route::get('applications/{application}', [AdminApplicationController::class, 'show'])->name('applications.api.show');

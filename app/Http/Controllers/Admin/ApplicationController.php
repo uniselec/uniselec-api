@@ -24,20 +24,24 @@ class ApplicationController extends BasicCrudController
 
     public function preliminaryResults(Request $request)
     {
-        $modalidadeParam = $request->input('modalidade');
-        $applications = Application::orderBy('id', 'desc')->get();
-        if ($modalidadeParam === 'AC') {
+        $positionTypeParam = $request->input('position-type');
+        $perPage = $request->input('per_page', 1000); // Número de resultados por página, padrão é 15
+        $page = $request->input('page', 1); // Página atual, padrão é 1
+
+        // Obter as inscrições com paginação
+        $applications = Application::orderBy('id', 'desc')->paginate($perPage, ['*'], 'page', $page);
+
+        if ($positionTypeParam === 'AC') {
             $enemNumbers = $applications->map(function ($application) {
                 return $application->data['enem'] ?? null;
             })->filter()->values();
         } else {
-            $enemNumbers = $applications->map(function ($application) use ($modalidadeParam) {
+            $enemNumbers = $applications->map(function ($application) use ($positionTypeParam) {
                 $data = $application->data;
                 $vagas = $data['vaga'] ?? [];
                 foreach ($vagas as $vaga) {
-
                     $modalidade = explode(':', $vaga, 2)[0] . ':';
-                    if ($modalidade === $modalidadeParam) {
+                    if ($modalidade === $positionTypeParam) {
                         return $data['enem'] ?? null;
                     }
                 }
@@ -49,10 +53,12 @@ class ApplicationController extends BasicCrudController
         foreach ($enemNumbers as $enemNumber) {
             $csvContent .= "$enemNumber\n";
         }
+
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="enem_numbers.csv"',
         ];
+
         return response($csvContent, 200, $headers);
     }
 
@@ -74,20 +80,17 @@ class ApplicationController extends BasicCrudController
         if (!Hash::check($request->current_password, $admin->password)) {
             return response()->json(['error' => 'Senha atual incorreta.'], 403);
         }
-
-        // Atualização da senha
         $admin->password = Hash::make($request->new_password);
         $admin->save();
 
         return response()->json(['message' => 'Senha alterada com sucesso.'], 200);
     }
-
     public function index(Request $request)
     {
         $perPage = (int) $request->get('per_page', $this->defaultPerPage);
         $hasFilter = in_array(Filterable::class, class_uses($this->model()));
 
-        $query = $this->queryBuilder()->with('user'); // Carregar a relação 'user'
+        $query = $this->queryBuilder()->with('user');
 
         if ($hasFilter) {
             $query = $query->filter($request->all());
@@ -108,10 +111,6 @@ class ApplicationController extends BasicCrudController
 
         return ApplicationResource::collection($data);
     }
-
-
-
-
 
     /**
      * @OA\Get(
@@ -138,72 +137,14 @@ class ApplicationController extends BasicCrudController
      */
     public function show($id)
     {
-
-        $userId = request()->user()->id;
-        $application = $this->model()::where('id', $id)
-            ->where('user_id', $userId)
+        $application = $this->model()::with('user')
+            ->where('id', $id)
             ->first();
+
         if (!$application) {
             return response()->json(['message' => 'Application not found or not authorized'], 404);
         }
         return new ApplicationResource($application);
-    }
-
-    /**
-     * @OA\Put(
-     *     path="/api/applications/{id}",
-     *     summary="Update an application",
-     *     tags={"Application"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(ref="#/components/schemas/Application")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Application updated successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Application")
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Application not found"
-     *     )
-     * )
-     */
-    public function update(Request $request, $id)
-    {
-        $start = Carbon::parse(env('REGISTRATION_START', '2024-08-02 08:00:00'));
-        $end = Carbon::parse(env('REGISTRATION_END', '2024-08-03 23:59:00'));
-        $now = now();
-
-        if ($now->lt($start) || $now->gt($end)) {
-            return response()->json([
-                'message' => 'Inscrições estão fechadas. O período de inscrição é de ' . $start->format('d/m/Y H:i') . ' até ' . $end->format('d/m/Y H:i') . '.',
-            ], 403);
-        }
-
-        $user = $request->user();
-        $application = Application::find($id);
-
-        if (!$application || $application->user_id !== $user->id) {
-            return response()->json(['error' => 'Você não tem permissão para atualizar esta inscrição.'], 403);
-        }
-
-        return parent::update($request, $id);
-    }
-
-    /**
-     * Método `destroy` removido conforme solicitado
-     */
-    public function destroy($id)
-    {
-        return response()->json(['error' => 'Method not allowed.'], 405);
     }
 
     protected function model()
