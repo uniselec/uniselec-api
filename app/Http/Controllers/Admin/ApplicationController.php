@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\BasicCrudController;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ApplicationResource;
@@ -20,29 +21,14 @@ class ApplicationController extends BasicCrudController
         'user_id' => 'required|integer',
         'data' => 'required|array',
     ];
-    /**
-     * @OA\Get(
-     *     path="/api/all-applications",
-     *     summary="Get list of all applications",
-     *     tags={"Application"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/Application"))
-     *     )
-     * )
-     */
-    public function allApplications(Request $request)
+
+    public function preliminaryResults(Request $request)
     {
-        $perPage = (int) $request->get('per_page', $this->defaultPerPage);
+
+        $perPage = 1000;
         $hasFilter = in_array(Filterable::class, class_uses($this->model()));
 
         $query = $this->queryBuilder();
-
-        if ($hasFilter) {
-            $query = $query->filter($request->all());
-        }
 
         $data = $query->orderBy('id', 'desc')->paginate($perPage);
 
@@ -56,7 +42,6 @@ class ApplicationController extends BasicCrudController
                 ],
             ]);
         }
-
         return ApplicationResource::collection($data);
     }
     public function changeAdminPassword(Request $request)

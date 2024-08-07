@@ -8,6 +8,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use OpenApi\Annotations as OA;
 use EloquentFilter\Filterable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @OA\Schema(
@@ -40,4 +41,12 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    /**
+     * Get the applications for the user.
+     */
+    public function applications(): HasMany
+    {
+        return $this->hasMany(Application::class);
+    }
 }

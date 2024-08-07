@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\BasicCrudController;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\AdminCollection;
 use App\Http\Resources\AdminResource;

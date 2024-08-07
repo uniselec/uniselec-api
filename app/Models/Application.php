@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use OpenApi\Annotations as OA;
 use EloquentFilter\Filterable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @OA\Schema(
@@ -20,7 +21,6 @@ use EloquentFilter\Filterable;
  */
 class Application extends Model
 {
-
     use HasFactory, Filterable;
 
     protected $fillable = [
@@ -32,4 +32,12 @@ class Application extends Model
     protected $casts = [
         'data' => 'array',
     ];
+
+    /**
+     * Get the user that owns the application.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 }
