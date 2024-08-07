@@ -24,26 +24,39 @@ class ApplicationController extends BasicCrudController
 
     public function preliminaryResults(Request $request)
     {
+        $modalidadeParam = $request->input('modalidade');
+        $applications = Application::orderBy('id', 'desc')->get();
+        if ($modalidadeParam === 'AC') {
+            $enemNumbers = $applications->map(function ($application) {
+                return $application->data['enem'] ?? null;
+            })->filter()->values();
+        } else {
+            $enemNumbers = $applications->map(function ($application) use ($modalidadeParam) {
+                $data = $application->data;
+                $vagas = $data['vaga'] ?? [];
+                foreach ($vagas as $vaga) {
 
-        $perPage = 1000;
-        $hasFilter = in_array(Filterable::class, class_uses($this->model()));
-
-        $query = $this->queryBuilder();
-
-        $data = $query->orderBy('id', 'desc')->paginate($perPage);
-
-        if ($data instanceof \Illuminate\Pagination\LengthAwarePaginator) {
-            return ApplicationResource::collection($data->items())->additional([
-                'meta' => [
-                    'current_page' => $data->currentPage(),
-                    'per_page' => $data->perPage(),
-                    'total' => $data->total(),
-                    'last_page' => $data->lastPage(),
-                ],
-            ]);
+                    $modalidade = explode(':', $vaga, 2)[0] . ':';
+                    if ($modalidade === $modalidadeParam) {
+                        return $data['enem'] ?? null;
+                    }
+                }
+                return null;
+            })->filter()->values();
         }
-        return ApplicationResource::collection($data);
+
+        $csvContent = "";
+        foreach ($enemNumbers as $enemNumber) {
+            $csvContent .= "$enemNumber\n";
+        }
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="enem_numbers.csv"',
+        ];
+        return response($csvContent, 200, $headers);
     }
+
+
     public function changeAdminPassword(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -68,60 +81,16 @@ class ApplicationController extends BasicCrudController
 
         return response()->json(['message' => 'Senha alterada com sucesso.'], 200);
     }
-    public function indexAll(Request $request)
-    {
-        $perPage = (int) $request->get('per_page', $this->defaultPerPage);
-        $hasFilter = in_array(Filterable::class, class_uses($this->model()));
 
-        $query = $this->queryBuilder();
-
-        if ($hasFilter) {
-            $query = $query->filter($request->all());
-        }
-
-        $data = $query->orderBy('id', 'desc')->paginate($perPage);
-
-        if ($data instanceof \Illuminate\Pagination\LengthAwarePaginator) {
-            return ApplicationResource::collection($data->items())->additional([
-                'meta' => [
-                    'current_page' => $data->currentPage(),
-                    'per_page' => $data->perPage(),
-                    'total' => $data->total(),
-                    'last_page' => $data->lastPage(),
-                ],
-            ]);
-        }
-
-        return ApplicationResource::collection($data);
-    }
-    /**
-     * @OA\Get(
-     *     path="/api/applications",
-     *     summary="Get list of applications",
-     *     tags={"Application"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/Application"))
-     *     )
-     * )
-     */
     public function index(Request $request)
     {
-        $user = $request->user();
         $perPage = (int) $request->get('per_page', $this->defaultPerPage);
         $hasFilter = in_array(Filterable::class, class_uses($this->model()));
 
-        $query = $this->queryBuilder();
+        $query = $this->queryBuilder()->with('user'); // Carregar a relação 'user'
 
         if ($hasFilter) {
             $query = $query->filter($request->all());
-        }
-
-
-        if (!$user->can('admin')) {
-            $query->where('user_id', $user->id);
         }
 
         $data = $query->orderBy('id', 'desc')->paginate($perPage);
@@ -140,75 +109,6 @@ class ApplicationController extends BasicCrudController
         return ApplicationResource::collection($data);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/applications",
-     *     summary="Create or update an application",
-     *     tags={"Application"},
-     *     security={{"sanctum":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(ref="#/components/schemas/Application")
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Application created or updated successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Application")
-     *     ),
-     *     @OA\Response(
-     *         response=400,
-     *         description="Invalid request",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string")
-     *         )
-     *     )
-     * )
-     */
-    public function store(Request $request)
-    {
-        $start = Carbon::parse(env('REGISTRATION_START', '2024-08-02 08:00:00'));
-        $end = Carbon::parse(env('REGISTRATION_END', '2024-08-03 23:59:00'));
-        $now = now();
-
-        if ($now->lt($start) || $now->gt($end)) {
-            return response()->json([
-                'message' => 'Inscrições estão fechadas. O período de inscrição é de ' . $start->format('d/m/Y H:i') . ' até ' . $end->format('d/m/Y H:i') . '.',
-            ], 403);
-        }
-
-        $userId = $request->user()->id;
-
-        $existingApplication = Application::where('user_id', $userId)->first();
-
-        $applicationData = $request->all();
-        $applicationData['user_id'] = $userId;
-
-        $currentTimestamp = now()->toDateTimeString();
-        if (!isset($applicationData['data'])) {
-            $applicationData['data'] = [];
-        }
-        $applicationData['data']['updated_at'] = $currentTimestamp;
-
-        if (isset($request->data)) {
-            $applicationData['verification_code'] = md5(json_encode($applicationData['data']));
-        }
-
-        if ($existingApplication) {
-            $existingApplication->update($applicationData);
-            return response()->json([
-                'message' => 'Inscrição atualizada com sucesso.',
-                'application' => $existingApplication
-            ], 200);
-        }
-
-        $request->merge(['user_id' => $userId]);
-        $application = Application::create($applicationData);
-
-        return response()->json([
-            'message' => 'Inscrição criada com sucesso.',
-            'application' => $application
-        ], 201);
-    }
 
 
 

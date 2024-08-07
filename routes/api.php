@@ -56,7 +56,7 @@ Route::get('/student-selection', function () {
 
 Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->group(function () {
     Route::put('change-password', [AuthController::class, 'changeAdminPassword'])->name('admin.changePassword');
-    Route::get('applications', [AdminApplicationController::class, 'indexAll'])->name('applications.index');
+    Route::get('applications', [AdminApplicationController::class, 'index'])->name('applications.index');
 
     Route::get('results', [AdminApplicationController::class, 'preliminaryResults'])->name('applications.preliminaryResults');
 
