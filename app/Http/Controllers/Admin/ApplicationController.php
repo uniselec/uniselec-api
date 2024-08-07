@@ -25,10 +25,10 @@ class ApplicationController extends BasicCrudController
     public function preliminaryResults(Request $request)
     {
         $positionTypeParam = $request->input('position-type');
-        $perPage = $request->input('per_page', 1000); // Número de resultados por página, padrão é 15
-        $page = $request->input('page', 1); // Página atual, padrão é 1
+        $perPage = $request->input('per_page', 1000);
+        $page = $request->input('page', 1);
 
-        // Obter as inscrições com paginação
+
         $applications = Application::orderBy('id', 'desc')->paginate($perPage, ['*'], 'page', $page);
 
         if ($positionTypeParam === 'AC') {
