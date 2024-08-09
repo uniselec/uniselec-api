@@ -22,46 +22,6 @@ class ApplicationController extends BasicCrudController
         'data' => 'required|array',
     ];
 
-    public function preliminaryResults(Request $request)
-    {
-        $positionTypeParam = $request->input('position-type');
-        $perPage = $request->input('per_page', 1000);
-        $page = $request->input('page', 1);
-
-
-        $applications = Application::orderBy('id', 'desc')->paginate($perPage, ['*'], 'page', $page);
-
-        if ($positionTypeParam === 'AC') {
-            $enemNumbers = $applications->map(function ($application) {
-                return $application->data['enem'] ?? null;
-            })->filter()->values();
-        } else {
-            $enemNumbers = $applications->map(function ($application) use ($positionTypeParam) {
-                $data = $application->data;
-                $vagas = $data['vaga'] ?? [];
-                foreach ($vagas as $vaga) {
-                    $modalidade = explode(':', $vaga, 2)[0] . ':';
-                    if ($modalidade === $positionTypeParam) {
-                        return $data['enem'] ?? null;
-                    }
-                }
-                return null;
-            })->filter()->values();
-        }
-
-        $csvContent = "";
-        foreach ($enemNumbers as $enemNumber) {
-            $csvContent .= "$enemNumber\n";
-        }
-
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="enem_numbers.csv"',
-        ];
-
-        return response($csvContent, 200, $headers);
-    }
-
 
     public function changeAdminPassword(Request $request)
     {
