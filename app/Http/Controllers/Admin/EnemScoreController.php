@@ -9,10 +9,14 @@ use App\Models\EnemScore;
 use Illuminate\Http\Request;
 use OpenApi\Annotations as OA;
 
-class ENEMScoreController extends BasicCrudController
+class EnemScoreController extends BasicCrudController
 {
     private $rules = [
-        'enem' => 'required|max:255'
+        'enem' => 'required|max:255',
+        "application_id" => 'required',
+        "enem" => 'required',
+        "scores" => 'required',
+        "original_scores" => 'required'
     ];
 
     public function index(Request $request)

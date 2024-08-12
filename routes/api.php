@@ -59,8 +59,8 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->gr
     Route::get('applications', [AdminApplicationController::class, 'index'])->name('applications.index');
 
 
-    Route::apiResource('enem_scores', EnemScoreController::class)->names('enem_scores.api');
-    Route::apiResource('application_status', ApplicationStatusController::class)->names('enem_scores.api');
+    Route::apiResource('enem-scores', EnemScoreController::class)->names('enem_scores.api');
+    Route::apiResource('application-status', ApplicationStatusController::class)->names('application-status.api');
 
     Route::get('applications/{application}', [AdminApplicationController::class, 'show'])->name('applications.api.show');
 

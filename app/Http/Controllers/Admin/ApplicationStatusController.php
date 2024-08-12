@@ -3,28 +3,37 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\BasicCrudController;
-use App\Http\Controllers\Controller;
-use App\Http\Resources\DocumentResource;
-use App\Models\Document;
+use App\Http\Resources\ApplicationStatusResource;
+use App\Models\ApplicationStatus;
 use Illuminate\Http\Request;
-use OpenApi\Annotations as OA;
 
 class ApplicationStatusController extends BasicCrudController
 {
     private $rules = [
-        'application_id' => 'required'
+        'enem' => 'required|max:255',
+        "application_id" => 'required',
+        "scores" => 'required|array',  // Confirme que scores é um array
+        "original_scores" => 'required|string'
     ];
 
     public function index(Request $request)
     {
         return parent::index($request);
     }
-
     public function store(Request $request)
     {
-        return parent::store($request);
-    }
+        $data = $this->validate($request, $this->rulesStore());
 
+        if (is_array($data['scores'])) {
+            $data['scores'] = json_encode($data['scores']);
+        }
+
+        $enemScore = $this->model()::create($data);
+
+        $enemScore->refresh();
+        $resource = $this->resource();
+        return new $resource($enemScore);
+    }
 
     public function show($id)
     {
@@ -43,7 +52,7 @@ class ApplicationStatusController extends BasicCrudController
 
     protected function model()
     {
-        return Document::class;
+        return ApplicationStatus::class;
     }
 
     protected function rulesStore()
@@ -63,6 +72,6 @@ class ApplicationStatusController extends BasicCrudController
 
     protected function resource()
     {
-        return DocumentResource::class;
+        return ApplicationStatusResource::class;
     }
 }

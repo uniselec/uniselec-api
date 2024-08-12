@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,6 +15,10 @@ class EnemScore extends Model
         'enem',
         'scores',
         'original_scores',
+    ];
+
+    protected $casts = [
+        'scores' => 'array', // Cast para array JSON
     ];
 
     public function application()
