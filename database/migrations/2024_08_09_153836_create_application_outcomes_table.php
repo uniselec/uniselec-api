@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('application_status', function (Blueprint $table) {
+        Schema::create('application_outcomes', function (Blueprint $table) {
             $table->id();
             $table->foreignId('application_id')->constrained()->onDelete('cascade');
             $table->enum('status', ['approved', 'rejected'])->nullable();
@@ -29,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('application_status');
+        Schema::dropIfExists('application_outcomes');
     }
 };

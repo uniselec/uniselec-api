@@ -3,17 +3,20 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\BasicCrudController;
-use App\Http\Resources\ApplicationStatusResource;
-use App\Models\ApplicationStatus;
+use App\Http\Resources\ApplicationOutcomeResource;
+use App\Models\ApplicationOutcome;
 use Illuminate\Http\Request;
 
-class ApplicationStatusController extends BasicCrudController
+class ApplicationOutcomeController extends BasicCrudController
 {
     private $rules = [
-        'enem' => 'required|max:255',
-        "application_id" => 'required',
-        "scores" => 'required|array',  // Confirme que scores é um array
-        "original_scores" => 'required|string'
+            "application_id" => 'required',
+            "status" => 'required',
+            "classification_status" => 'required',
+            "average_score" => 'required',
+            "final_score" => 'required',
+            "ranking" => 'required',
+            "reason" => 'required',
     ];
 
     public function index(Request $request)
@@ -24,15 +27,16 @@ class ApplicationStatusController extends BasicCrudController
     {
         $data = $this->validate($request, $this->rulesStore());
 
-        if (is_array($data['scores'])) {
-            $data['scores'] = json_encode($data['scores']);
+
+        if (empty($data['classification_status'])) {
+            return response()->json(['error' => 'O campo classification_status é obrigatório.'], 422);
         }
 
-        $enemScore = $this->model()::create($data);
+        $applicationOutcome = $this->model()::create($data);
 
-        $enemScore->refresh();
+        $applicationOutcome->refresh();
         $resource = $this->resource();
-        return new $resource($enemScore);
+        return new $resource($applicationOutcome);
     }
 
     public function show($id)
@@ -52,7 +56,7 @@ class ApplicationStatusController extends BasicCrudController
 
     protected function model()
     {
-        return ApplicationStatus::class;
+        return ApplicationOutcome::class;
     }
 
     protected function rulesStore()
@@ -72,6 +76,6 @@ class ApplicationStatusController extends BasicCrudController
 
     protected function resource()
     {
-        return ApplicationStatusResource::class;
+        return ApplicationOutcomeResource::class;
     }
 }

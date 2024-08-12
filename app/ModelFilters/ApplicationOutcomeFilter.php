@@ -2,7 +2,7 @@
 
 namespace App\ModelFilters;
 
-class ApplicationStatusFilter extends DefaultModelFilter
+class ApplicationOutcomeFilter extends DefaultModelFilter
 {
     protected $sortable = ['created_at'];
 

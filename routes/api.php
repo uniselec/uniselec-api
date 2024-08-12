@@ -2,7 +2,7 @@
 
 use App\Http\Controllers\User\ApplicationController as UserApplicationController;
 use App\Http\Controllers\Admin\ApplicationController as AdminApplicationController;
-use App\Http\Controllers\Admin\ApplicationStatusController;
+use App\Http\Controllers\Admin\ApplicationOutcomeController;
 use App\Http\Controllers\Admin\DocumentController as AdminDocumentController;
 use App\Http\Controllers\Admin\EnemScoreController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
@@ -60,7 +60,7 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->gr
 
 
     Route::apiResource('enem-scores', EnemScoreController::class)->names('enem_scores.api');
-    Route::apiResource('application-status', ApplicationStatusController::class)->names('application-status.api');
+    Route::apiResource('application-outcomes', ApplicationOutcomeController::class)->names('application-outcomes.api');
 
     Route::get('applications/{application}', [AdminApplicationController::class, 'show'])->name('applications.api.show');
 

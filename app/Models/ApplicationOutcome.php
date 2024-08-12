@@ -5,11 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ApplicationStatus extends Model
+class ApplicationOutcome extends Model
 {
     use HasFactory;
 
-    protected $table = 'application_status';
+    protected $table = 'application_outcomes';
 
     protected $fillable = [
         'application_id',
