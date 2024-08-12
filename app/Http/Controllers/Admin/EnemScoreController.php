@@ -3,18 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\BasicCrudController;
-use App\Http\Controllers\Controller;
 use App\Http\Resources\EnemScoreResource;
 use App\Models\EnemScore;
+use App\Models\Application;
 use Illuminate\Http\Request;
-use OpenApi\Annotations as OA;
+use Illuminate\Support\Facades\Validator;
 
 class EnemScoreController extends BasicCrudController
 {
     private $rules = [
         'enem' => 'required|max:255',
-        "application_id" => 'required',
-        "enem" => 'required',
         "scores" => 'required',
         "original_scores" => 'required'
     ];
@@ -26,7 +24,27 @@ class EnemScoreController extends BasicCrudController
 
     public function store(Request $request)
     {
-        return parent::store($request);
+        $validator = Validator::make($request->all(), $this->rulesStore());
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $application = Application::where('data->enem', $request->enem)->first();
+
+        if (!$application) {
+            return response()->json(['error' => 'Nenhuma inscrição encontrada para o ENEM informado.'], 404);
+        }
+
+        $enemScore = EnemScore::updateOrCreate(
+            ['enem' => $request->enem],
+            [
+                'application_id' => $application->id,
+                'scores' => $request->scores,
+                'original_scores' => $request->original_scores,
+            ]
+        );
+
+        return new EnemScoreResource($enemScore);
     }
 
     public function show($id)
