@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\User\ApplicationController as UserApplicationController;
 use App\Http\Controllers\Admin\ApplicationController as AdminApplicationController;
 use App\Http\Controllers\Admin\ApplicationOutcomeController;
@@ -62,6 +63,8 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->gr
     Route::post('/process-outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
 
     Route::apiResource('enem-scores', EnemScoreController::class)->names('enem_scores.api');
+
+    Route::apiResource('admins', AdminController::class)->names('admins.api');
 
     Route::get('application-outcomes', [ApplicationOutcomeController::class, 'index'])->name('application-outcomes.api.index');
     Route::get('application-outcomes/{id}', [ApplicationOutcomeController::class, 'show'])->name('application-outcomes.api.show');
