@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('application_id')->constrained()->onDelete('cascade');
             $table->enum('status', ['approved', 'rejected', 'pending'])->nullable();
             $table->enum('classification_status', ['classified', 'classifiable', 'disqualified', 'pending'])->nullable();
+            $table->enum('convocation_status', ['convoked'])->nullable();
             $table->decimal('average_score', 8, 2)->nullable();
             $table->decimal('final_score', 8, 2)->nullable();
             $table->integer('ranking')->nullable();

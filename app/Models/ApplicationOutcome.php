@@ -15,6 +15,7 @@ class ApplicationOutcome extends Model
         'application_id',
         'status',
         'classification_status',
+        'convocation_status',
         'average_score',
         'final_score',
         'ranking',
