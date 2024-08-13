@@ -30,17 +30,29 @@ class ProcessApplicationOutcome
 
         foreach ($enemScores as $enemScore) {
             $application = $enemScore->application;
+
+
             if ($enemScore->scores['cpf'] !== $application->data['cpf']) {
                 $this->createOrUpdateOutcomeForApplication($application, 'pending', 'Inconsistência no CPF');
                 continue;
             }
-            $applicationBirtdate = \DateTime::createFromFormat('Y-m-d', $application->data['birtdate']);
+
+
+            if ($this->normalizeString($enemScore->scores['name']) !== $this->normalizeString($application->data['name'])) {
+                $this->createOrUpdateOutcomeForApplication($application, 'pending', 'Inconsistência no Nome');
+                continue;
+            }
+
+
+            $applicationBirtdate = \DateTime::createFromFormat('Y-m-d', $application->data['birthdate']);
             $enemScoreBirthdate = \DateTime::createFromFormat('d/m/Y', $enemScore->scores['birthdate']);
 
             if (!$applicationBirtdate || !$enemScoreBirthdate || $applicationBirtdate->format('Y-m-d') !== $enemScoreBirthdate->format('Y-m-d')) {
                 $this->createOrUpdateOutcomeForApplication($application, 'pending', 'Inconsistência na Data de Nascimento');
                 continue;
             }
+
+
             $averageScore = $this->calculateAverageScore($enemScore->scores);
             $finalScore = $this->applyBonus($averageScore, $application->data['bonus']);
             $this->createOrUpdateOutcomeForApplication($application, 'approved', null, $averageScore, $finalScore);
@@ -78,5 +90,14 @@ class ProcessApplicationOutcome
                 'reason' => $reason,
             ]
         );
+    }
+
+    private function normalizeString($string)
+    {
+        $string = trim($string);
+        $string = preg_replace('/\s+/', '', $string);
+        $string = strtolower($string);
+        $string = iconv('UTF-8', 'ASCII//TRANSLIT', $string);
+        return $string;
     }
 }
