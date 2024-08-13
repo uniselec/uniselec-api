@@ -15,13 +15,26 @@ class ApplicationOutcomeController extends BasicCrudController
     private $rules = [
         "application_id" => 'required',
         "status" => 'required',
-        "classification_status" => 'required',
-        "average_score" => 'required',
-        "final_score" => 'required',
-        "ranking" => 'required',
         "reason" => 'required',
     ];
+    public function patchUpdate(Request $request, $id)
+    {
+        $applicationOutcome = ApplicationOutcome::find($id);
 
+        if (!$applicationOutcome) {
+            return response()->json(['error' => 'ApplicationOutcome not found.'], 404);
+        }
+        $validatedData = $request->validate([
+            'status' => 'required|string|in:approved,rejected',
+            'reason' => 'nullable|string',
+        ]);
+
+        if ($validatedData['status'] === 'rejected' && empty($validatedData['reason'])) {
+            return response()->json(['error' => 'Reason is required when status is rejected.'], 422);
+        }
+        $applicationOutcome->update($validatedData);
+        return new ApplicationOutcomeResource($applicationOutcome);
+    }
     public function queryBuilder(): Builder
     {
         return parent::queryBuilder()->with([

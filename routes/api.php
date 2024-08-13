@@ -62,7 +62,11 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->gr
     Route::post('/process-outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
 
     Route::apiResource('enem-scores', EnemScoreController::class)->names('enem_scores.api');
-    Route::apiResource('application-outcomes', ApplicationOutcomeController::class)->names('application-outcomes.api');
+
+    Route::get('application-outcomes', [ApplicationOutcomeController::class, 'index'])->name('application-outcomes.api.index');
+    Route::get('application-outcomes/{id}', [ApplicationOutcomeController::class, 'show'])->name('application-outcomes.api.show');
+    Route::patch('application-outcomes/{id}', [ApplicationOutcomeController::class, 'patchUpdate'])->name('application-outcomes.patch');
+
 
     Route::get('applications/{application}', [AdminApplicationController::class, 'show'])->name('applications.api.show');
 
