@@ -24,7 +24,10 @@ class ApplicationOutcomeController extends BasicCrudController
 
     public function queryBuilder(): Builder
     {
-        return parent::queryBuilder()->with('application');
+        return parent::queryBuilder()->with([
+            'application',
+            'application.enemScore',
+        ]);
     }
 
     public function index(Request $request)

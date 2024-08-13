@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\ApplicationController as AdminApplicationControll
 use App\Http\Controllers\Admin\ApplicationOutcomeController;
 use App\Http\Controllers\Admin\DocumentController as AdminDocumentController;
 use App\Http\Controllers\Admin\EnemScoreController;
+use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Public\DocumentController as PublicDocumentController;
 
@@ -58,7 +59,7 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->gr
     Route::put('change-password', [AuthController::class, 'changeAdminPassword'])->name('admin.changePassword');
     Route::get('applications', [AdminApplicationController::class, 'index'])->name('applications.index');
 
-    Route::post('/generate-application-outcomes', [ApplicationOutcomeController::class, 'generateAllOutcomes']);
+    Route::post('/process-outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
 
     Route::apiResource('enem-scores', EnemScoreController::class)->names('enem_scores.api');
     Route::apiResource('application-outcomes', ApplicationOutcomeController::class)->names('application-outcomes.api');

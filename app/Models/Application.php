@@ -40,4 +40,12 @@ class Application extends Model
     {
         return $this->belongsTo(User::class);
     }
+    public function applicationOutcome()
+    {
+        return $this->hasOne(ApplicationOutcome::class);
+    }
+    public function enemScore()
+    {
+        return $this->hasOne(EnemScore::class, 'application_id', 'id');
+    }
 }
