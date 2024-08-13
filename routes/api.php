@@ -58,6 +58,7 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->gr
     Route::put('change-password', [AuthController::class, 'changeAdminPassword'])->name('admin.changePassword');
     Route::get('applications', [AdminApplicationController::class, 'index'])->name('applications.index');
 
+    Route::post('/generate-application-outcomes', [ApplicationOutcomeController::class, 'generateAllOutcomes']);
 
     Route::apiResource('enem-scores', EnemScoreController::class)->names('enem_scores.api');
     Route::apiResource('application-outcomes', ApplicationOutcomeController::class)->names('application-outcomes.api');

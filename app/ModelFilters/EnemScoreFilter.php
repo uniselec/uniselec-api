@@ -8,7 +8,7 @@ class EnemScoreFilter extends DefaultModelFilter
 
     public function search($search)
     {
-        $this->where('name', 'LIKE', "%$search%");
+        $this->where('enem', 'LIKE', "%$search%");
     }
 
     /**

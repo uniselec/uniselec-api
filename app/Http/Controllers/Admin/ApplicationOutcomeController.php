@@ -4,20 +4,28 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\BasicCrudController;
 use App\Http\Resources\ApplicationOutcomeResource;
+use App\Models\Application;
 use App\Models\ApplicationOutcome;
+use App\Models\EnemScore;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\Builder;
 
 class ApplicationOutcomeController extends BasicCrudController
 {
     private $rules = [
-            "application_id" => 'required',
-            "status" => 'required',
-            "classification_status" => 'required',
-            "average_score" => 'required',
-            "final_score" => 'required',
-            "ranking" => 'required',
-            "reason" => 'required',
+        "application_id" => 'required',
+        "status" => 'required',
+        "classification_status" => 'required',
+        "average_score" => 'required',
+        "final_score" => 'required',
+        "ranking" => 'required',
+        "reason" => 'required',
     ];
+
+    public function queryBuilder(): Builder
+    {
+        return parent::queryBuilder()->with('application');
+    }
 
     public function index(Request $request)
     {
@@ -25,18 +33,9 @@ class ApplicationOutcomeController extends BasicCrudController
     }
     public function store(Request $request)
     {
-        $data = $this->validate($request, $this->rulesStore());
-
-
-        if (empty($data['classification_status'])) {
-            return response()->json(['error' => 'O campo classification_status é obrigatório.'], 422);
-        }
-
-        $applicationOutcome = $this->model()::create($data);
-
-        $applicationOutcome->refresh();
-        $resource = $this->resource();
-        return new $resource($applicationOutcome);
+        return response()->json([
+            'error' => 'O método store não é permitido para ApplicationOutcome. Por favor, utilize a rota de processamento para criar ou atualizar ApplicationOutcomes.'
+        ], 403);
     }
 
     public function show($id)

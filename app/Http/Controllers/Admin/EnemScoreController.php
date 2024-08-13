@@ -8,7 +8,7 @@ use App\Models\EnemScore;
 use App\Models\Application;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-
+use Illuminate\Database\Eloquent\Builder;
 class EnemScoreController extends BasicCrudController
 {
     private $rules = [
@@ -21,7 +21,10 @@ class EnemScoreController extends BasicCrudController
     {
         return parent::index($request);
     }
-
+    public function queryBuilder(): Builder
+    {
+        return parent::queryBuilder()->with('application');
+    }
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), $this->rulesStore());
