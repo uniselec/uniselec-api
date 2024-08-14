@@ -6,7 +6,7 @@ use App\Models\Application;
 use App\Models\ApplicationOutcome;
 use App\Models\EnemScore;
 
-class ProcessApplicationOutcome
+class ProcessApplicationOutcomeWithoutPending
 {
     public function process()
     {
@@ -33,12 +33,7 @@ class ProcessApplicationOutcome
             $processedApplicationIds[] = $application->id;
 
             $averageScore = $this->calculateAverageScore($enemScore->scores);
-
-            if (isset($application->data['bonus'])) {
-                $finalScore = $this->applyBonus($averageScore, $application->data['bonus']);
-            } else {
-                $finalScore = $averageScore;
-            }
+            $finalScore = $this->applyBonus($averageScore, $application->data['bonus'] ?? []);
 
             $reasons = [];
 
@@ -50,8 +45,8 @@ class ProcessApplicationOutcome
                 $reasons[] = 'Inconsistência no Nome';
             }
 
-            if (isset($application->data['birtdate']) && isset($enemScore->scores['birthdate'])) {
-                $applicationBirthdate = \DateTime::createFromFormat('Y-m-d', $application->data['birtdate']);
+            if (isset($application->data['birthdate']) && isset($enemScore->scores['birthdate'])) {
+                $applicationBirthdate = \DateTime::createFromFormat('Y-m-d', $application->data['birthdate']);
                 $enemScoreBirthdate = \DateTime::createFromFormat('d/m/Y', $enemScore->scores['birthdate']);
 
                 if (!$applicationBirthdate || !$enemScoreBirthdate || $applicationBirthdate->format('Y-m-d') !== $enemScoreBirthdate->format('Y-m-d')) {
@@ -61,15 +56,9 @@ class ProcessApplicationOutcome
                 $reasons[] = 'Data de Nascimento ausente ou inconsistente';
             }
 
-            if (!empty($reasons)) {
-                $this->createOrUpdateOutcomeForApplication($application, 'pending', implode('; ', $reasons), $averageScore, $finalScore);
-            } else {
-
-                $this->createOrUpdateOutcomeForApplication($application, 'approved', null, $averageScore, $finalScore);
-            }
+            $this->createOrUpdateOutcomeForApplication($application, 'approved', implode('; ', $reasons), $averageScore, $finalScore);
         }
 
-        // Verificar se há aplicações sem EnemScore associado e marcar como pendentes
         $applicationsWithoutEnemScore = Application::whereNotIn('id', $processedApplicationIds)->get();
         foreach ($applicationsWithoutEnemScore as $application) {
             $this->createOrUpdateOutcomeForApplication($application, 'rejected', 'Inscrição do ENEM não Identificada');
@@ -101,7 +90,7 @@ class ProcessApplicationOutcome
             ['application_id' => $application->id],
             [
                 'status' => $status,
-                'classification_status' => $status === 'approved' ? 'classifiable' : null,
+                'classification_status' => 'classifiable',
                 'average_score' => $averageScore,
                 'final_score' => $finalScore,
                 'reason' => $reason,
