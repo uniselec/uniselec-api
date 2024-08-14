@@ -15,7 +15,7 @@ class UsersTableSeeder extends Seeder
     public function run(): void
     {
         $faker = Faker::create('pt_BR');
-        $numUsers = 5;
+        $numUsers = 20;
         $enemBase = 231000000000;
 
         $users = [];
@@ -24,7 +24,7 @@ class UsersTableSeeder extends Seeder
         for ($i = 1; $i <= $numUsers; $i++) {
             $name = $faker->name;
             $email = $faker->unique()->safeEmail;
-            $cpf = $i <= 3 ? substr((string)($enemBase + $i - 1), -11) : $faker->cpf(false);
+            $cpf = $i <= 15 ? substr((string)($enemBase + $i - 1), -11) : $faker->cpf(false);
 
             $users[] = [
                 'name' => $name,

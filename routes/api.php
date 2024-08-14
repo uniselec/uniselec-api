@@ -67,6 +67,7 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->gr
     Route::apiResource('admins', AdminController::class)->names('admins.api');
 
     Route::get('application-outcomes', [ApplicationOutcomeController::class, 'index'])->name('application-outcomes.api.index');
+    Route::get('process-outcomes-witout-pending', [ApplicationOutcomeController::class, 'index-without'])->name('application-outcomes.api.index');
     Route::get('application-outcomes/{id}', [ApplicationOutcomeController::class, 'show'])->name('application-outcomes.api.show');
     Route::patch('application-outcomes/{id}', [ApplicationOutcomeController::class, 'patchUpdate'])->name('application-outcomes.patch');
 

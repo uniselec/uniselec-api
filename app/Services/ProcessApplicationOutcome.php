@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Application;
 use App\Models\ApplicationOutcome;
 use App\Models\EnemScore;
-use Illuminate\Support\Collection;
 
 class ProcessApplicationOutcome
 {
@@ -13,7 +12,6 @@ class ProcessApplicationOutcome
     {
         $this->ensureAllApplicationsHaveOutcomes();
         $this->processEnemScores();
-        $this->assignRanking();
     }
 
     private function ensureAllApplicationsHaveOutcomes()
@@ -21,105 +19,59 @@ class ProcessApplicationOutcome
         $applications = Application::doesntHave('applicationOutcome')->get();
 
         foreach ($applications as $application) {
-            $this->createOrUpdateOutcomeForApplication($application, 'rejected', 'Número de inscrição inválido');
+            $this->createOrUpdateOutcomeForApplication($application, 'pending', 'Resultado Não Processado');
         }
     }
 
     private function processEnemScores()
     {
         $enemScores = EnemScore::with('application')->get();
+        $processedApplicationIds = [];
 
         foreach ($enemScores as $enemScore) {
             $application = $enemScore->application;
+            $processedApplicationIds[] = $application->id;
+
             $averageScore = $this->calculateAverageScore($enemScore->scores);
             $finalScore = $this->applyBonus($averageScore, $application->data['bonus']);
 
+            $reasons = [];
 
+            // Validação de CPF
             if ($enemScore->scores['cpf'] !== $application->data['cpf']) {
-                $this->createOrUpdateOutcomeForApplication($application, 'pending', 'Inconsistência no CPF', $averageScore, $finalScore);
-                continue;
+                $reasons[] = 'Inconsistência no CPF';
             }
 
-
+            // Validação de Nome
             if ($this->normalizeString($enemScore->scores['name']) !== $this->normalizeString($application->data['name'])) {
-                $this->createOrUpdateOutcomeForApplication($application, 'pending', 'Inconsistência no Nome', $averageScore, $finalScore);
-                continue;
+                $reasons[] = 'Inconsistência no Nome';
             }
 
-
+            // Validação de Data de Nascimento
             if (isset($application->data['birtdate']) && isset($enemScore->scores['birthdate'])) {
                 $applicationBirthdate = \DateTime::createFromFormat('Y-m-d', $application->data['birtdate']);
                 $enemScoreBirthdate = \DateTime::createFromFormat('d/m/Y', $enemScore->scores['birthdate']);
 
                 if (!$applicationBirthdate || !$enemScoreBirthdate || $applicationBirthdate->format('Y-m-d') !== $enemScoreBirthdate->format('Y-m-d')) {
-                    $this->createOrUpdateOutcomeForApplication($application, 'pending', 'Inconsistência na Data de Nascimento', $averageScore, $finalScore);
-                    continue;
+                    $reasons[] = 'Inconsistência na Data de Nascimento';
                 }
             } else {
-
-                $this->createOrUpdateOutcomeForApplication($application, 'pending', 'Data de Nascimento ausente ou inconsistente', $averageScore, $finalScore);
-                continue;
+                $reasons[] = 'Data de Nascimento ausente ou inconsistente';
             }
 
-
-            $this->createOrUpdateOutcomeForApplication($application, 'approved', null, $averageScore, $finalScore);
+            // Se houverem inconsistências, cria um resultado pendente
+            if (!empty($reasons)) {
+                $this->createOrUpdateOutcomeForApplication($application, 'pending', implode('; ', $reasons), $averageScore, $finalScore);
+            } else {
+                // Se não houverem inconsistências, aprova a aplicação
+                $this->createOrUpdateOutcomeForApplication($application, 'approved', null, $averageScore, $finalScore);
+            }
         }
-    }
 
-    private function assignRanking()
-    {
-
-        $outcomes = ApplicationOutcome::whereIn('status', ['approved', 'pending'])
-            ->with(['application' => function ($query) {
-                $query->select('id', 'data');
-            }])
-            ->orderBy('final_score', 'desc')
-            ->get();
-
-
-        $outcomes = $outcomes->sort(function ($a, $b) {
-            if ($a->final_score === $b->final_score) {
-                $aBirthdate = \DateTime::createFromFormat('Y-m-d', $a->application->data['birtdate']);
-                $bBirthdate = \DateTime::createFromFormat('Y-m-d', $b->application->data['birtdate']);
-
-
-                if ($aBirthdate != $bBirthdate) {
-                    return $aBirthdate < $bBirthdate ? -1 : 1;
-                }
-
-
-                if ($a->application->enem_score->scores['writing_score'] != $b->application->enem_score->scores['writing_score']) {
-                    return $a->application->enem_score->scores['writing_score'] > $b->application->enem_score->scores['writing_score'] ? -1 : 1;
-                }
-
-
-                if ($a->application->enem_score->scores['language_score'] != $b->application->enem_score->scores['language_score']) {
-                    return $a->application->enem_score->scores['language_score'] > $b->application->enem_score->scores['language_score'] ? -1 : 1;
-                }
-
-
-                if ($a->application->enem_score->scores['math_score'] != $b->application->enem_score->scores['math_score']) {
-                    return $a->application->enem_score->scores['math_score'] > $b->application->enem_score->scores['math_score'] ? -1 : 1;
-                }
-
-
-                if ($a->application->enem_score->scores['science_score'] != $b->application->enem_score->scores['science_score']) {
-                    return $a->application->enem_score->scores['science_score'] > $b->application->enem_score->scores['science_score'] ? -1 : 1;
-                }
-
-
-                if ($a->application->enem_score->scores['humanities_score'] != $b->application->enem_score->scores['humanities_score']) {
-                    return $a->application->enem_score->scores['humanities_score'] > $b->application->enem_score->scores['humanities_score'] ? -1 : 1;
-                }
-            }
-
-            return $a->final_score > $b->final_score ? -1 : 1;
-        });
-
-
-        foreach ($outcomes as $index => $outcome) {
-            $outcome->ranking = $index + 1;
-            $outcome->save();
+        // Verificar se há aplicações sem EnemScore associado e marcar como pendentes
+        $applicationsWithoutEnemScore = Application::whereNotIn('id', $processedApplicationIds)->get();
+        foreach ($applicationsWithoutEnemScore as $application) {
+            $this->createOrUpdateOutcomeForApplication($application, 'rejected', 'Inscrição do ENEM não Identificada');
         }
     }
 

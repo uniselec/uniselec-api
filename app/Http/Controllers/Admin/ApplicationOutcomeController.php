@@ -25,7 +25,7 @@ class ApplicationOutcomeController extends BasicCrudController
             return response()->json(['error' => 'ApplicationOutcome not found.'], 404);
         }
         $validatedData = $request->validate([
-            'status' => 'required|string|in:approved,rejected',
+            'status' => 'required|string|in:approved,rejected,pending',
             'reason' => 'nullable|string',
         ]);
 
