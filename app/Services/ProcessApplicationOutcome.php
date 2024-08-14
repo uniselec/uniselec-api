@@ -68,8 +68,6 @@ class ProcessApplicationOutcome
                 $this->createOrUpdateOutcomeForApplication($application, 'approved', null, $averageScore, $finalScore);
             }
         }
-
-        // Verificar se há aplicações sem EnemScore associado e marcar como pendentes
         $applicationsWithoutEnemScore = Application::whereNotIn('id', $processedApplicationIds)->get();
         foreach ($applicationsWithoutEnemScore as $application) {
             $this->createOrUpdateOutcomeForApplication($application, 'rejected', 'Inscrição do ENEM não Identificada');
