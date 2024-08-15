@@ -67,7 +67,9 @@ class ProcessApplicationOutcome
                 $reasons[] = 'Data de Nascimento ausente ou inconsistente';
             }
 
-            if (!empty($reasons)) {
+            if (count($reasons) === 3) {
+                $this->createOrUpdateOutcomeForApplication($application, 'rejected', implode('; ', $reasons), $averageScore, $finalScore);
+            } elseif (!empty($reasons)) {
                 $this->createOrUpdateOutcomeForApplication($application, 'pending', implode('; ', $reasons), $averageScore, $finalScore);
             } else {
                 $this->createOrUpdateOutcomeForApplication($application, 'approved', null, $averageScore, $finalScore);
@@ -79,6 +81,7 @@ class ProcessApplicationOutcome
             $this->createOrUpdateOutcomeForApplication($application, 'rejected', 'Inscrição do ENEM não Identificada');
         }
     }
+
 
     private function markDuplicateApplications()
     {
