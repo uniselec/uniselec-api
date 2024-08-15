@@ -32,22 +32,29 @@ class EnemScoreController extends BasicCrudController
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $application = Application::where('data->enem', $request->enem)->first();
+        $applications = Application::where('data->enem', $request->enem)->get();
 
-        if (!$application) {
+        if ($applications->isEmpty()) {
             return response()->json(['error' => 'Nenhuma inscrição encontrada para o ENEM informado.'], 404);
         }
 
-        $enemScore = EnemScore::updateOrCreate(
-            ['enem' => $request->enem],
-            [
-                'application_id' => $application->id,
-                'scores' => $request->scores,
-                'original_scores' => $request->original_scores,
-            ]
-        );
+        $enemScores = [];
+        foreach ($applications as $application) {
+            $enemScore = EnemScore::updateOrCreate(
+                [
+                    'enem' => $request->enem,
+                    'application_id' => $application->id,
+                ],
+                [
+                    'scores' => $request->scores,
+                    'original_scores' => $request->original_scores,
+                ]
+            );
 
-        return new EnemScoreResource($enemScore);
+            $enemScores[] = new EnemScoreResource($enemScore);
+        }
+
+        return response()->json($enemScores, 201);
     }
 
     public function show($id)
