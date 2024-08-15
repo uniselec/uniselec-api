@@ -56,12 +56,14 @@ class ProcessApplicationOutcome
                 $reasons[] = 'Inconsistência no Nome';
             }
 
+            $birthdateInconsistency = false;
             if (isset($application->data['birtdate']) && isset($enemScore->scores['birthdate'])) {
                 $applicationBirthdate = \DateTime::createFromFormat('Y-m-d', $application->data['birtdate']);
                 $enemScoreBirthdate = \DateTime::createFromFormat('d/m/Y', $enemScore->scores['birthdate']);
 
                 if (!$applicationBirthdate || !$enemScoreBirthdate || $applicationBirthdate->format('Y-m-d') !== $enemScoreBirthdate->format('Y-m-d')) {
                     $reasons[] = 'Inconsistência na Data de Nascimento';
+                    $birthdateInconsistency = true;
                 }
             } else {
                 $reasons[] = 'Data de Nascimento ausente ou inconsistente';
@@ -69,6 +71,8 @@ class ProcessApplicationOutcome
 
             if (count($reasons) === 3) {
                 $this->createOrUpdateOutcomeForApplication($application, 'rejected', implode('; ', $reasons), $averageScore, $finalScore);
+            } elseif (count($reasons) === 1 && $birthdateInconsistency) {
+                $this->createOrUpdateOutcomeForApplication($application, 'approved', null, $averageScore, $finalScore);
             } elseif (!empty($reasons)) {
                 $this->createOrUpdateOutcomeForApplication($application, 'pending', implode('; ', $reasons), $averageScore, $finalScore);
             } else {
@@ -81,6 +85,7 @@ class ProcessApplicationOutcome
             $this->createOrUpdateOutcomeForApplication($application, 'rejected', 'Inscrição do ENEM não Identificada');
         }
     }
+
 
 
     private function markDuplicateApplications()
