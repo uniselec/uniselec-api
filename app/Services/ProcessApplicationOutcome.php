@@ -83,11 +83,15 @@ class ProcessApplicationOutcome
             ->get();
 
         foreach ($usersWithMultipleApplications as $user) {
-            $applications = Application::where('user_id', $user->user_id)->get();
+            $applications = Application::where('user_id', $user->user_id)
+                ->orderBy('created_at', 'asc')
+                ->get();
 
-            foreach ($applications as $application) {
-                $this->createOrUpdateOutcomeForApplication($application, 'pending', 'Inscrição duplicada');
+
+            for ($i = 0; $i < count($applications) - 1; $i++) {
+                $this->createOrUpdateOutcomeForApplication($applications[$i], 'rejected', 'Inscrição duplicada');
             }
+
         }
     }
 
