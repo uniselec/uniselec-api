@@ -12,6 +12,7 @@ class ProcessApplicationOutcome
     {
         $this->ensureAllApplicationsHaveOutcomes();
         $this->processEnemScores();
+        $this->markDuplicateApplications();
     }
 
     private function ensureAllApplicationsHaveOutcomes()
@@ -64,13 +65,29 @@ class ProcessApplicationOutcome
             if (!empty($reasons)) {
                 $this->createOrUpdateOutcomeForApplication($application, 'pending', implode('; ', $reasons), $averageScore, $finalScore);
             } else {
-
                 $this->createOrUpdateOutcomeForApplication($application, 'approved', null, $averageScore, $finalScore);
             }
         }
+
         $applicationsWithoutEnemScore = Application::whereNotIn('id', $processedApplicationIds)->get();
         foreach ($applicationsWithoutEnemScore as $application) {
             $this->createOrUpdateOutcomeForApplication($application, 'rejected', 'Inscrição do ENEM não Identificada');
+        }
+    }
+
+    private function markDuplicateApplications()
+    {
+        $usersWithMultipleApplications = Application::select('user_id')
+            ->groupBy('user_id')
+            ->havingRaw('COUNT(*) > 1')
+            ->get();
+
+        foreach ($usersWithMultipleApplications as $user) {
+            $applications = Application::where('user_id', $user->user_id)->get();
+
+            foreach ($applications as $application) {
+                $this->createOrUpdateOutcomeForApplication($application, 'pending', 'Inscrição duplicada');
+            }
         }
     }
 
