@@ -33,6 +33,11 @@ class ProcessApplicationOutcome
             $application = $enemScore->application;
             $processedApplicationIds[] = $application->id;
 
+            if (strpos($enemScore->original_scores, 'Candidato não encontrado') !== false) {
+                $this->createOrUpdateOutcomeForApplication($application, 'rejected', 'Inscrição do ENEM não Identificada');
+                continue;
+            }
+
             $averageScore = $this->calculateAverageScore($enemScore->scores);
 
             if (isset($application->data['bonus'])) {
@@ -91,7 +96,6 @@ class ProcessApplicationOutcome
             for ($i = 0; $i < count($applications) - 1; $i++) {
                 $this->createOrUpdateOutcomeForApplication($applications[$i], 'rejected', 'Inscrição duplicada');
             }
-
         }
     }
 
