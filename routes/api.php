@@ -28,8 +28,8 @@ use Illuminate\Support\Carbon;
 |
 */
 
-Route::prefix('backoffice')->group(function () {
-    Route::post('/login', [AuthController::class, 'authAdmin'])->name('backoffice.login');
+Route::prefix('admin')->group(function () {
+    Route::post('/login', [AuthController::class, 'authAdmin'])->name('admin.login');
 });
 
 Route::middleware(['auth:sanctum'])->group(function () {
@@ -56,7 +56,7 @@ Route::get('/student-selection', function () {
     ]);
 });
 
-Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->group(function () {
+Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('admin')->group(function () {
     Route::put('change-password', [AuthController::class, 'changeAdminPassword'])->name('admin.changePassword');
     Route::get('applications', [AdminApplicationController::class, 'index'])->name('applications.index');
 
@@ -75,14 +75,14 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('backoffice')->gr
 
     Route::get('applications/{application}', [AdminApplicationController::class, 'show'])->name('applications.api.show');
 
-    Route::post('/logout', [AuthController::class, 'logout'])->name('backoffice.logout');
+    Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
     Route::get('/me', [AuthController::class, 'me'])->name('user.profile');
-    Route::post('/register', [RegisterController::class, 'registerAdmin'])->name('backoffice.register');
+    Route::post('/register', [RegisterController::class, 'registerAdmin'])->name('admin.register');
 
     Route::post('documents', [AdminDocumentController::class, 'store'])->name('documents.store');
     Route::put('documents/{id}', [AdminDocumentController::class, 'update'])->name('documents.update');
     Route::delete('documents/{id}', [AdminDocumentController::class, 'destroy'])->name('documents.destroy');
-    Route::get('users', [AdminUserController::class, 'index'])->name('backoffice.users.index');
+    Route::get('users', [AdminUserController::class, 'index'])->name('admin.users.index');
 
 
 });
