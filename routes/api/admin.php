@@ -4,12 +4,11 @@ use App\Http\Controllers\User\ApplicationController as UserApplicationController
 use App\Http\Controllers\Admin\ApplicationController as AdminApplicationController;
 use App\Http\Controllers\Admin\ApplicationOutcomeController;
 use App\Http\Controllers\Admin\CourseController;
-use App\Http\Controllers\Admin\DocumentController as AdminDocumentController;
+use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\EnemScoreController;
 use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
-use App\Http\Controllers\Public\DocumentController as PublicDocumentController;
 
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\AuthController;
@@ -44,8 +43,8 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('admin')->group(f
     Route::get('/me', [AuthController::class, 'me'])->name('user.profile');
     Route::post('/register', [RegisterController::class, 'registerAdmin'])->name('admin.register');
 
-    Route::post('documents', [AdminDocumentController::class, 'store'])->name('documents.store');
-    Route::put('documents/{id}', [AdminDocumentController::class, 'update'])->name('documents.update');
-    Route::delete('documents/{id}', [AdminDocumentController::class, 'destroy'])->name('documents.destroy');
+    Route::apiResource('documents', DocumentController::class)->names('documents.api');
+    Route::patch('documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('documents.updateStatus');
+
     Route::get('users', [AdminUserController::class, 'index'])->name('admin.users.index');
 });

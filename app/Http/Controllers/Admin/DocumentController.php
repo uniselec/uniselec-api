@@ -16,46 +16,19 @@ class DocumentController extends BasicCrudController
         'description' => 'required|max:255'
     ];
 
-    /**
-     * @OA\Get(
-     *     path="/api/documents",
-     *     summary="Get list of documents",
-     *     tags={"Documents"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/Document"))
-     *     )
-     * )
-     */
+
     public function index(Request $request)
     {
         return parent::index($request);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/documents",
-     *     summary="Create a new document",
-     *     tags={"Documents"},
-     *     security={{"sanctum":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(ref="#/components/schemas/Document")
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Document created successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Document")
-     *     )
-     * )
-     */
     public function store(Request $request)
     {
         $request->validate([
             'title' => 'required|string|max:255',
             'file' => 'required|file|max:10240', // Máximo de 10 MB
+            'status' => 'in:draft,published,archived',
+            'process_selection_id' => 'required|exists:process_selections,id'
         ]);
 
         $file = $request->file('file');
@@ -67,93 +40,46 @@ class DocumentController extends BasicCrudController
             'description' => $request->description,
             'path' => $path,
             'filename' => $filename,
+            'status' => $request->status ?? 'draft',
+            'process_selection_id' => $request->process_selection_id,
         ]);
 
         return new DocumentResource($document);
     }
 
-    /**
-     * @OA\Get(
-     *     path="/api/documents/{id}",
-     *     summary="Get a document by ID",
-     *     tags={"Documents"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(ref="#/components/schemas/Document")
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Document not found"
-     *     )
-     * )
-     */
+    public function update(Request $request, $id)
+    {
+        $document = Document::findOrFail($id);
+
+        $request->validate([
+            'title' => 'string|max:255',
+            'status' => 'in:draft,published,archived',
+            'process_selection_id' => 'exists:process_selections,id'
+        ]);
+
+        $document->update($request->only(['title', 'description', 'status', 'process_selection_id']));
+
+        return new DocumentResource($document);
+    }
+    public function updateStatus(Request $request, $id)
+    {
+        $document = Document::findOrFail($id);
+
+        $request->validate([
+            'status' => 'required|in:draft,published,archived'
+        ]);
+
+        $document->update(['status' => $request->status]);
+
+        return response()->json(['message' => 'Status atualizado com sucesso', 'data' => new DocumentResource($document)]);
+    }
+
     public function show($id)
     {
         return parent::show($id);
     }
 
-    /**
-     * @OA\Put(
-     *     path="/api/documents/{id}",
-     *     summary="Update a document",
-     *     tags={"Documents"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(ref="#/components/schemas/Document")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Document updated successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Document")
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Document not found"
-     *     )
-     * )
-     */
-    public function update(Request $request, $id)
-    {
-        return parent::update($request, $id);
-    }
 
-    /**
-     * @OA\Delete(
-     *     path="/api/documents/{id}",
-     *     summary="Delete a document",
-     *     tags={"Documents"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=204,
-     *         description="Document deleted successfully"
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Document not found"
-     *     )
-     * )
-     */
     public function destroy($id)
     {
         return parent::destroy($id);

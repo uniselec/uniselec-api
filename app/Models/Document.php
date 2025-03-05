@@ -13,11 +13,13 @@ class Document extends Model
 
     protected $fillable = [
         'title',
-        'process_selection_id',
         'description',
         'path',
         'filename',
+        'process_selection_id',
+        'status'
     ];
+
     public function processSelection()
     {
         return $this->belongsTo(ProcessSelection::class);
