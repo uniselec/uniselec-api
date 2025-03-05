@@ -3,24 +3,22 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\BasicCrudController;
-use App\Http\Resources\ProcessSelectionResource;
-use App\Models\ProcessSelection;
+use App\Http\Resources\CourseResource;
+use App\Models\Course;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use EloquentFilter\Filterable;
 use ReflectionClass;
 
 
-class ProcessSelectionController extends BasicCrudController
+class CourseController extends BasicCrudController
 {
 
     private $rules = [
         'name' => '',
-        'description' => '',
-        'status' => '',
-        'start_date' => '',
-        'end_date' => '',
-        'type' => '',
+        'modality' => '',
+        'campus' => '',
+        'state' => '',
     ];
 
     public function index(Request $request)
@@ -43,7 +41,7 @@ class ProcessSelectionController extends BasicCrudController
     }
     protected function model()
     {
-        return ProcessSelection::class;
+        return Course::class;
     }
 
     protected function rulesStore()
@@ -63,6 +61,6 @@ class ProcessSelectionController extends BasicCrudController
 
     protected function resource()
     {
-        return ProcessSelectionResource::class;
+        return CourseResource::class;
     }
 }

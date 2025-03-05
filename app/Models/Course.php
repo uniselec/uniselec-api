@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
+use EloquentFilter\Filterable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Course extends Model
 {
-    use HasFactory;
+    use HasFactory, Filterable;
 
-    protected $fillable = ['name', 'modality', 'campus', 'uf'];
+    protected $fillable = ['name', 'state', 'modality', 'campus', 'uf'];
 
     protected $casts = [
         'modality' => 'string',
