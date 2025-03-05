@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\ApplicationOutcomeController;
 use App\Http\Controllers\Admin\DocumentController as AdminDocumentController;
 use App\Http\Controllers\Admin\EnemScoreController;
 use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
+use App\Http\Controllers\Admin\ProcessSelectionController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Public\DocumentController as PublicDocumentController;
 
@@ -24,6 +25,7 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('admin')->group(f
     Route::post('/process-outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
     Route::post('/process-outcomes-without-pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);
 
+    Route::apiResource('process_selections', ProcessSelectionController::class)->names('admin.processSelection');
     Route::apiResource('enem-scores', EnemScoreController::class)->names('enem_scores.api');
 
     Route::apiResource('admins', AdminController::class)->names('admins.api');
