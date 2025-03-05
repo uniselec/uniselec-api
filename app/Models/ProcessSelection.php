@@ -10,15 +10,9 @@ class ProcessSelection extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'status', 'start_date', 'end_date', 'selection_type'
+        'name', 'description', 'status', 'start_date', 'end_date', 'type'
     ];
 
-    protected $casts = [
-        'status' => 'string',
-        'selection_type' => 'string',
-        'start_date' => 'datetime',
-        'end_date' => 'datetime',
-    ];
 
     public function courses()
     {

@@ -18,10 +18,11 @@ class ProcessSelectionController extends BasicCrudController
 
     private $rules = [
         'name' => '',
+        'description' => '',
         'status' => '',
         'start_date' => '',
         'end_date' => '',
-        'selection_type' => '',
+        'type' => '',
     ];
 
     public function index(Request $request)
