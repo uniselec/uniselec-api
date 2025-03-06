@@ -10,7 +10,7 @@ class Course extends Model
 {
     use HasFactory, Filterable;
 
-    protected $fillable = ['name', 'state', 'modality', 'campus', 'uf'];
+    protected $fillable = ['name', 'state', 'modality', 'campus'];
 
     protected $casts = [
         'modality' => 'string',

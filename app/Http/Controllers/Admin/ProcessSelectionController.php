@@ -10,10 +10,8 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 use EloquentFilter\Filterable;
 use ReflectionClass;
 
-
 class ProcessSelectionController extends BasicCrudController
 {
-
     private $rules = [
         'name' => '',
         'description' => '',
@@ -22,6 +20,21 @@ class ProcessSelectionController extends BasicCrudController
         'end_date' => '',
         'type' => '',
     ];
+
+    public function show($id)
+    {
+        $processSelection = $this->queryBuilder()
+            ->with(['courses', 'documents'])
+            ->findOrFail($id);
+
+        $processSelection->courses->each(function ($course) {
+            $course->vacancies = $course->pivot->vacancies;
+        });
+
+        return new ProcessSelectionResource($processSelection);
+    }
+
+
 
     public function index(Request $request)
     {
@@ -32,7 +45,7 @@ class ProcessSelectionController extends BasicCrudController
             $query = $query->filter($request->all());
         }
         $query->whereNotNull('created_at');
-        $data = $request->has('all') || ! $this->defaultPerPage
+        $data = $request->has('all') || !$this->defaultPerPage
             ? $query->get()
             : $query->paginate($perPage);
         $resourceCollectionClass = $this->resourceCollection();

@@ -10,14 +10,20 @@ class ProcessSelection extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'description', 'status', 'start_date', 'end_date', 'type'
+        'name',
+        'description',
+        'status',
+        'start_date',
+        'end_date',
+        'type'
     ];
 
 
     public function courses()
     {
-        return $this->belongsToMany(Course::class, 'process_selection_courses')
-            ->withPivot('vacancies');
+        return $this->belongsToMany(\App\Models\Course::class, 'process_selection_courses')
+            ->withPivot('vacancies')
+            ->withTimestamps();
     }
 
     public function applications()

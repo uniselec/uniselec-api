@@ -1,4 +1,5 @@
 <?php
+
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\User\ApplicationController as UserApplicationController;
 use App\Http\Controllers\Admin\ApplicationController as AdminApplicationController;
@@ -8,6 +9,7 @@ use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\EnemScoreController;
 use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
+use App\Http\Controllers\Admin\ProcessSelectionCourseController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -24,8 +26,14 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('admin')->group(f
 
     Route::post('/process-outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
     Route::post('/process-outcomes-without-pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);
+    Route::post('process-selection/{processSelection}/courses', [ProcessSelectionCourseController::class, 'sync'])
+        ->name('admin.process_selection.courses.sync');
+    Route::delete('process-selection/course/remove', [ProcessSelectionCourseController::class, 'remove'])
+        ->name('admin.process_selection.courses.remove');
 
     Route::apiResource('process_selections', ProcessSelectionController::class)->names('admin.processSelection');
+
+
     Route::apiResource('courses', CourseController::class)->names('admin.courses');
     Route::apiResource('enem-scores', EnemScoreController::class)->names('enem_scores.api');
 
