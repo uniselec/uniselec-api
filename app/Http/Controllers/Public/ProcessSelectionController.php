@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\BasicCrudController;
 use App\Http\Resources\ProcessSelectionResource;
@@ -24,7 +24,12 @@ class ProcessSelectionController extends BasicCrudController
     public function show($id)
     {
         $processSelection = $this->queryBuilder()
-            ->with(['courses', 'documents'])
+            ->with([
+                'courses',
+                'documents' => function ($query) {
+                    $query->where('status', 'published');
+                }
+            ])
             ->findOrFail($id);
 
         $processSelection->courses->each(function ($course) {
@@ -34,30 +39,26 @@ class ProcessSelectionController extends BasicCrudController
         return new ProcessSelectionResource($processSelection);
     }
 
+
     public function index(Request $request)
     {
         $perPage = (int) $request->get('per_page', $this->defaultPerPage);
         $hasFilter = in_array(Filterable::class, class_uses($this->model()));
-        $query = $this->queryBuilder()->with(['courses', 'documents']);
-
+        $query = $this->queryBuilder();
         if ($hasFilter) {
             $query = $query->filter($request->all());
         }
-
+        $query->where('status', 'active');
         $query->whereNotNull('created_at');
-
         $data = $request->has('all') || !$this->defaultPerPage
             ? $query->get()
             : $query->paginate($perPage);
-
         $resourceCollectionClass = $this->resourceCollection();
         $refClass = new ReflectionClass($this->resourceCollection());
-
         return $refClass->isSubclassOf(ResourceCollection::class)
             ? new $resourceCollectionClass($data)
             : $resourceCollectionClass::collection($data);
     }
-
     protected function model()
     {
         return ProcessSelection::class;

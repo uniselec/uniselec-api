@@ -13,11 +13,11 @@ use App\Http\Controllers\Public\DocumentController as PublicDocumentController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
-
-
+use App\Http\Controllers\Public\ProcessSelectionController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Carbon;
 
+Route::apiResource('process_selections', ProcessSelectionController::class)->names('admin.processSelection');
 
 Route::get('documents/{id}', [PublicDocumentController::class, 'show'])->name('documents.show');
 Route::get('documents', [PublicDocumentController::class, 'index'])->name('documents.index');
