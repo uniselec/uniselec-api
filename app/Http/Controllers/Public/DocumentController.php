@@ -34,7 +34,10 @@ class DocumentController extends BasicCrudController
         return parent::index($request);
     }
 
-
+    protected function queryBuilder(): \Illuminate\Database\Eloquent\Builder
+    {
+        return \App\Models\Document::query()->where('status', 'published');
+    }
     /**
      * @OA\Get(
      *     path="/api/documents/{id}",

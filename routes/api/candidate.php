@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Carbon;
 
 
-Route::middleware(['auth:sanctum'])->prefix('candidate')->group(function () {
+Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/me', [AuthController::class, 'me'])->name('user.profile');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('applications', [UserApplicationController::class, 'index'])->name('applications.index');

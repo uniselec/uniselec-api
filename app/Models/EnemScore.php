@@ -18,7 +18,7 @@ class EnemScore extends Model
     ];
 
     protected $casts = [
-        'scores' => 'array', // Cast para array JSON
+        'scores' => 'array',
     ];
 
     public function application()

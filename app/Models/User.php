@@ -10,17 +10,6 @@ use OpenApi\Annotations as OA;
 use EloquentFilter\Filterable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/**
- * @OA\Schema(
- *     schema="User",
- *     required={"name", "email", "password"},
- *     @OA\Property(property="id", type="integer", readOnly=true, description="User ID"),
- *     @OA\Property(property="name", type="string", description="User name"),
- *     @OA\Property(property="email", type="string", description="User email"),
- *     @OA\Property(property="cpf", type="string", description="User cpf"),
- *     @OA\Property(property="password", type="string", description="User password"),
- * )
- */
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, Filterable;
@@ -42,9 +31,7 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
-    /**
-     * Get the applications for the user.
-     */
+
     public function applications(): HasMany
     {
         return $this->hasMany(Application::class);

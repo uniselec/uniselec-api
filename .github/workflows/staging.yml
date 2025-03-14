@@ -1,8 +1,9 @@
-name: Static Web App build & deploy - Website-Staging
+name: Api - Staging - Deploy
 on:
   push:
     branches:
       - main
+
 
 jobs:
   web-deploy:
@@ -16,7 +17,7 @@ jobs:
     - name: 📦 Set up PHP
       uses: shivammathur/setup-php@v2
       with:
-        php-version: '8.1'
+        php-version: '8.2'
 
     - name: 🛠️ Install Composer
       run: |
@@ -30,6 +31,6 @@ jobs:
     - name: 📂 Sync files
       uses: SamKirkland/FTP-Deploy-Action@v4.3.5
       with:
-        server: jefponte.com
-        username: uniselec-api-staging@jefponte.com
-        password: ${{ secrets.FTP_PASSWORD }}
+        server: ${{ secrets.FTP_SERVER_STAGING }}
+        username: ${{ secrets.FTP_USENAME_STAGING }}
+        password: ${{ secrets.FTP_PASSWORD_STAGING }}
