@@ -16,9 +16,9 @@ class CourseController extends BasicCrudController
 
     private $rules = [
         'name' => '',
+        'academic_unit' => '',
         'modality' => '',
-        'campus' => '',
-        'state' => '',
+
     ];
 
     public function index(Request $request)

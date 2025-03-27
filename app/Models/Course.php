@@ -10,15 +10,10 @@ class Course extends Model
 {
     use HasFactory, Filterable;
 
-    protected $fillable = ['name', 'state', 'modality', 'campus'];
+    protected $fillable = ['name', 'academic_unit', 'modality'];
 
     protected $casts = [
-        'modality' => 'string',
+        'modality'      => 'string',
+        'academic_unit' => 'array',
     ];
-
-    public function processSelections()
-    {
-        return $this->belongsToMany(ProcessSelection::class, 'process_selection_courses')
-            ->withPivot('vacancies');
-    }
 }
