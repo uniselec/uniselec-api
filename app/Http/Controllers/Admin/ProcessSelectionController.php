@@ -10,26 +10,28 @@ use Illuminate\Http\Resources\Json\ResourceCollection;
 use EloquentFilter\Filterable;
 use ReflectionClass;
 
+
 class ProcessSelectionController extends BasicCrudController
 {
+
     private $rules = [
-        'name' => '',
-        'description' => '',
-        'status' => '',
-        'start_date' => '',
-        'end_date' => '',
-        'type' => '',
+        'status' => "",
+        'name' => "",
+        'description' => "",
+        'start_date' => "",
+        'end_date' => "",
+        'type' => "",
+        'courses' => "",
+        'admission_categories' => "",
+        'allowed_enem_years' => "",
+        'currenty_step' => "",
     ];
 
     public function show($id)
     {
         $processSelection = $this->queryBuilder()
-            ->with(['courses', 'documents'])
+            ->with(['documents'])
             ->findOrFail($id);
-
-        $processSelection->courses->each(function ($course) {
-            $course->vacancies = $course->pivot->vacancies;
-        });
 
         return new ProcessSelectionResource($processSelection);
     }
@@ -38,26 +40,20 @@ class ProcessSelectionController extends BasicCrudController
     {
         $perPage = (int) $request->get('per_page', $this->defaultPerPage);
         $hasFilter = in_array(Filterable::class, class_uses($this->model()));
-        $query = $this->queryBuilder()->with(['courses', 'documents']);
-
+        $query = $this->queryBuilder()->with(['documents']);
         if ($hasFilter) {
             $query = $query->filter($request->all());
         }
-
         $query->whereNotNull('created_at');
-
-        $data = $request->has('all') || !$this->defaultPerPage
+        $data = $request->has('all') || ! $this->defaultPerPage
             ? $query->get()
             : $query->paginate($perPage);
-
         $resourceCollectionClass = $this->resourceCollection();
         $refClass = new ReflectionClass($this->resourceCollection());
-
         return $refClass->isSubclassOf(ResourceCollection::class)
             ? new $resourceCollectionClass($data)
             : $resourceCollectionClass::collection($data);
     }
-
     protected function model()
     {
         return ProcessSelection::class;

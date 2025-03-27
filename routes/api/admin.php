@@ -29,9 +29,9 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('admin')->group(f
     Route::apiResource('courses', CourseController::class)->names('admin.courses');
     Route::apiResource('admission_categories', AdmissionCategoryController::class)->names('admin.admission_categories');
     Route::apiResource('academic_units', AcademicUnitController::class)->names('admin.academic_units');
-
-
     Route::apiResource('process_selections', ProcessSelectionController::class)->names('admin.processSelection');
+
+
 
     Route::apiResource('documents', DocumentController::class)->names('documents.api');
     Route::patch('documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('documents.updateStatus');
