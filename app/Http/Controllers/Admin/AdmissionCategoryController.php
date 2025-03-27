@@ -3,22 +3,22 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\BasicCrudController;
-use App\Http\Resources\CourseResource;
-use App\Models\Course;
+use App\Http\Resources\AcademicUnitResource;
+use App\Http\Resources\AdmissionCategoryResource;
+use App\Models\AcademicUnit;
+use App\Models\AdmissionCategory;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use EloquentFilter\Filterable;
 use ReflectionClass;
 
 
-class CourseController extends BasicCrudController
+class AdmissionCategoryController extends BasicCrudController
 {
 
     private $rules = [
         'name' => '',
-        'academic_unit' => '',
-        'modality' => '',
-
+        'description' => ''
     ];
 
     public function index(Request $request)
@@ -41,7 +41,7 @@ class CourseController extends BasicCrudController
     }
     protected function model()
     {
-        return Course::class;
+        return AdmissionCategory::class;
     }
 
     protected function rulesStore()
@@ -61,6 +61,6 @@ class CourseController extends BasicCrudController
 
     protected function resource()
     {
-        return CourseResource::class;
+        return AdmissionCategoryResource::class;
     }
 }

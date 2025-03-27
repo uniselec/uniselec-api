@@ -10,21 +10,23 @@ class ProcessSelection extends Model
     use HasFactory;
 
     protected $fillable = [
+        'status',
         'name',
         'description',
-        'status',
         'start_date',
         'end_date',
-        'type'
+        'type',
+        'courses',
+        'admission_categories',
+        'allowed_enem_years',
+        'currenty_step',
     ];
 
-
-    public function courses()
-    {
-        return $this->belongsToMany(\App\Models\Course::class, 'process_selection_courses')
-            ->withPivot('vacancies')
-            ->withTimestamps();
-    }
+    protected $casts = [
+        'courses' => 'array',
+        'admission_categories'=> 'array',
+        'allowed_enem_years'=> 'array',
+    ];
 
     public function applications()
     {

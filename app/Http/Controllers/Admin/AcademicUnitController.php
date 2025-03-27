@@ -3,22 +3,21 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\BasicCrudController;
-use App\Http\Resources\CourseResource;
-use App\Models\Course;
+use App\Http\Resources\AcademicUnitResource;
+use App\Models\AcademicUnit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use EloquentFilter\Filterable;
 use ReflectionClass;
 
 
-class CourseController extends BasicCrudController
+class AcademicUnitController extends BasicCrudController
 {
 
     private $rules = [
         'name' => '',
-        'academic_unit' => '',
-        'modality' => '',
-
+        'description' => '',
+        'state' => '',
     ];
 
     public function index(Request $request)
@@ -41,7 +40,7 @@ class CourseController extends BasicCrudController
     }
     protected function model()
     {
-        return Course::class;
+        return AcademicUnit::class;
     }
 
     protected function rulesStore()
@@ -61,6 +60,6 @@ class CourseController extends BasicCrudController
 
     protected function resource()
     {
-        return CourseResource::class;
+        return AcademicUnitResource::class;
     }
 }

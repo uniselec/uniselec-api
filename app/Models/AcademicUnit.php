@@ -6,14 +6,15 @@ use EloquentFilter\Filterable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Course extends Model
+class AcademicUnit extends Model
 {
     use HasFactory, Filterable;
 
-    protected $fillable = ['name', 'academic_unit', 'modality'];
+    protected $fillable = ['name', 'description','state'];
 
     protected $casts = [
-        'modality'      => 'string',
-        'academic_unit' => 'array',
+        'modality' => 'string',
     ];
+
+
 }
