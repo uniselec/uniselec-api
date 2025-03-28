@@ -15,7 +15,6 @@ return new class extends Migration
             // Adiciona o campo JSON para armazenar os anos permitidos para as notas do ENEM
             $table->json('allowed_enem_years')
                   ->nullable()
-                  ->default(json_encode([]))
                   ->after('modalities');
         });
     }
