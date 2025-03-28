@@ -13,11 +13,10 @@ return new class extends Migration
     public function up(): void
     {
         DB::statement("
-        ALTER TABLE process_selections
-        CHANGE COLUMN modalities admission_categories longtext
-        CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL
-        CHECK (json_valid(`admission_categories`))
-    ");
+            ALTER TABLE process_selections
+            CHANGE COLUMN modalities admission_categories longtext
+            CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL
+        ");
     }
 
     /**
