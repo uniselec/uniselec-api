@@ -25,16 +25,12 @@ class ProcessSelectionController extends BasicCrudController
     {
         $processSelection = $this->queryBuilder()
             ->with([
-                'courses',
                 'documents' => function ($query) {
                     $query->where('status', 'published');
                 }
             ])
             ->findOrFail($id);
 
-        $processSelection->courses->each(function ($course) {
-            $course->vacancies = $course->pivot->vacancies;
-        });
 
         return new ProcessSelectionResource($processSelection);
     }
