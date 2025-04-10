@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AdmissionCategoryController;
 use App\Http\Controllers\User\ApplicationController as UserApplicationController;
 use App\Http\Controllers\Admin\ApplicationController as AdminApplicationController;
 use App\Http\Controllers\Admin\ApplicationOutcomeController;
+use App\Http\Controllers\Admin\BonusOptionController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\EnemScoreController;
@@ -28,6 +29,9 @@ Route::middleware(['auth:sanctum', 'abilities:admin'])->prefix('admin')->group(f
 
     Route::apiResource('courses', CourseController::class)->names('admin.courses');
     Route::apiResource('admission_categories', AdmissionCategoryController::class)->names('admin.admission_categories');
+
+    Route::apiResource('bonus_options', BonusOptionController::class)->names('admin.bonus_options');
+
     Route::apiResource('academic_units', AcademicUnitController::class)->names('admin.academic_units');
     Route::apiResource('process_selections', ProcessSelectionController::class)->names('admin.processSelection');
 
