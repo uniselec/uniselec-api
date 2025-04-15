@@ -20,11 +20,13 @@ class ProcessSelection extends Model
         'admission_categories',
         'allowed_enem_years',
         'currenty_step',
+        'bonus_options'
     ];
 
     protected $casts = [
         'courses' => 'array',
         'admission_categories'=> 'array',
+        'bonus_options'=> 'array',
         'allowed_enem_years'=> 'array',
     ];
 

@@ -24,6 +24,7 @@ class ProcessSelectionController extends BasicCrudController
         'courses' => "",
         'admission_categories' => "",
         'allowed_enem_years' => "",
+        'bonus_options' => "",
         'currenty_step' => "",
     ];
 
