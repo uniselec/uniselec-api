@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ApplicationResource;
 use App\Models\Application;
+use App\Models\ProcessSelection;
 use Illuminate\Http\Request;
 use OpenApi\Annotations as OA;
 use EloquentFilter\Filterable;
@@ -72,19 +73,7 @@ class ApplicationController extends BasicCrudController
 
         return ApplicationResource::collection($data);
     }
-    /**
-     * @OA\Get(
-     *     path="/api/applications",
-     *     summary="Get list of applications",
-     *     tags={"Application"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/Application"))
-     *     )
-     * )
-     */
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -118,36 +107,23 @@ class ApplicationController extends BasicCrudController
         return ApplicationResource::collection($data);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/applications",
-     *     summary="Create or update an application",
-     *     tags={"Application"},
-     *     security={{"sanctum":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(ref="#/components/schemas/Application")
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Application created or updated successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Application")
-     *     ),
-     *     @OA\Response(
-     *         response=400,
-     *         description="Invalid request",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string")
-     *         )
-     *     )
-     * )
-     */
+
     public function store(Request $request)
     {
-        $start = Carbon::parse(env('REGISTRATION_START', '2024-08-02 08:00:00'));
-        $end = Carbon::parse(env('REGISTRATION_END', '2024-08-03 23:59:00'));
-        $now = now();
 
+        $validatedData = $request->validate([
+            'data'  => 'required',
+            'process_selection_id'   => 'required',
+        ]);
+
+
+        $processSelection = ProcessSelection::where('id', $validatedData['process_selection_id'])
+            ->where('status', 'active')
+            ->firstOrFail();
+        $processSelectionId = $processSelection->id;
+        $start = $processSelection->start_date;
+        $end = $processSelection->end_date;
+        $now = now();
         if ($now->lt($start) || $now->gt($end)) {
             return response()->json([
                 'message' => 'Inscrições estão fechadas. O período de inscrição é de ' . $start->format('d/m/Y H:i') . ' até ' . $end->format('d/m/Y H:i') . '.',
@@ -156,17 +132,30 @@ class ApplicationController extends BasicCrudController
 
         $userId = $request->user()->id;
 
-        $existingApplication = Application::where('user_id', $userId)->first();
+        $existingApplication = Application::where('user_id', $userId)
+            ->where('process_Selection_id', $processSelectionId)
+            ->first();
 
+
+        // if($existingApplication) {
+        //     return response()->json([
+        //         'message' => 'Já tem uma inscrição para este candidato neste processo.'
+        //     ], 422);
+        // }
+
+
+        // $applicationData = $validatedData['data'];
         $applicationData = $request->all();
+
         $applicationData['user_id'] = $userId;
 
         $currentTimestamp = now()->toDateTimeString();
         if (!isset($applicationData['data'])) {
             $applicationData['data'] = [];
         }
-        $applicationData['data']['updated_at'] = $currentTimestamp;
 
+        $applicationData['data']['updated_at'] = $currentTimestamp;
+        $applicationData['process_selection_id'] = $processSelectionId;
         if (isset($request->data)) {
             $applicationData['verification_code'] = md5(json_encode($applicationData['data']));
         }
@@ -189,31 +178,6 @@ class ApplicationController extends BasicCrudController
     }
 
 
-
-
-    /**
-     * @OA\Get(
-     *     path="/api/applications/{id}",
-     *     summary="Get an application by ID",
-     *     tags={"Application"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(ref="#/components/schemas/Application")
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Application not found or not authorized"
-     *     )
-     * )
-     */
     public function show($id)
     {
 
@@ -227,33 +191,6 @@ class ApplicationController extends BasicCrudController
         return new ApplicationResource($application);
     }
 
-    /**
-     * @OA\Put(
-     *     path="/api/applications/{id}",
-     *     summary="Update an application",
-     *     tags={"Application"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(ref="#/components/schemas/Application")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Application updated successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/Application")
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Application not found"
-     *     )
-     * )
-     */
     public function update(Request $request, $id)
     {
         $start = Carbon::parse(env('REGISTRATION_START', '2024-08-02 08:00:00'));
