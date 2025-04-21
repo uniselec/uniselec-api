@@ -44,7 +44,7 @@ class ProcessSelectionController extends BasicCrudController
         if ($hasFilter) {
             $query = $query->filter($request->all());
         }
-        $query->where('status', 'active');
+        $query->whereIn('status', ['active', 'finished']);
         $query->whereNotNull('created_at');
         $data = $request->has('all') || !$this->defaultPerPage
             ? $query->get()
