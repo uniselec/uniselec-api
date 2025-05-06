@@ -23,7 +23,8 @@ class ApplicationResource extends JsonResource
             'valid_verification_code' =>  md5(json_encode($this->data)) === $this->verification_code,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
-            'user' => new UserResource($this->whenLoaded('user')), // Inclui os dados do usuário
+            'user' => new UserResource($this->whenLoaded('user')),
+            'process_selection'       => new ProcessSelectionResource($this->whenLoaded('processSelection')),
         ];
     }
 }
