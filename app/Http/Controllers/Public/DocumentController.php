@@ -16,19 +16,7 @@ class DocumentController extends BasicCrudController
         'description' => 'required|max:255'
     ];
 
-    /**
-     * @OA\Get(
-     *     path="/api/documents",
-     *     summary="Get list of documents",
-     *     tags={"Documents"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/Document"))
-     *     )
-     * )
-     */
+
     public function index(Request $request)
     {
         return parent::index($request);
@@ -38,29 +26,7 @@ class DocumentController extends BasicCrudController
     {
         return \App\Models\Document::query()->where('status', 'published');
     }
-    /**
-     * @OA\Get(
-     *     path="/api/documents/{id}",
-     *     summary="Get a document by ID",
-     *     tags={"Documents"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(ref="#/components/schemas/Document")
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Document not found"
-     *     )
-     * )
-     */
+
     public function show($id)
     {
         return parent::show($id);
