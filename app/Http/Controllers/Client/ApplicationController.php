@@ -23,56 +23,8 @@ class ApplicationController extends BasicCrudController
         'data' => 'required|array',
     ];
 
-    public function changeAdminPassword(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'current_password' => 'required',
-            'new_password' => 'required|string|min:8|confirmed',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
-        }
-
-        $admin = $request->user();
 
 
-        if (!Hash::check($request->current_password, $admin->password)) {
-            return response()->json(['error' => 'Senha atual incorreta.'], 403);
-        }
-
-        // Atualização da senha
-        $admin->password = Hash::make($request->new_password);
-        $admin->save();
-
-        return response()->json(['message' => 'Senha alterada com sucesso.'], 200);
-    }
-    public function indexAll(Request $request)
-    {
-        $perPage = (int) $request->get('per_page', $this->defaultPerPage);
-        $hasFilter = in_array(Filterable::class, class_uses($this->model()));
-
-        $query = $this->queryBuilder();
-
-        if ($hasFilter) {
-            $query = $query->filter($request->all());
-        }
-
-        $data = $query->orderBy('id', 'desc')->paginate($perPage);
-
-        if ($data instanceof \Illuminate\Pagination\LengthAwarePaginator) {
-            return ApplicationResource::collection($data->items())->additional([
-                'meta' => [
-                    'current_page' => $data->currentPage(),
-                    'per_page' => $data->perPage(),
-                    'total' => $data->total(),
-                    'last_page' => $data->lastPage(),
-                ],
-            ]);
-        }
-
-        return ApplicationResource::collection($data);
-    }
 
     public function index(Request $request)
     {
@@ -193,21 +145,27 @@ class ApplicationController extends BasicCrudController
 
     public function update(Request $request, $id)
     {
-        $start = Carbon::parse(env('REGISTRATION_START', '2024-08-02 08:00:00'));
-        $end = Carbon::parse(env('REGISTRATION_END', '2024-08-03 23:59:00'));
-        $now = now();
-
-        if ($now->lt($start) || $now->gt($end)) {
-            return response()->json([
-                'message' => 'Inscrições estão fechadas. O período de inscrição é de ' . $start->format('d/m/Y H:i') . ' até ' . $end->format('d/m/Y H:i') . '.',
-            ], 403);
-        }
-
-        $user = $request->user();
-        $application = Application::find($id);
+        $user        = $request->user();
+        $application = Application::with('processSelection')->find($id);
 
         if (!$application || $application->user_id !== $user->id) {
             return response()->json(['error' => 'Você não tem permissão para atualizar esta inscrição.'], 403);
+        }
+
+        $processSelection = $application->processSelection;
+
+        if (!$processSelection || $processSelection->status !== 'active') {
+            return response()->json(['message' => 'Processo de seleção inativo ou inexistente.'], 403);
+        }
+
+        $now  = now();
+        $from = $processSelection->start_date;
+        $to   = $processSelection->end_date;
+
+        if ($now->lt($from) || $now->gt($to)) {
+            return response()->json([
+                'message' => "Inscrições estão fechadas. O período de inscrição é de {$from->format('d/m/Y H:i')} até {$to->format('d/m/Y H:i')}.",
+            ], 403);
         }
 
         return parent::update($request, $id);
