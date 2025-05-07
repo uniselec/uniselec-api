@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\User;
+namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\BasicCrudController;
 use Illuminate\Support\Facades\Validator;
