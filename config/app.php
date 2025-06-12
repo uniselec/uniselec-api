@@ -4,7 +4,9 @@ use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\ServiceProvider;
 
 return [
-
+    'url' => env('APP_URL', 'http://localhost:8000'),
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+    'backoffice_url' => env('BACKOFFICE_URL', 'http://localhost:5174'),
     /*
     |--------------------------------------------------------------------------
     | Application Name
