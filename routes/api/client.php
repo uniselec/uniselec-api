@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
 use App\Http\Controllers\Client\ApplicationController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\RegisterController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -15,5 +16,7 @@ Route::middleware(['auth:sanctum'])->prefix('client')->group(function () {
     Route::apiResource('process_selections', ProcessSelectionController::class)->only(['index', 'show'])->names('admin.processSelection');
     Route::apiResource('documents', DocumentController::class)->only(['index', 'show'])->names('admin.documents');
     Route::apiResource('applications', ApplicationController::class)->only(['index', 'show', 'store'])->names('admin.documents');
+
+    Route::put('profile', [RegisterController::class, 'updateProfileClient'])->name('client.profile.update');
 
 });

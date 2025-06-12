@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Auth;
 use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\Admin;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use OpenApi\Annotations as OA;
 
 class RegisterController extends Controller
@@ -86,5 +88,39 @@ class RegisterController extends Controller
                 ]
             ]);
         }
+    }
+
+
+
+    public function updateProfileClient(Request $request)
+    {
+        $user = $request->user();
+        if (!$user instanceof User) {
+            return response()->json(['message' => 'User is not a client.'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'password'           => 'nullable|string|min:8|confirmed',
+        ], [], $this->validationAttributes());
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation Error',
+                'errors'  => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
+
+        if (!empty($data['password'])) {
+            $data['password'] = Hash::make($data['password']);
+        } else {
+            unset($data['password']);
+        }
+        $user->update($data);
+        $token = $user->createToken('api-web')->plainTextToken;
+        $user['token'] = $token;
+        $user->refresh();
+        return response()->json(['token' => $token, 'user' => new UserResource($user)], 200);
     }
 }

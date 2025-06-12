@@ -3,72 +3,55 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Rules\ValidCpf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use OpenApi\Annotations as OA;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
-
-
-
-    /**
-     * @OA\Post(
-     *     path="/api/login",
-     *     summary="Authenticate user and return token",
-     *     tags={"Auth"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             @OA\Property(property="email", type="string", format="email", example="john.doe@example.com"),
-     *             @OA\Property(property="password", type="string", format="password", example="password123")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="User authenticated successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="token", type="string"),
-     *             @OA\Property(property="user", ref="#/components/schemas/User")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=401,
-     *         description="Invalid credentials"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
-     * )
-     */
     public function auth(Request $request)
     {
-        $input = $request->all();
-
-        $validation = Validator::make($input, [
-            'email' => 'required|email',
-            'password' => 'required',
+        // 1️⃣ Valida só o identificador e a senha
+        $data = $request->validate([
+            'identifier' => ['required', 'string'],           // e-mail ou CPF
+            'password'   => ['required', 'string'],
         ]);
 
-        if ($validation->fails()) {
-            return response()->json(['error' => $validation->errors()], 422);
+        $login = $data['identifier'];
+
+        // 2️⃣ Detecta e busca o usuário
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            $user = User::where('email', $login)->first();
+        } else {
+            // limpa tudo que não for dígito
+            $cpf = preg_replace('/\D/', '', $login);
+            // opcional: valida o formato
+            Validator::make(['cpf' => $cpf], ['cpf' => ['required', 'size:11', new ValidCpf]])->validate();
+            $user = User::where('cpf', $cpf)->first();
         }
 
-        $credentials = $request->only('email', 'password');
-
-        if (!Auth::guard('web')->attempt($credentials)) {
-            abort(401, 'Invalid Credentials');
+        if (! $user) {
+            return response()->json(['message' => 'Credenciais inválidas.'], 401);
         }
 
-        $user = $request->user();
+        // 3️⃣ Checa a senha
+        if (! Hash::check($data['password'], $user->password)) {
+            return response()->json(['message' => 'Credenciais inválidas.'], 401);
+        }
+        // if($user->status !== 'active') {
+        //     return response()->json(['message' => 'User is not active.'], 403);
+        // }
+        // 4️⃣ Emite o token Sanctum
         $token = $user->createToken('api-web', ['web'])->plainTextToken;
 
         return response()->json([
             'token' => $token,
-            'user' => $user,
-        ]);
+            'user'  => $user,
+        ], 200);
     }
     public function authAdmin(Request $request)
     {
@@ -77,54 +60,29 @@ class AuthController extends Controller
             'email' => 'required|email',
             'password' => 'required',
         ]);
-        if ($validation->fails()) {
-            return response()->json(['error' => $validation->errors()], 422);
-        }
+
         $credentials = $request->only('email', 'password');
         if (!Auth::guard('admin')->attempt($credentials)) {
             abort(401, 'Invalid Credentials');
         }
         $user = $request->user('admin');
+
         $token = $user->createToken('api-web', ['admin'])->plainTextToken;
         return response()->json(
             ['token' => $token, 'user' => $user]
         );
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/logout",
-     *     summary="Logout user",
-     *     tags={"Auth"},
-     *     security={{"bearerAuth":{}}},
-     *     security={{"sanctum":{}}},
-     *     @OA\Response(
-     *         response=204,
-     *         description="Logged out successfully"
-     *     )
-     * )
-     */
     public function logout(Request $request)
     {
-        $user = $request->user();
-        $user->tokens()->delete();
-
-        return response()->json(['message' => 'Logged out from all sessions successfully'], 204);
+        if (!$request->user()) {
+            return response()->json(['message' => 'User not authenticated.'], 401);
+        }
+        $request->user()->currentAccessToken()->delete();
+        return response()->json(['message' => 'Logged out successfully.'], 200);
     }
 
-    /**
-     * @OA\Get(
-     *     path="/api/me",
-     *     summary="Get authenticated user",
-     *     tags={"Auth"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Authenticated user data",
-     *         @OA\JsonContent(ref="#/components/schemas/User")
-     *     )
-     * )
-     */
+
     public function me(Request $request)
     {
         $user = $request->user();
@@ -132,5 +90,12 @@ class AuthController extends Controller
         return response()->json(
             ['me' => $user]
         );
+    }
+
+    public function invalidateAllTokens(Request $request)
+    {
+        PersonalAccessToken::query()->delete();
+
+        return response()->json(['message' => 'Todos os tokens foram invalidados com sucesso.'], 200);
     }
 }
