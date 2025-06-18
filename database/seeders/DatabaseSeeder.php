@@ -18,5 +18,8 @@ class DatabaseSeeder extends Seeder
         $this->call(AdmissionCategorySeeder::class);
         $this->call(AdminSeeder::class);
         $this->call(AcademicUnitSeeder::class);
+        $this->call(BonusOptionSeeder::class);
+        $this->call(CourseSeeder::class);
+
     }
 }
