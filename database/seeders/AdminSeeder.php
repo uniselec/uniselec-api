@@ -14,6 +14,7 @@ class AdminSeeder extends Seeder
         DB::table('admins')->insert([
             'name'       => 'Jefferson Uchoa Ponte',
             'email'      => 'jefponte@gmail.com',
+            'role'      => 'super_user',
             'password'   => Hash::make('rootroot'),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
