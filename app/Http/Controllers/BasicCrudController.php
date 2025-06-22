@@ -9,12 +9,11 @@ use EloquentFilter\Filterable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 abstract class BasicCrudController extends Controller
 {
-
     protected $defaultPerPage = 15;
 
     protected abstract function model();
@@ -49,11 +48,12 @@ abstract class BasicCrudController extends Controller
             : $resourceCollectionClass::collection($data);
     }
 
-
-
     public function store(Request $request)
     {
-        $validatedData = $this->validate($request, $this->rulesStore());
+        $validator = Validator::make($request->all(), $this->rulesStore());
+
+        $validatedData = $validator->validate();
+
         $obj = $this->queryBuilder()->create($validatedData);
         $obj->refresh();
         $resource = $this->resource();
@@ -77,10 +77,13 @@ abstract class BasicCrudController extends Controller
     public function update(Request $request, $id)
     {
         $obj = $this->findOrFail($id);
-        $validatedData = $this->validate(
-            $request,
-            $request->isMethod('PUT') ? $this->rulesUpdate() : $this->rulesPatch()
-        );
+
+        $rules = $request->isMethod('PUT') ? $this->rulesUpdate() : $this->rulesPatch();
+
+        $validator = Validator::make($request->all(), $rules);
+
+        $validatedData = $validator->validate();
+
         $obj->update($validatedData);
         $resource = $this->resource();
         return new $resource($obj);

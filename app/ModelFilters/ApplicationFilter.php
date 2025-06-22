@@ -6,9 +6,9 @@ class ApplicationFilter extends DefaultModelFilter
 {
     protected $sortable = ['created_at'];
 
-    public function search($search)
+    public function search($description)
     {
-        $this->where('name', 'LIKE', "%$search%");
+        $this->where('description', 'LIKE', "%$description%");
     }
 
     /**

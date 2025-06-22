@@ -1,6 +1,5 @@
 <?php
 
-
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\BasicCrudController;
@@ -8,143 +7,80 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\UserCollection;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Notifications\AdminResetPasswordNotification;
+use App\Notifications\UserResetPasswordNotification;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use OpenApi\Annotations as OA;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Http\Resources\Json\ResourceCollection;
+use ReflectionClass;
+use EloquentFilter\Filterable;
+use Illuminate\Support\Facades\Storage;
 
 class UserController extends BasicCrudController
 {
+
     private $rules = [
         'name' => 'required|max:255',
-        'email' => 'required|max:255'
+        'nickname' => '',
+        'email' => 'required|max:255',
+        'mobile' => '',
+        'phone' => '',
+        'institutional_phone' => '',
+        'joined_at' => '',
+        'birthdate' => '',
+        'gender' => '',
+        'enrollment' => '',
+        'cpf' => '',
+        'rg' => '',
+        'rg_issued_at' => '',
+        'rg_issuer' => '',
+        'rg_state' => '',
+        'address' => '',
+        'address_number' => '',
+        'address_complement' => '',
+        'neighborhood' => '',
+        'city' => '',
+        'nucleus_code' => '',
+        'state' => '',
+        'zip_code' => '',
+        'degree' => '',
+        'position' => '',
+        'functional_status' => '',
+        'institutional_email' => '',
+        'email_verified_at' => '',
+        'remember_token' => '',
+        'password' => '',
+        'status' => '',
+        'documents' => '',
     ];
-
-    /**
-     * @OA\Get(
-     *     path="/api/users",
-     *     summary="Get list of users",
-     *     tags={"Users"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/User"))
-     *     )
-     * )
-     */
-    public function index(Request $request)
+    public function resendPasswordResetLink(Request $request)
     {
-        return parent::index($request);
-    }
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email|exists:users,email',
+        ]);
 
-    /**
-     * @OA\Post(
-     *     path="/api/users",
-     *     summary="Create a new user",
-     *     tags={"Users"},
-     *     security={{"sanctum":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(ref="#/components/schemas/User")
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="User created successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/User")
-     *     )
-     * )
-     */
-    public function store(Request $request)
-    {
-        return parent::store($request);
-    }
+        if ($validator->fails()) {
+            return response()->json(['message' => 'E-mail inválido ou não encontrado.'], 422);
+        }
 
-    /**
-     * @OA\Get(
-     *     path="/api/users/{id}",
-     *     summary="Get a user by ID",
-     *     tags={"Users"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(ref="#/components/schemas/User")
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="User not found"
-     *     )
-     * )
-     */
-    public function show($id)
-    {
-        return parent::show($id);
-    }
+        $email = $request->input('email');
 
-    /**
-     * @OA\Put(
-     *     path="/api/users/{id}",
-     *     summary="Update a user",
-     *     tags={"Users"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(ref="#/components/schemas/User")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="User updated successfully",
-     *         @OA\JsonContent(ref="#/components/schemas/User")
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="User not found"
-     *     )
-     * )
-     */
-    public function update(Request $request, $id)
-    {
-        return parent::update($request, $id);
-    }
+        Password::broker('users')->sendResetLink(
+            ['email' => $email],
+            function ($user, $token) {
+                $frontendUrl = config('app.frontend_url');
+                $resetLink = "{$frontendUrl}/reset-password/{$token}/" . urlencode($user->email);
 
-    /**
-     * @OA\Delete(
-     *     path="/api/users/{id}",
-     *     summary="Delete a user",
-     *     tags={"Users"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=204,
-     *         description="User deleted successfully"
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="User not found"
-     *     )
-     * )
-     */
-    public function destroy($id)
-    {
-        return parent::destroy($id);
-    }
+                $user->notify(new UserResetPasswordNotification($resetLink));
+            }
+        );
 
+        return response()->json(['message' => 'Link de redefinição reenviado com sucesso.']);
+    }
     protected function model()
     {
         return User::class;

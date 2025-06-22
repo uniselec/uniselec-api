@@ -8,7 +8,10 @@ class AdminFilter extends DefaultModelFilter
 
     public function search($search)
     {
-        $this->where('name', 'LIKE', "%$search%");
+        $this->where(function ($query) use ($search) {
+            $query->where('name', 'LIKE', "%$search%")
+                  ->orWhere('email', 'LIKE', "%$search%");
+        });
     }
 
     /**
