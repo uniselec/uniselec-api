@@ -101,7 +101,7 @@ class RegisterController extends Controller
 
         $validator = Validator::make($request->all(), [
             'password'           => 'nullable|string|min:8|confirmed',
-        ], [], $this->validationAttributes());
+        ], [], []);
 
         if ($validator->fails()) {
             return response()->json([
@@ -123,4 +123,41 @@ class RegisterController extends Controller
         $user->refresh();
         return response()->json(['token' => $token, 'user' => new UserResource($user)], 200);
     }
+    public function updateProfileAdmin(Request $request)
+    {
+        $user = $request->user();
+        if (!$user instanceof Admin) {
+            return response()->json(['message' => 'User is not an admin.'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'email' => 'sometimes|required|email|unique:admins,email,' . $user->id,
+            'password' => 'nullable|min:8|confirmed'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation Error',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $data = $validator->validated();
+
+        if (isset($data['password']) && $data['password']) {
+            $data['password'] = Hash::make($data['password']);
+        } else {
+            unset($data['password']);
+        }
+
+        $user->update($data);
+        $token = $user->createToken('api-web', [$user->role])->plainTextToken;
+
+        return response()->json(
+            ['token' => $token, 'user' => $user],
+            200
+        );
+    }
+
 }

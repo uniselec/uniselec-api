@@ -3,17 +3,12 @@
 use App\Http\Controllers\Admin\AcademicUnitController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdmissionCategoryController;
-use App\Http\Controllers\Admin\ApplicationOutcomeController;
+use App\Http\Controllers\Admin\ApplicationController;
 use App\Http\Controllers\Admin\BonusOptionController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DocumentController;
-use App\Http\Controllers\Admin\EnemScoreController;
-use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
-use App\Http\Controllers\Admin\ProcessSelectionCourseController;
-use App\Http\Controllers\Admin\ApplicationController;
 use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
 
@@ -43,22 +38,15 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::apiResource('applications', ApplicationController::class)->only(['index', 'show'])->names('admin.applications');
         Route::apiResource('users', UserController::class)->only(['index', 'show']);
 
+        Route::put('profile', [RegisterController::class, 'updateProfileAdmin'])->name('admin.super_user.profile.update');
 
 
-
-
-        Route::put('change-password', [AuthController::class, 'changeAdminPassword'])->name('admin.changePassword');
-        // Route::get('applications', [AdminApplicationController::class, 'index'])->name('applications.index');
-        // Route::get('applications/{application}', [AdminApplicationController::class, 'show'])->name('applications.api.show');
-
-
-
-        Route::post('/process-outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
-        Route::post('/process-outcomes-without-pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);
-        Route::apiResource('enem-scores', EnemScoreController::class)->names('enem_scores.api');
-        Route::get('application-outcomes', [ApplicationOutcomeController::class, 'index'])->name('application-outcomes.api.index');
-        Route::get('application-outcomes/{id}', [ApplicationOutcomeController::class, 'show'])->name('application-outcomes.api.show');
-        Route::patch('application-outcomes/{id}', [ApplicationOutcomeController::class, 'patchUpdate'])->name('application-outcomes.patch');
+        // Route::post('/process-outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
+        // Route::post('/process-outcomes-without-pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);
+        // Route::apiResource('enem-scores', EnemScoreController::class)->names('enem_scores.api');
+        // Route::get('application-outcomes', [ApplicationOutcomeController::class, 'index'])->name('application-outcomes.api.index');
+        // Route::get('application-outcomes/{id}', [ApplicationOutcomeController::class, 'show'])->name('application-outcomes.api.show');
+        // Route::patch('application-outcomes/{id}', [ApplicationOutcomeController::class, 'patchUpdate'])->name('application-outcomes.patch');
 
 
         Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
