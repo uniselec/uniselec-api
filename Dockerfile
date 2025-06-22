@@ -1,4 +1,4 @@
-FROM php:8.1-apache
+FROM php:8.2-apache
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libpq-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_pgsql mbstring zip exif pcntl gd
+    && docker-php-ext-install pdo pdo_pgsql pdo_mysql mbstring zip exif pcntl gd
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 RUN a2enmod rewrite
 COPY . /var/www/html

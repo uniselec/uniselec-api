@@ -21,7 +21,7 @@ class Application extends Model
     ];
 
     protected $casts = [
-        'data' => 'array',
+        'form_data' => 'array',
     ];
 
     public function user()

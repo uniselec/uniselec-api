@@ -11,6 +11,7 @@ use App\Models\Venue;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use EloquentFilter\Filterable;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Validator;
 use ReflectionClass;
 
@@ -40,6 +41,12 @@ class ApplicationController extends BasicCrudController
         return $refClass->isSubclassOf(ResourceCollection::class)
             ? new $resourceCollectionClass($data)
             : $resourceCollectionClass::collection($data);
+    }
+
+    public function show($id)
+    {
+        $application = Application::findOrFail($id);
+        return new ApplicationResource($application);
     }
     protected function model()
     {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Rules\ValidCpf;
 use Illuminate\Http\Request;
@@ -47,7 +48,7 @@ class AuthController extends Controller
         // }
         // 4️⃣ Emite o token Sanctum
         $token = $user->createToken('api-web', ['web'])->plainTextToken;
-
+        $user = new UserResource($user);
         return response()->json([
             'token' => $token,
             'user'  => $user,
@@ -91,7 +92,12 @@ class AuthController extends Controller
             ['me' => $user]
         );
     }
-
+    public function meClient(Request $request)
+    {
+        $user = $request->user();
+        $user = User::with('statusLogs')->findOrFail($user->id);
+        return new UserResource($user);
+    }
     public function invalidateAllTokens(Request $request)
     {
         PersonalAccessToken::query()->delete();

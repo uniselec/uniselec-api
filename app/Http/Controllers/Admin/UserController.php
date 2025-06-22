@@ -100,6 +100,11 @@ class UserController extends BasicCrudController
     {
         return $this->resource();
     }
+    public function show($id)
+    {
+        $user = User::findOrFail($id);
+        return new UserResource($user);
+    }
 
     protected function resource()
     {

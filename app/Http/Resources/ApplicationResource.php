@@ -6,14 +6,13 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class ApplicationResource extends JsonResource
 {
+
     /**
      * Transform the resource into an array.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return array
      */
-
-    public static $wrap = 'data';
     public function toArray($request)
     {
         return parent::toArray($request);
