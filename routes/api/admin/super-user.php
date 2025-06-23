@@ -4,9 +4,12 @@ use App\Http\Controllers\Admin\AcademicUnitController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdmissionCategoryController;
 use App\Http\Controllers\Admin\ApplicationController;
+use App\Http\Controllers\Admin\ApplicationOutcomeController;
 use App\Http\Controllers\Admin\BonusOptionController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DocumentController;
+use App\Http\Controllers\Admin\EnemScoreController;
+use App\Http\Controllers\Admin\EnemScoreImportController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
@@ -29,26 +32,24 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::apiResource('process_selections', ProcessSelectionController::class)->names('admin.processSelection');
         Route::apiResource('admission_categories', AdmissionCategoryController::class)->names('admin.admission_categories');
         Route::apiResource('bonus_options', BonusOptionController::class)->names('admin.bonus_options');
-
-
         Route::apiResource('documents', DocumentController::class)->names('documents.api');
+
         Route::patch('documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('documents.updateStatus');
 
-
         Route::apiResource('applications', ApplicationController::class)->only(['index', 'show'])->names('admin.applications');
+        Route::apiResource('application_outcomes', ApplicationOutcomeController::class)->only(['index', 'show'])->names('admin.applications');
         Route::apiResource('users', UserController::class)->only(['index', 'show']);
-
+        Route::apiResource('enem_scores', EnemScoreController::class)->only(['index', 'show'])->names('enem_scores.api');;
         Route::put('profile', [RegisterController::class, 'updateProfileAdmin'])->name('admin.super_user.profile.update');
 
 
         // Route::post('/process-outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
         // Route::post('/process-outcomes-without-pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);
-        // Route::apiResource('enem-scores', EnemScoreController::class)->names('enem_scores.api');
         // Route::get('application-outcomes', [ApplicationOutcomeController::class, 'index'])->name('application-outcomes.api.index');
         // Route::get('application-outcomes/{id}', [ApplicationOutcomeController::class, 'show'])->name('application-outcomes.api.show');
         // Route::patch('application-outcomes/{id}', [ApplicationOutcomeController::class, 'patchUpdate'])->name('application-outcomes.patch');
 
-
+        Route::post('enem_scores/import', EnemScoreImportController::class)->name('enem_scores.import');
         Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
         Route::get('/me', [AuthController::class, 'me'])->name('user.profile');
         Route::post('/register', [RegisterController::class, 'registerAdmin'])->name('admin.register');

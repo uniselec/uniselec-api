@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\BasicCrudController;
 use App\Http\Resources\EnemScoreResource;
 use App\Models\EnemScore;
-use App\Models\Application;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Http\Resources\Json\ResourceCollection;
+use EloquentFilter\Filterable;
+use ReflectionClass;
 use Illuminate\Database\Eloquent\Builder;
+
 class EnemScoreController extends BasicCrudController
 {
+
     private $rules = [
         'enem' => 'required|max:255',
         "scores" => 'required',
@@ -19,59 +22,22 @@ class EnemScoreController extends BasicCrudController
 
     public function index(Request $request)
     {
-        return parent::index($request);
-    }
-    public function queryBuilder(): Builder
-    {
-        return parent::queryBuilder()->with('application');
-    }
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), $this->rulesStore());
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+        $perPage = (int) $request->get('per_page', $this->defaultPerPage);
+        $hasFilter = in_array(Filterable::class, class_uses($this->model()));
+        $query = $this->queryBuilder();
+        if ($hasFilter) {
+            $query = $query->filter($request->all());
         }
-
-        $applications = Application::where('data->enem', $request->enem)->get();
-
-        if ($applications->isEmpty()) {
-            return response()->json(['error' => 'Nenhuma inscrição encontrada para o ENEM informado.'], 404);
-        }
-
-        $enemScores = [];
-        foreach ($applications as $application) {
-            $enemScore = EnemScore::updateOrCreate(
-                [
-                    'enem' => $request->enem,
-                    'application_id' => $application->id,
-                ],
-                [
-                    'scores' => $request->scores,
-                    'original_scores' => $request->original_scores,
-                ]
-            );
-
-            $enemScores[] = new EnemScoreResource($enemScore);
-        }
-
-        return response()->json($enemScores, 201);
+        $query->whereNotNull('created_at');
+        $data = $request->has('all') || ! $this->defaultPerPage
+            ? $query->get()
+            : $query->paginate($perPage);
+        $resourceCollectionClass = $this->resourceCollection();
+        $refClass = new ReflectionClass($this->resourceCollection());
+        return $refClass->isSubclassOf(ResourceCollection::class)
+            ? new $resourceCollectionClass($data)
+            : $resourceCollectionClass::collection($data);
     }
-
-    public function show($id)
-    {
-        return parent::show($id);
-    }
-
-    public function update(Request $request, $id)
-    {
-        return parent::update($request, $id);
-    }
-
-    public function destroy($id)
-    {
-        return parent::destroy($id);
-    }
-
     protected function model()
     {
         return EnemScore::class;
@@ -95,5 +61,10 @@ class EnemScoreController extends BasicCrudController
     protected function resource()
     {
         return EnemScoreResource::class;
+    }
+
+    public function queryBuilder(): Builder
+    {
+        return parent::queryBuilder()->with('application');
     }
 }
