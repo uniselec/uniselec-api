@@ -8,6 +8,8 @@ use App\Models\EnemScore;
 
 class ProcessApplicationOutcome
 {
+    public function __construct(private int $processSelectionId) {}
+
     public function process()
     {
         $this->ensureAllApplicationsHaveOutcomes();
@@ -17,7 +19,8 @@ class ProcessApplicationOutcome
 
     private function ensureAllApplicationsHaveOutcomes()
     {
-        $applications = Application::doesntHave('applicationOutcome')->get();
+        $applications = Application::where('process_selection_id', $this->processSelectionId)
+            ->doesntHave('applicationOutcome')->get();
 
         foreach ($applications as $application) {
             $this->createOrUpdateOutcomeForApplication($application, 'pending', 'Resultado Não Processado');
@@ -26,7 +29,12 @@ class ProcessApplicationOutcome
 
     private function processEnemScores()
     {
-        $enemScores = EnemScore::with('application')->get();
+        $enemScores = EnemScore::with('application')
+            ->whereHas(
+                'application',
+                fn($q) =>
+                $q->where('process_selection_id', $this->processSelectionId)
+            )->get();
         $processedApplicationIds = [];
 
         foreach ($enemScores as $enemScore) {
@@ -40,25 +48,25 @@ class ProcessApplicationOutcome
 
             $averageScore = $this->calculateAverageScore($enemScore->scores);
 
-            if (isset($application->data['bonus'])) {
-                $finalScore = $this->applyBonus($averageScore, $application->data['bonus']);
+            if (isset($application->form_data['bonus'])) {
+                $finalScore = $this->applyBonus($averageScore, $application->form_data['bonus']);
             } else {
                 $finalScore = $averageScore;
             }
 
             $reasons = [];
 
-            if ($enemScore->scores['cpf'] !== $application->data['cpf']) {
+            if ($enemScore->scores['cpf'] !== $application->form_data['cpf']) {
                 $reasons[] = 'Inconsistência no CPF';
             }
 
-            if ($this->normalizeString($enemScore->scores['name']) !== $this->normalizeString($application->data['name'])) {
+            if ($this->normalizeString($enemScore->scores['name']) !== $this->normalizeString($application->form_data['name'])) {
                 $reasons[] = 'Inconsistência no Nome';
             }
 
             $birthdateInconsistency = false;
-            if (isset($application->data['birtdate']) && isset($enemScore->scores['birthdate'])) {
-                $applicationBirthdate = \DateTime::createFromFormat('Y-m-d', $application->data['birtdate']);
+            if (isset($application->form_data['birthdate']) && isset($enemScore->scores['birthdate'])) {
+                $applicationBirthdate = \DateTime::createFromFormat('Y-m-d', $application->form_data['birtdate']);
                 $enemScoreBirthdate = \DateTime::createFromFormat('d/m/Y', $enemScore->scores['birthdate']);
 
                 if (!$applicationBirthdate || !$enemScoreBirthdate || $applicationBirthdate->format('Y-m-d') !== $enemScoreBirthdate->format('Y-m-d')) {
@@ -116,13 +124,13 @@ class ProcessApplicationOutcome
     private function applyBonus($averageScore, $bonuses)
     {
         $finalScore = $averageScore;
-        foreach ($bonuses as $bonus) {
-            if (strpos($bonus, '10%') !== false) {
-                $finalScore *= 1.10;
-            } elseif (strpos($bonus, '20%') !== false) {
-                $finalScore *= 1.20;
-            }
-        }
+        // foreach ($bonuses as $bonus) {
+        //     if (strpos($bonus, '10%') !== false) {
+        //         $finalScore *= 1.10;
+        //     } elseif (strpos($bonus, '20%') !== false) {
+        //         $finalScore *= 1.20;
+        //     }
+        // }
         return $finalScore;
     }
 

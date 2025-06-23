@@ -15,10 +15,10 @@ class UserFilter extends DefaultModelFilter
     {
         $this->where('name', 'LIKE', "%$name%");
     }
-    public function status($status)
-    {
-        $this->where('status', 'LIKE', "$status");
-    }
+    // public function status($status)
+    // {
+    //     $this->where('status', 'LIKE', "$status");
+    // }
     public function id($id)
     {
         $this->where('id', 'LIKE', "%$id%");

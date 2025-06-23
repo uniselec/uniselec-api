@@ -5,10 +5,14 @@ namespace App\ModelFilters;
 class ApplicationFilter extends DefaultModelFilter
 {
     protected $sortable = ['created_at'];
-
+    protected $drop_id = false;
     public function search($description)
     {
         $this->where('description', 'LIKE', "%$description%");
+    }
+    public function processSelectionId($id)
+    {
+        $this->where('process_selection_id', $id);
     }
 
     /**
