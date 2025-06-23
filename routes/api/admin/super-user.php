@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\EnemScoreController;
 use App\Http\Controllers\Admin\EnemScoreImportController;
+use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
@@ -43,10 +44,9 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::put('profile', [RegisterController::class, 'updateProfileAdmin'])->name('admin.super_user.profile.update');
 
 
-        // Route::post('/process-outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
-        // Route::post('/process-outcomes-without-pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);
-        // Route::get('application-outcomes', [ApplicationOutcomeController::class, 'index'])->name('application-outcomes.api.index');
-        // Route::get('application-outcomes/{id}', [ApplicationOutcomeController::class, 'show'])->name('application-outcomes.api.show');
+        Route::post('process_selections/{selection}/outcomes',[ProcessApplicationOutcomeController::class,'processOutcomes']);
+        Route::post('process_selections/{selection}/outcomes_without_pending',[ProcessApplicationOutcomeController::class,'processOutcomesWithoutPending']);
+
         // Route::patch('application-outcomes/{id}', [ApplicationOutcomeController::class, 'patchUpdate'])->name('application-outcomes.patch');
 
         Route::post('enem_scores/import', EnemScoreImportController::class)->name('enem_scores.import');

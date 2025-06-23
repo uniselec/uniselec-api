@@ -8,17 +8,21 @@ use App\Services\ProcessApplicationOutcomeWithoutPending;
 
 class ProcessApplicationOutcomeController extends Controller
 {
-    public function processOutcomes()
+    public function processOutcomes(int $selectionId)
     {
-        $service = new ProcessApplicationOutcome();
-        $service->process();
-        return response()->json(['message' => 'Application outcomes processed successfully.']);
+        (new ProcessApplicationOutcome($selectionId))->process();
+
+        return response()->json([
+            'message' => "Outcomes processed for process {$selectionId}"
+        ]);
     }
 
-    public function processOutcomesWithoutPending()
+    public function processOutcomesWithoutPending(int $selectionId)
     {
-        $service = new ProcessApplicationOutcomeWithoutPending();
-        $service->process();
-        return response()->json(['message' => 'Application outcomes processed successfully without pending status.']);
+        (new ProcessApplicationOutcomeWithoutPending($selectionId))->process();
+
+        return response()->json([
+            'message' => "Outcomes processed (no pending) for process {$selectionId}"
+        ]);
     }
 }
