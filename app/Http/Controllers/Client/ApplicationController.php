@@ -98,15 +98,14 @@ class ApplicationController extends BasicCrudController
         $applicationData['user_id'] = $userId;
 
         $currentTimestamp = now()->toDateTimeString();
-        if (!isset($applicationData['data'])) {
-            $applicationData['data'] = [];
+        if (!isset($applicationData['form_data'])) {
+            $applicationData['form_data'] = [];
         }
 
-        $applicationData['data']['updated_at'] = $currentTimestamp;
+        $applicationData['form_data']['updated_at'] = $currentTimestamp;
         $applicationData['process_selection_id'] = $processSelectionId;
-        if (isset($request->data)) {
-            $applicationData['verification_code'] = md5(json_encode($applicationData['data']));
-        }
+        $applicationData['verification_code'] = md5(json_encode($applicationData['form_data']));
+
 
         if ($existingApplication) {
             $existingApplication->update($applicationData);
