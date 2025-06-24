@@ -15,7 +15,7 @@ class Application extends Model
 
     protected $fillable = [
         'user_id',
-        'data',
+        'form_data',
         'process_selection_id',
         'verification_code'
     ];
