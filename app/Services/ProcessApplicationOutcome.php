@@ -17,59 +17,75 @@ class ProcessApplicationOutcome
         $this->markDuplicateApplications();
     }
 
-    private function ensureAllApplicationsHaveOutcomes()
-    {
-        $applications = Application::where('process_selection_id', $this->processSelectionId)
-            ->doesntHave('applicationOutcome')->get();
+    /* ---------------------------------------------------------------------- */
+    /* ----------------------   1) OUTCOME PLACEHOLDERS   -------------------- */
+    /* ---------------------------------------------------------------------- */
 
-        foreach ($applications as $application) {
-            $this->createOrUpdateOutcomeForApplication($application, 'pending', 'Resultado Não Processado');
-        }
+    private function ensureAllApplicationsHaveOutcomes(): void
+    {
+        Application::where('process_selection_id', $this->processSelectionId)
+            ->doesntHave('applicationOutcome')
+            ->each(fn ($app) =>
+                $this->createOrUpdateOutcomeForApplication(
+                    $app,
+                    'pending',
+                    'Resultado Não Processado'
+                )
+            );
     }
 
-    private function processEnemScores()
+    /* ---------------------------------------------------------------------- */
+    /* ----------------------   2) PROCESSAMENTO ENEM    --------------------- */
+    /* ---------------------------------------------------------------------- */
+
+    private function processEnemScores(): void
     {
         $enemScores = EnemScore::with('application')
-            ->whereHas(
-                'application',
-                fn($q) =>
+            ->whereHas('application', fn ($q) =>
                 $q->where('process_selection_id', $this->processSelectionId)
-            )->get();
-        $processedApplicationIds = [];
+            )
+            ->get();
+
+        $processedIds = [];
 
         foreach ($enemScores as $enemScore) {
-            $application = $enemScore->application;
-            $processedApplicationIds[] = $application->id;
+            $application      = $enemScore->application;
+            $processedIds[]   = $application->id;
+            $applicationData  = $application->form_data ?? [];
 
-            if (strpos($enemScore->original_scores, 'Candidato não encontrado') !== false) {
-                $this->createOrUpdateOutcomeForApplication($application, 'rejected', 'Inscrição do ENEM não Identificada');
+            /* --- inscrição não localizada --- */
+            if (str_contains($enemScore->original_scores, 'Candidato não encontrado')) {
+                $this->createOrUpdateOutcomeForApplication(
+                    $application,
+                    'rejected',
+                    'Inscrição do ENEM não Identificada'
+                );
                 continue;
             }
 
+            /* --- cálculo da média e bônus ---------------------------------- */
             $averageScore = $this->calculateAverageScore($enemScore->scores);
 
-            if (isset($application->form_data['bonus'])) {
-                $finalScore = $this->applyBonus($averageScore, $application->form_data['bonus']);
-            } else {
-                $finalScore = $averageScore;
-            }
+            $bonusObject  = $applicationData['bonus'] ?? null;
+            $finalScore   = $this->applyBonus($averageScore, $bonusObject);
 
+            /* --- consistências -------------------------------------------- */
             $reasons = [];
 
-            if ($enemScore->scores['cpf'] !== $application->form_data['cpf']) {
+            if (($enemScore->scores['cpf'] ?? '') !== ($applicationData['cpf'] ?? '')) {
                 $reasons[] = 'Inconsistência no CPF';
             }
 
-            if ($this->normalizeString($enemScore->scores['name']) !== $this->normalizeString($application->form_data['name'])) {
+            if ($this->normalizeString($enemScore->scores['name'] ?? '') !==
+                $this->normalizeString($applicationData['name'] ?? '')) {
                 $reasons[] = 'Inconsistência no Nome';
             }
 
             $birthdateInconsistency = false;
-            if (isset($application->form_data['birthdate']) && isset($enemScore->scores['birthdate'])) {
-                $applicationBirthdate = \DateTime::createFromFormat('Y-m-d', $application->form_data['birtdate']);
-                $enemScoreBirthdate = \DateTime::createFromFormat('d/m/Y', $enemScore->scores['birthdate']);
-
-                if (!$applicationBirthdate || !$enemScoreBirthdate || $applicationBirthdate->format('Y-m-d') !== $enemScoreBirthdate->format('Y-m-d')) {
+            if (($applicationData['birthdate'] ?? null) && ($enemScore->scores['birthdate'] ?? null)) {
+                $appDate  = \DateTime::createFromFormat('Y-m-d', $applicationData['birthdate']);
+                $enemDate = \DateTime::createFromFormat('d/m/Y', $enemScore->scores['birthdate']);
+                if (!$appDate || !$enemDate || $appDate->format('Y-m-d') !== $enemDate->format('Y-m-d')) {
                     $reasons[] = 'Inconsistência na Data de Nascimento';
                     $birthdateInconsistency = true;
                 }
@@ -77,87 +93,143 @@ class ProcessApplicationOutcome
                 $reasons[] = 'Data de Nascimento ausente ou inconsistente';
             }
 
+            /* --- regra de decisão ----------------------------------------- */
             if (count($reasons) === 3) {
-                $this->createOrUpdateOutcomeForApplication($application, 'rejected', implode('; ', $reasons), $averageScore, $finalScore);
+                $status = 'rejected';
             } elseif (count($reasons) === 1 && $birthdateInconsistency) {
-                $this->createOrUpdateOutcomeForApplication($application, 'approved', null, $averageScore, $finalScore);
+                $status = 'approved';
             } elseif (!empty($reasons)) {
-                $this->createOrUpdateOutcomeForApplication($application, 'pending', implode('; ', $reasons), $averageScore, $finalScore);
+                $status = 'pending';
             } else {
-                $this->createOrUpdateOutcomeForApplication($application, 'approved', null, $averageScore, $finalScore);
+                $status = 'approved';
             }
+
+            $this->createOrUpdateOutcomeForApplication(
+                $application,
+                $status,
+                empty($reasons) ? null : implode('; ', $reasons),
+                $averageScore,
+                $finalScore
+            );
         }
 
-        $applicationsWithoutEnemScore = Application::whereNotIn('id', $processedApplicationIds)->get();
-        foreach ($applicationsWithoutEnemScore as $application) {
-            $this->createOrUpdateOutcomeForApplication($application, 'rejected', 'Inscrição do ENEM não Identificada');
-        }
+        /* --- aplicações SEM registro de ENEM ------------------------------ */
+        Application::whereNotIn('id', $processedIds)
+            ->where('process_selection_id', $this->processSelectionId)
+            ->get()
+            ->each(fn ($app) =>
+                $this->createOrUpdateOutcomeForApplication(
+                    $app,
+                    'rejected',
+                    'Inscrição do ENEM não Identificada'
+                )
+            );
     }
 
+    /* ---------------------------------------------------------------------- */
+    /* ----------------------   3) DUPLICIDADE DE INSCR.  -------------------- */
+    /* ---------------------------------------------------------------------- */
 
-
-    private function markDuplicateApplications()
+    private function markDuplicateApplications(): void
     {
-        $usersWithMultipleApplications = Application::select('user_id')
+        Application::select('user_id')
             ->groupBy('user_id')
             ->havingRaw('COUNT(*) > 1')
-            ->get();
+            ->pluck('user_id')
+            ->each(function ($userId) {
+                $apps = Application::where('user_id', $userId)
+                    ->orderBy('created_at')
+                    ->get();
 
-        foreach ($usersWithMultipleApplications as $user) {
-            $applications = Application::where('user_id', $user->user_id)
-                ->orderBy('created_at', 'asc')
-                ->get();
+                // Mantém apenas a inscrição mais recente
+                $apps->slice(0, $apps->count() - 1)
+                    ->each(fn ($app) =>
+                        $this->createOrUpdateOutcomeForApplication(
+                            $app,
+                            'rejected',
+                            'Inscrição duplicada'
+                        )
+                    );
+            });
+    }
 
+    /* ---------------------------------------------------------------------- */
+    /* ---------------------------   HELPERS   ------------------------------ */
+    /* ---------------------------------------------------------------------- */
 
-            for ($i = 0; $i < count($applications) - 1; $i++) {
-                $this->createOrUpdateOutcomeForApplication($applications[$i], 'rejected', 'Inscrição duplicada');
-            }
+    private function calculateAverageScore(array $scores): float
+    {
+        $sum = $scores['science_score'] + $scores['humanities_score']
+             + $scores['language_score'] + $scores['math_score']
+             + $scores['writing_score'];
+
+        return $sum / 5;
+    }
+
+    /**
+     * Aplica um único bônus (objeto) sobre a média.
+     * Espera campo "value" em percentual (ex.: "10.00") — fallback para
+     * porcentagem contida em "name".
+     */
+    private function applyBonus(float $average, array|null $bonus): float
+    {
+
+        if (!$bonus) {
+            return $average;
         }
-    }
 
-    private function calculateAverageScore($scores)
-    {
-        $totalScore = $scores['science_score'] + $scores['humanities_score'] + $scores['language_score'] + $scores['math_score'] + $scores['writing_score'];
-        return $totalScore / 5;
-    }
+        // 1) valor explícito
 
-    private function applyBonus($averageScore, $bonuses)
-    {
-        $finalScore = $averageScore;
-        // foreach ($bonuses as $bonus) {
-        //     if (strpos($bonus, '10%') !== false) {
-        //         $finalScore *= 1.10;
-        //     } elseif (strpos($bonus, '20%') !== false) {
-        //         $finalScore *= 1.20;
+        if (isset($bonus['value']) && is_numeric($bonus['value'])) {
+            return $average * (1 + floatval($bonus['value']) / 100);
+        }
+
+        // // 2) fallback: procura "10%" / "20%" no name
+        // if (isset($bonus['name'])) {
+        //     if (str_contains($bonus['name'], '20%')) {
+        //         return $average * 1.20;
+        //     }
+        //     if (str_contains($bonus['name'], '10%')) {
+        //         return $average * 1.10;
         //     }
         // }
-        return $finalScore;
+
+        return $average;
     }
 
-    private function createOrUpdateOutcomeForApplication($application, $status, $reason = null, $averageScore = '0.00', $finalScore = '0.00')
+    private function createOrUpdateOutcomeForApplication(
+        Application $application,
+        string      $status,
+        ?string     $reason       = null,
+        float|string $average     = '0.00',
+        float|string $final       = '0.00'
+    ): void
     {
         ApplicationOutcome::updateOrCreate(
             ['application_id' => $application->id],
             [
-                'status' => $status,
+                'status'                => $status,
                 'classification_status' => $status === 'approved' ? 'classifiable' : null,
-                'average_score' => $averageScore,
-                'final_score' => $finalScore,
-                'reason' => $reason,
+                'average_score'         => $average,
+                'final_score'           => $final,
+                'reason'                => $reason,
             ]
         );
     }
 
-    private function normalizeString($string)
+    private function normalizeString(string $str): string
     {
-        if ($string !== mb_convert_encoding(mb_convert_encoding($string, 'UTF-32', 'UTF-8'), 'UTF-8', 'UTF-32'))
-            $string = mb_convert_encoding($string, 'UTF-8', mb_detect_encoding($string));
-        $string = htmlentities($string, ENT_NOQUOTES, 'UTF-8');
-        $string = preg_replace('`&([a-z]{1,2})(acute|uml|circ|grave|ring|cedil|slash|tilde|caron|lig);`i', '\1', $string);
-        $string = html_entity_decode($string, ENT_NOQUOTES, 'UTF-8');
-        $string = preg_replace(array('`[^a-z0-9]`i', '`[-]+`'), ' ', $string);
-        $string = preg_replace('/( ){2,}/', '$1', $string);
-        $string = strtoupper(trim($string));
-        return $string;
+        $str = mb_convert_encoding($str, 'UTF-8', 'auto');
+        $str = htmlentities($str, ENT_NOQUOTES, 'UTF-8');
+        $str = preg_replace(
+            '`&([a-z]{1,2})(acute|uml|circ|grave|ring|cedil|slash|tilde|caron|lig);`i',
+            '$1',
+            $str
+        );
+        $str = html_entity_decode($str, ENT_NOQUOTES, 'UTF-8');
+        $str = preg_replace(['`[^a-z0-9]`i', '`[-]+`'], ' ', $str);
+        $str = preg_replace('/( ){2,}/', '$1', $str);
+
+        return strtoupper(trim($str));
     }
 }

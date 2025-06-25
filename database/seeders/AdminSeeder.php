@@ -11,13 +11,15 @@ class AdminSeeder extends Seeder
 {
     public function run(): void
     {
-        DB::table('admins')->insert([
-            'name'       => 'Jefferson Uchoa Ponte',
-            'email'      => 'jefponte@gmail.com',
-            'role'      => 'super_user',
-            'password'   => Hash::make('rootroot'),
-            'created_at' => Carbon::now(),
-            'updated_at' => Carbon::now(),
-        ]);
+        DB::table('admins')->updateOrInsert(
+            ['email' => 'jefponte@gmail.com'],
+            [
+                'name'       => 'Jefferson Uchoa Ponte',
+                'role'       => 'super_user',
+                'password'   => Hash::make('rootroot'),
+                'updated_at' => Carbon::now(),
+                'created_at' => Carbon::now(),
+            ]
+        );
     }
 }

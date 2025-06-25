@@ -44,10 +44,10 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::put('profile', [RegisterController::class, 'updateProfileAdmin'])->name('admin.super_user.profile.update');
 
 
-        Route::post('process_selections/{selection}/outcomes',[ProcessApplicationOutcomeController::class,'processOutcomes']);
-        Route::post('process_selections/{selection}/outcomes_without_pending',[ProcessApplicationOutcomeController::class,'processOutcomesWithoutPending']);
+        Route::post('process_selections/{selection}/outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
+        Route::post('process_selections/{selection}/outcomes_without_pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);
 
-        // Route::patch('application-outcomes/{id}', [ApplicationOutcomeController::class, 'patchUpdate'])->name('application-outcomes.patch');
+        Route::patch('application_outcomes/{id}', [ApplicationOutcomeController::class, 'patchUpdate'])->name('application-outcomes.patch');
 
         Route::post('enem_scores/import', EnemScoreImportController::class)->name('enem_scores.import');
         Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');

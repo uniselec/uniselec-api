@@ -17,24 +17,7 @@ class ApplicationOutcomeController extends BasicCrudController
         "status" => 'required',
         "reason" => 'required',
     ];
-    public function patchUpdate(Request $request, $id)
-    {
-        $applicationOutcome = ApplicationOutcome::find($id);
 
-        if (!$applicationOutcome) {
-            return response()->json(['error' => 'ApplicationOutcome not found.'], 404);
-        }
-        $validatedData = $request->validate([
-            'status' => 'required|string|in:approved,rejected,pending',
-            'reason' => 'nullable|string',
-        ]);
-
-        if ($validatedData['status'] === 'rejected' && empty($validatedData['reason'])) {
-            return response()->json(['error' => 'Reason is required when status is rejected.'], 422);
-        }
-        $applicationOutcome->update($validatedData);
-        return new ApplicationOutcomeResource($applicationOutcome);
-    }
     public function queryBuilder(): Builder
     {
         return parent::queryBuilder()->with([
@@ -92,5 +75,24 @@ class ApplicationOutcomeController extends BasicCrudController
     protected function resource()
     {
         return ApplicationOutcomeResource::class;
+    }
+
+    public function patchUpdate(Request $request, $id)
+    {
+        $applicationOutcome = ApplicationOutcome::find($id);
+
+        if (!$applicationOutcome) {
+            return response()->json(['error' => 'ApplicationOutcome not found.'], 404);
+        }
+        $validatedData = $request->validate([
+            'status' => 'required|string|in:approved,rejected,pending',
+            'reason' => 'nullable|string',
+        ]);
+
+        if ($validatedData['status'] === 'rejected' && empty($validatedData['reason'])) {
+            return response()->json(['error' => 'Reason is required when status is rejected.'], 422);
+        }
+        $applicationOutcome->update($validatedData);
+        return new ApplicationOutcomeResource($applicationOutcome);
     }
 }

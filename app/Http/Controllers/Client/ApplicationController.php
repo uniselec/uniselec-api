@@ -20,7 +20,7 @@ class ApplicationController extends BasicCrudController
 {
     private $rules = [
         'user_id' => 'required|integer',
-        'data' => 'required|array',
+        'form_data' => 'required|array',
     ];
 
 
@@ -32,17 +32,13 @@ class ApplicationController extends BasicCrudController
         $perPage = (int) $request->get('per_page', $this->defaultPerPage);
         $hasFilter = in_array(Filterable::class, class_uses($this->model()));
 
-        $query = $this->queryBuilder();
+        $query = $this->queryBuilder()->with('processSelection');
 
         if ($hasFilter) {
             $query = $query->filter($request->all());
         }
 
-
-        if (!$user->can('admin')) {
-            $query->where('user_id', $user->id);
-        }
-
+        $query->where('user_id', $user->id);
         $data = $query->orderBy('id', 'desc')->paginate($perPage);
 
         if ($data instanceof \Illuminate\Pagination\LengthAwarePaginator) {
@@ -64,7 +60,7 @@ class ApplicationController extends BasicCrudController
     {
 
         $validatedData = $request->validate([
-            'data'  => 'required',
+            'form_data'  => 'required',
             'process_selection_id'   => 'required',
         ]);
 
@@ -102,15 +98,14 @@ class ApplicationController extends BasicCrudController
         $applicationData['user_id'] = $userId;
 
         $currentTimestamp = now()->toDateTimeString();
-        if (!isset($applicationData['data'])) {
-            $applicationData['data'] = [];
+        if (!isset($applicationData['form_data'])) {
+            $applicationData['form_data'] = [];
         }
 
-        $applicationData['data']['updated_at'] = $currentTimestamp;
+        $applicationData['form_data']['updated_at'] = $currentTimestamp;
         $applicationData['process_selection_id'] = $processSelectionId;
-        if (isset($request->data)) {
-            $applicationData['verification_code'] = md5(json_encode($applicationData['data']));
-        }
+        $applicationData['verification_code'] = md5(json_encode($applicationData['form_data']));
+
 
         if ($existingApplication) {
             $existingApplication->update($applicationData);

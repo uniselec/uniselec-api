@@ -15,11 +15,15 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(AdmissionCategorySeeder::class);
-        $this->call(AdminSeeder::class);
-        $this->call(AcademicUnitSeeder::class);
-        $this->call(BonusOptionSeeder::class);
-        $this->call(CourseSeeder::class);
 
+        $this->call([
+            AcademicUnitSeeder::class,
+            AdmissionCategorySeeder::class,
+            BonusOptionSeeder::class,
+            CourseSeeder::class,
+            ProcessSelectionSeeder::class,   // novo
+            AdminSeeder::class,
+            UsersTableSeeder::class,
+        ]);
     }
 }
