@@ -173,26 +173,28 @@ class ProcessApplicationOutcome
      */
     private function applyBonus(float $average, array|null $bonus): float
     {
+
         if (!$bonus) {
             return $average;
         }
 
         // 1) valor explícito
+
         if (isset($bonus['value']) && is_numeric($bonus['value'])) {
             return $average * (1 + floatval($bonus['value']) / 100);
         }
 
-        // 2) fallback: procura "10%" / "20%" no name
-        if (isset($bonus['name'])) {
-            if (str_contains($bonus['name'], '20%')) {
-                return $average * 1.20;
-            }
-            if (str_contains($bonus['name'], '10%')) {
-                return $average * 1.10;
-            }
-        }
+        // // 2) fallback: procura "10%" / "20%" no name
+        // if (isset($bonus['name'])) {
+        //     if (str_contains($bonus['name'], '20%')) {
+        //         return $average * 1.20;
+        //     }
+        //     if (str_contains($bonus['name'], '10%')) {
+        //         return $average * 1.10;
+        //     }
+        // }
 
-        return $average; // sem bônus aplicável
+        return $average;
     }
 
     private function createOrUpdateOutcomeForApplication(
