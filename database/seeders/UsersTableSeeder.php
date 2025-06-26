@@ -20,7 +20,7 @@ class UsersTableSeeder extends Seeder
         $applications = [];
 
         for ($i = 1; $i <= $numUsers; $i++) {
-            $course           = DB::table('courses')->inRandomOrder()->first();
+            $course           = DB::table('courses')->find(1);
             $categorySamples  = DB::table('admission_categories')->inRandomOrder()->take(rand(1, 2))->get();
             $name             = $faker->name;
             $email            = $faker->unique()->safeEmail;
