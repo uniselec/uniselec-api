@@ -1,8 +1,8 @@
 @component('mail::message')
 UNILAB
-## Acesso à página de filiado
+## Acesso à página do candidato
 
-Novo pedido de criação de acesso à área de filiados
+Novo pedido de criação de acesso à área do candidato do sistema Uniselec/seleções UNILAB.
 
 
 @component('mail::button', ['url' => $resetUrl])
