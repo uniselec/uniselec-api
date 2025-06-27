@@ -51,7 +51,7 @@ class UsersTableSeeder extends Seeder
                 'user_id'             => $i,
                 'process_selection_id' => $selectionId,
                 'form_data' => json_encode([
-                    'edital'                => 'Edital nº 04/2024 - PROCESSO SELETIVO UNILAB – PERÍODO LETIVO 2024.1 Curso Medicina',
+                    'edital'                => 'Edital nº 04/2024 - PROCESSO SELETIVO UNILAB – PERÍODO LETIVO 2024.1 Curso de Administração',
                     'position'              => $course,
                     'name'                  => $name,
                     'email'                 => $email,

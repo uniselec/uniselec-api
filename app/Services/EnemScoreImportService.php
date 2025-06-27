@@ -8,11 +8,16 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Application;
 use App\Models\EnemScore;
 use Illuminate\Support\Arr;
+use App\Models\ApplicationOutcome;
 
 class EnemScoreImportService
 {
     public function import(\SplFileInfo|\Stringable $file, int $processId): array
     {
+        ApplicationOutcome::whereHas('application', function ($query) use ($processId) {
+            $query->where('process_selection_id', $processId);
+        })->delete();
+
         $csv = Reader::createFromPath($file->getRealPath(), 'r');
         $csv->setDelimiter(';');
         $records = (new Statement())->process($csv);
