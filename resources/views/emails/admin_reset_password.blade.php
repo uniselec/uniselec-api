@@ -1,8 +1,8 @@
 @component('mail::message')
 UNILAB
-## Acesso à página administrativa de filiados
+## Acesso à página administrativa do sistema Uniselec
 
-Novo pedido de criação de acesso à área administrativa da área de filiados
+Novo pedido de criação de acesso à área administrativa da área do sistema Uniselec
 
 
 @component('mail::button', ['url' => $resetUrl])
