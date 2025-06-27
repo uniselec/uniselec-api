@@ -23,6 +23,12 @@ class ProcessApplicationOutcome
 
     private function ensureAllApplicationsHaveOutcomes(): void
     {
+        // Remove todos os ApplicationOutcomes deste processo seletivo
+        ApplicationOutcome::whereIn(
+            'application_id',
+            Application::where('process_selection_id', $this->processSelectionId)->pluck('id')
+        )->delete();
+
         Application::where('process_selection_id', $this->processSelectionId)
             ->doesntHave('applicationOutcome')
             ->each(fn ($app) =>
