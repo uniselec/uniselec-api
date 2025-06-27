@@ -15,10 +15,10 @@ class ProcessSelectionSeeder extends Seeder
 
         // Seleciona só os dois cursos desejados
         $courses = DB::table('courses')
-            ->whereIn('id', [20, 8])
+            ->whereIn('id', [1, 8])
             ->get()
             ->map(function ($course) {
-                $vacancies = $course->id == 20
+                $vacancies = $course->id == 1
                     ? ['AC' => 10, 'LB - Q' => 1, 'LI - Q' => 1, 'LB - EP' => 1, 'LI - EP' => 1, 'LB - PCD' => 1, 'LB - PPI' => 1, 'LI - PCD' => 1, 'LI - PPI' => 1]
                     : ['AC' => 20, 'LB - Q' => 3, 'LI - Q' => 3, 'LB - EP' => 3, 'LI - EP' => 2, 'LB - PCD' => 3, 'LB - PPI' => 3, 'LI - PCD' => 3, 'LI - PPI' => 3];
 
