@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\EnemScoreController;
 use App\Http\Controllers\Admin\EnemScoreImportController;
+use App\Http\Controllers\Admin\KnowledgeAreaController;
 use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
 use App\Http\Controllers\Admin\UserController;
@@ -34,6 +35,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::apiResource('admission_categories', AdmissionCategoryController::class)->names('admin.admission_categories');
         Route::apiResource('bonus_options', BonusOptionController::class)->names('admin.bonus_options');
         Route::apiResource('documents', DocumentController::class)->names('documents.api');
+        Route::apiResource('knowledge_areas', KnowledgeAreaController::class)->names('admin.knowledge_areas');
 
         Route::patch('documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('documents.updateStatus');
 

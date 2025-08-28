@@ -2,52 +2,33 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\BasicCrudController;
-use App\Http\Resources\ProcessSelectionResource;
-use App\Models\ProcessSelection;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
+use App\Http\Controllers\BasicCrudController;
+use App\Http\Resources\KnowledgeAreaResource;
 use EloquentFilter\Filterable;
+use App\Models\KnowledgeArea;
+use Illuminate\Http\Request;
 use ReflectionClass;
 
-
-class ProcessSelectionController extends BasicCrudController
+class KnowledgeAreaController extends BasicCrudController
 {
 
     private $rules = [
-        'status' => "",
-        'name' => "",
-        'description' => "",
-        'start_date' => "",
-        'end_date' => "",
-        'type' => "",
-        'courses' => "",
-        'admission_categories' => "",
-        'knowledge_areas' => "",
-        'allowed_enem_years' => "",
-        'bonus_options' => "",
-        'currenty_step' => "",
+        'name' => '',
+        'slug' => '',
+        'description' => ''
     ];
-
-    public function show($id)
-    {
-        $processSelection = $this->queryBuilder()
-            ->with(['documents'])
-            ->findOrFail($id);
-
-        return new ProcessSelectionResource($processSelection);
-    }
 
     public function index(Request $request)
     {
         $perPage = (int) $request->get('per_page', $this->defaultPerPage);
         $hasFilter = in_array(Filterable::class, class_uses($this->model()));
-        $query = $this->queryBuilder()->with(['documents']);
+        $query = $this->queryBuilder();
         if ($hasFilter) {
             $query = $query->filter($request->all());
         }
         $query->whereNotNull('created_at');
-        $data = $request->has('all') || ! $this->defaultPerPage
+        $data = $request->has('all') || !$this->defaultPerPage
             ? $query->get()
             : $query->paginate($perPage);
         $resourceCollectionClass = $this->resourceCollection();
@@ -56,9 +37,10 @@ class ProcessSelectionController extends BasicCrudController
             ? new $resourceCollectionClass($data)
             : $resourceCollectionClass::collection($data);
     }
+
     protected function model()
     {
-        return ProcessSelection::class;
+        return KnowledgeArea::class;
     }
 
     protected function rulesStore()
@@ -78,6 +60,6 @@ class ProcessSelectionController extends BasicCrudController
 
     protected function resource()
     {
-        return ProcessSelectionResource::class;
+        return KnowledgeAreaResource::class;
     }
 }
