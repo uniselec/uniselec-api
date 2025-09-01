@@ -3,6 +3,7 @@
 return [
     'url' => env('APP_URL', 'http://localhost:8000'),
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+    'frontend_url_client' => env('WEB_APPLICATION_CLIENT', 'http://localhost:5175'),
     'backoffice_url' => env('BACKOFFICE_URL', 'http://localhost:5174'),
     /*
     |--------------------------------------------------------------------------

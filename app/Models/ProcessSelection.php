@@ -18,6 +18,7 @@ class ProcessSelection extends Model
         'type',
         'courses',
         'admission_categories',
+        'knowledge_areas',
         'allowed_enem_years',
         'currenty_step',
         'bonus_options'
@@ -26,6 +27,7 @@ class ProcessSelection extends Model
     protected $casts = [
         'courses' => 'array',
         'admission_categories'=> 'array',
+        'knowledge_areas'=> 'array',
         'bonus_options'=> 'array',
         'allowed_enem_years'=> 'array',
     ];
