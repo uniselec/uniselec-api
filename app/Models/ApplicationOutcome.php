@@ -20,7 +20,6 @@ class ApplicationOutcome extends Model
         'final_score',
         'ranking',
         'reason',
-        'status_notified_at',
     ];
 
     public function application()
