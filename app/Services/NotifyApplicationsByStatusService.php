@@ -14,7 +14,6 @@ class NotifyApplicationsByStatusService
 		$applications = $processSelection->applications;
 
 		foreach ($applications as $application) {
-			if(!$application->applicationOutcome->status_notified_at) {		
 				$processSelectionId = $processSelection->id;
 				$processSelectionName = $processSelection->name;
 				$candidateName = $application->form_data['name'];
@@ -31,11 +30,6 @@ class NotifyApplicationsByStatusService
 				);
 
 				$application->user->notify(new ApplicationStatusNotification($applicationStatusDTO));
-	
-				$application->applicationOutcome->forceFill([
-					'status_notified_at'  => Carbon::now(),
-				])->save();
-			}
 		}
 	}
 }
