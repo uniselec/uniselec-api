@@ -47,6 +47,33 @@ services:
     networks:
       - shared-network-uniselec
 
+  redis:
+    image: bitnami/redis:latest
+    restart: unless-stopped
+    container_name: uniselec-redis
+    volumes:
+      - ./docker/redis:/bitnami/redis/data
+    networks:
+      - shared-network-uniselec
+    environment:
+      - ALLOW_EMPTY_PASSWORD=no
+      - REDIS_PASSWORD=root
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: uniselec-api.worker
+    restart: unless-stopped
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - redis
+      - db     
+    networks:
+      - shared-network-uniselec
+    command: "php artisan queue:work redis --tries=3 --verbose"
+
 networks:
   shared-network-uniselec:
     external: true

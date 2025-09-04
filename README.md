@@ -104,6 +104,10 @@ O que eu consigo fazer em pouco tempo:
 
         sudo chmod -R 777 bootstrap/cache
 
+        sudo chown -R 1001:1001 docker/redis
+
+        sudo chmod -R 777 docker/redis
+
 
     Docker compose:
 
