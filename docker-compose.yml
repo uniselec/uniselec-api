@@ -74,6 +74,24 @@ services:
       - shared-network-uniselec
     command: "php artisan queue:work redis --tries=3 --verbose"
 
+  # For development and testing
+  mailpit: 
+    image: axllent/mailpit:latest
+    container_name: uniselec-mailpit
+    restart: unless-stopped
+    volumes:
+      - ./docker/mailplit:/data
+    ports:
+      - 1025:1025
+      - 8025:8025
+    environment:
+      MP_MAX_MESSAGES: 5000
+      MP_DATABASE: /data/mailpit.db
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    networks:
+      - shared-network-uniselec
+
 networks:
   shared-network-uniselec:
     external: true
