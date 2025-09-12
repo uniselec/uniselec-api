@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -21,7 +22,8 @@ class ProcessSelection extends Model
         'knowledge_areas',
         'allowed_enem_years',
         'currenty_step',
-        'bonus_options'
+        'bonus_options',
+        'last_applications_processed_at',
     ];
 
     protected $casts = [
@@ -30,6 +32,7 @@ class ProcessSelection extends Model
         'knowledge_areas'=> 'array',
         'bonus_options'=> 'array',
         'allowed_enem_years'=> 'array',
+        'last_applications_processed_at' => 'datetime',
     ];
 
     public function applications()
@@ -40,5 +43,14 @@ class ProcessSelection extends Model
     public function documents()
     {
         return $this->hasMany(Document::class);
+    }
+
+    protected function lastApplicationsProcessedAt(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value) => $value
+                ? \Carbon\Carbon::parse($value)->format('d/m/Y H:i')
+                : null
+        );
     }
 }

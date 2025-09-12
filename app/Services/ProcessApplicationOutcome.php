@@ -7,6 +7,7 @@ use App\Models\ApplicationOutcome;
 use App\Models\EnemScore;
 use App\Models\KnowledgeArea;
 use App\Models\ProcessSelection;
+use Carbon\Carbon;
 
 class ProcessApplicationOutcome
 {
@@ -17,6 +18,8 @@ class ProcessApplicationOutcome
         $this->ensureAllApplicationsHaveOutcomes();
         $this->processEnemScores();
         $this->markDuplicateApplications();
+        ProcessSelection::find($this->processSelectionId)
+            ->update(['last_applications_processed_at' => Carbon::now()]);
     }
 
     /* ---------------------------------------------------------------------- */
