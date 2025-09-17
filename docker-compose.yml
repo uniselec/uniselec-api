@@ -17,19 +17,21 @@ services:
     ports:
       - "8083:80"
     networks:
-      - uniselec-network
+      - shared-network-uniselec
 
   db:
     image: mysql:8.0
     container_name: uniselec-db
     restart: unless-stopped
+    ports:
+      - "3307:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: uniselec
     volumes:
       - dbdata:/var/lib/mysql
     networks:
-      - uniselec-network
+      - shared-network-uniselec
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
@@ -43,11 +45,38 @@ services:
     ports:
       - "8081:80"
     networks:
-      - uniselec-network
+      - shared-network-uniselec
+
+  redis:
+    image: bitnami/redis:latest
+    restart: unless-stopped
+    container_name: uniselec-redis
+    volumes:
+      - ./docker/redis:/bitnami/redis/data
+    networks:
+      - shared-network-uniselec
+    environment:
+      - ALLOW_EMPTY_PASSWORD=no
+      - REDIS_PASSWORD=root
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: uniselec-api.worker
+    restart: unless-stopped
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - redis
+      - db     
+    networks:
+      - shared-network-uniselec
+    command: "php artisan queue:work redis --tries=3 --verbose"
 
 networks:
-  uniselec-network:
-    driver: bridge
+  shared-network-uniselec:
+    external: true
 
 volumes:
   dbdata:

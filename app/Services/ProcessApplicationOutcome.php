@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Application;
 use App\Models\ApplicationOutcome;
 use App\Models\EnemScore;
+use App\Models\KnowledgeArea;
+use App\Models\ProcessSelection;
 
 class ProcessApplicationOutcome
 {
@@ -54,6 +56,15 @@ class ProcessApplicationOutcome
 
         $processedIds = [];
 
+        $processSelection = ProcessSelection::find($this->processSelectionId);
+        $knowledgeArea = KnowledgeArea::all();
+        $minimumScores = collect($processSelection->courses)
+        ->map(fn ($course) => [
+            'id' => $course['id'],
+            'name' => $course['name'],
+            'minimumScores' => $course['minimumScores']
+        ])->values()->toArray();
+
         foreach ($enemScores as $enemScore) {
             $application      = $enemScore->application;
             $processedIds[]   = $application->id;
@@ -99,8 +110,43 @@ class ProcessApplicationOutcome
                 $reasons[] = 'Data de Nascimento ausente ou inconsistente';
             }
 
+            /* --- análise da nota mínima ------------------------------ */
+
+            // Filtra a pontução mínima do curso escolhido pelo candidato.
+            $candidateCourseMinimumScores = array_filter($minimumScores, fn ($item) => $item['id'] === $applicationData['position']['id']);
+            $candidateCourseMinimumScores = reset($candidateCourseMinimumScores)['minimumScores'] ?? null;
+
+            $studentScores = $enemScore->scores;
+
+            $message = "Indeferido por não atingir a nota mínima em ";
+
+            // Filtra as áreas em que o candidato não atingiu a nota mínima
+            $failedScoreNames = collect($candidateCourseMinimumScores)
+            ->filter(function ($min, $key) use ($studentScores) {
+                return isset($studentScores[$key])
+                && floatval($studentScores[$key]) < floatval($min);
+            })
+            ->keys()
+            ->toArray();
+
+            // Verifica se houve ao menos uma reprovação por nota mínima
+            if ($rejectedByMinimumScore = count($failedScoreNames) > 0) {
+                
+                // Transforma os slugs das áreas reprovadas em suas descrições legíveis
+                $failedDescriptions = collect($failedScoreNames)
+                ->map(fn ($key) => $knowledgeArea->firstWhere('slug', $key)->name)
+                ->toArray();
+
+                // Monta a string final da mensagem
+                $message .= implode(', ', array_slice($failedDescriptions, 0, -1))
+                    . (count($failedDescriptions) > 1 ? ' e ' : '')
+                    . end($failedDescriptions);
+
+                $reasons[] = $message;
+            }
+
             /* --- regra de decisão ----------------------------------------- */
-            if (count($reasons) === 3) {
+            if ($rejectedByMinimumScore || (count($reasons) === 3)) {
                 $status = 'rejected';
             } elseif (count($reasons) === 1 && $birthdateInconsistency) {
                 $status = 'approved';

@@ -15,7 +15,7 @@ class AdminSeeder extends Seeder
             ['email' => 'jefponte@gmail.com'],
             [
                 'name'       => 'Jefferson Uchoa Ponte',
-                'role'       => 'super_user',
+                'role'       => 'promoter',
                 'password'   => Hash::make('rootroot'),
                 'updated_at' => Carbon::now(),
                 'created_at' => Carbon::now(),

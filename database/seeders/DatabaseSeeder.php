@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             ProcessSelectionSeeder::class,   // novo
             AdminSeeder::class,
             UsersTableSeeder::class,
+            KnowledgeAreaSeeder::class,
         ]);
     }
 }
