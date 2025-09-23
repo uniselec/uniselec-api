@@ -20,8 +20,11 @@ class ApplicationController extends BasicCrudController
 {
 
     private $rules = [
-        'title' => 'required',
-        'body' => 'required',
+        // 'title' => 'required',
+        // 'body' => 'required',
+        'name_source' => 'string|in:enem,application',
+        'birthdate_source' => 'string|in:enem,application',
+        'cpf_source' => 'string|in:enem,application',
     ];
 
     public function index(Request $request)
