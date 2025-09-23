@@ -6,33 +6,29 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class ApplicationOutcomeResource extends JsonResource
 {
-
     public function toArray($request)
     {
         $data = parent::toArray($request);
+
         $data['application']['resolved_inconsistencies'] = [
-            'selected_name' => $this->name_source
-                ? ($this->name_source === 'application'
-                ? ($this->form_data['name'] ?? null)
-                    : ($this->enemScore?->scores['name'] ?? null)
-                )
-                : null,
-
-            'selected_birthdate' => $this->birthdate_source
-                ? ($this->birthdate_source === 'application'
-                ? ($this->form_data['birthdate'] ?? null)
-                    : ($this->enemScore?->scores['birthdate'] ?? null)
-                )
-                : null,
-
-            'selected_cpf' => $this->cpf_source
-                ? ($this->cpf_source === 'application'
-                ? ($this->form_data['cpf'] ?? null)
-                    : ($this->enemScore?->scores['cpf'] ?? null)
-                )
-                : null,
+            'selected_name'      => $this->getResolvedValue($data, 'name'),
+            'selected_birthdate' => $this->getResolvedValue($data, 'birthdate'),
+            'selected_cpf'       => $this->getResolvedValue($data, 'cpf'),
         ];
 
-        return parent::toArray($request);
+        return $data;
+    }
+
+    private function getResolvedValue(array $data, string $field): ?string
+    {
+        $source = $data['application']["{$field}_source"] ?? null;
+
+        if (!$source) {
+            return null;
+        }
+
+        return $source === 'application'
+            ? ($data['application']['form_data'][$field] ?? null)
+            : ($data['application']['enem_score']['scores'][$field] ?? null);
     }
 }
