@@ -36,6 +36,7 @@ class ConvocationListSeat extends Model
 
                 $seat->seat_code = self::makeSeatCode(
                     $list->process_selection_id,
+                    $list->id,
                     $course->name,
                     $category->name,
                     $seq
@@ -47,16 +48,18 @@ class ConvocationListSeat extends Model
     /** Gera código: <PSID>-<CURSO>-<CAT>-<SEQ> */
     public static function makeSeatCode(
         int $processSelectionId,
+        int $convocationListId,
         string $courseName,
         string $categoryName,
         int $seq
     ): string {
-        $ps   = str_pad($processSelectionId, 3, '0', STR_PAD_LEFT);
-        $cur  = strtoupper(Str::substr(Str::slug(Str::words($courseName, 1, ''), ''), 0, 3));
-        $cat  = preg_replace('/\s+/', '', Str::ascii($categoryName));
-        $seq3 = str_pad($seq, 3, '0', STR_PAD_LEFT);
+        $ps   = str_pad($processSelectionId, 3, '0', STR_PAD_LEFT);   // 001
+        $list = str_pad($convocationListId,    3, '0', STR_PAD_LEFT); // 007
+        $cur  = strtoupper(Str::substr(Str::slug(Str::words($courseName, 1, ''), ''), 0, 3)); // MED
+        $cat  = preg_replace('/\s+/', '', Str::ascii($categoryName)); // LB-PPI
+        $seq3 = str_pad($seq, 3, '0', STR_PAD_LEFT);                  // 012
 
-        return "{$ps}-{$cur}-{$cat}-{$seq3}";
+        return "{$ps}-{$list}-{$cur}-{$cat}-{$seq3}";
     }
 
 
