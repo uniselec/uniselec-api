@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\BasicCrudController;
 use App\Http\Resources\ConvocationListResource;
 use App\Models\ConvocationList;
+use App\Models\ProcessSelection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use EloquentFilter\Filterable;
@@ -41,18 +42,52 @@ class ConvocationListController extends BasicCrudController
             ? new $resourceCollectionClass($data)
             : $resourceCollectionClass::collection($data);
     }
+
+    /* ------------------------------------------------------------------ */
     public function store(Request $request)
     {
-        $data = Validator::make($request->all(), $this->rulesStore())->validate();
+        $data = Validator::make($request->all(), $this->rulesStore())
+            ->validate();
 
-        // sempre grava quem gerou
-        $data['generated_by'] = $request->user()->id;   // ou auth()->id()
+        /* se não veio regra → gera usando o JSON do processo seletivo */
+        if (empty($data['remap_rules'])) {
+            $process = ProcessSelection::findOrFail($data['process_selection_id']);
 
-        $list = $this->queryBuilder()->create($data)->refresh();
+            /** `admission_categories` é um array de objetos:
+             *  [
+             *     { "id": 2, "name": "LB - Q", … },
+             *     { "id": 6, "name": "LI - Q", … },
+             *     { "id": 9, "name": "AC", … }
+             *  ]
+             */
+            $names = collect($process->admission_categories ?? [])
+                ->pluck('name')
+                ->all();                    // ["LB - Q","LI - Q","AC"]
 
-        return new ($this->resource())($list);
+            $data['remap_rules'] = $this->buildDefaultRules($names);
+        }
+
+        $data['generated_by'] = $request->user()->id;
+
+        $list = ConvocationList::create($data)->refresh();
+        return new ConvocationListResource($list);
     }
 
+   /** Gera:
+     *  "AC"    => ["LB - Q","LI - Q"],
+     *  "LB - Q"=> ["AC","LI - Q"],
+     *  …
+     */
+    private function buildDefaultRules(array $categoryNames): array
+    {
+        $rules = [];
+        foreach ($categoryNames as $name) {
+            $rules[$name] = array_values(
+                array_filter($categoryNames, fn ($n) => $n !== $name)
+            );
+        }
+        return $rules;
+    }
     protected function model()
     {
         return ConvocationList::class;

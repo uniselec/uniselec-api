@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use EloquentFilter\Filterable;
 use ReflectionClass;
-
+use Illuminate\Database\Eloquent\Builder;
 
 class ConvocationListApplicationController extends BasicCrudController
 {
@@ -65,5 +65,14 @@ class ConvocationListApplicationController extends BasicCrudController
     protected function resource()
     {
         return ConvocationListApplicationResource::class;
+    }
+    public function queryBuilder(): Builder
+    {
+        return parent::queryBuilder()->with([
+            'application:id,form_data',
+            'course:id,name,modality',
+            'category:id,name',
+            'seat:id,seat_code,status',
+        ]);
     }
 }
