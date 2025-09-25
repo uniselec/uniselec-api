@@ -17,7 +17,6 @@ return new class extends Migration
                   ->cascadeOnDelete();
 
             $table->foreignId('application_id')
-                  ->constrained()
                   ->cascadeOnDelete();
 
             $table->foreignId('course_id')
@@ -39,7 +38,6 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['convocation_list_id', 'application_id'], 'cla_unique_per_list');
             $table->index(['course_id', 'admission_category_id'], 'cla_modality_idx');
         });
     }
