@@ -10,11 +10,13 @@ class ApplicationOutcomeResource extends JsonResource
     {
         $data = parent::toArray($request);
 
-        $data['application']['resolved_inconsistencies'] = [
-            'selected_name'      => $this->getResolvedValue($data, 'name'),
-            'selected_birthdate' => $this->getResolvedValue($data, 'birthdate'),
-            'selected_cpf'       => $this->getResolvedValue($data, 'cpf'),
-        ];
+        if(isset($data['application'])) {
+            $data['application']['resolved_inconsistencies'] = [
+                'selected_name'      => $this->getResolvedValue($data, 'name'),
+                'selected_birthdate' => $this->getResolvedValue($data, 'birthdate'),
+                'selected_cpf'       => $this->getResolvedValue($data, 'cpf'),
+            ];
+        }
 
         return $data;
     }

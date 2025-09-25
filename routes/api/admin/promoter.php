@@ -40,7 +40,8 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
 
         Route::patch('documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('documents.updateStatus');
 
-        Route::apiResource('applications', ApplicationController::class)->only(['index','show', 'update'])->names('admin.applications');
+        Route::apiResource('applications', ApplicationController::class)->only(['index','show'])->names('admin.applications');
+        Route::patch('applications/{application_id}/resolve-inconsistencies', [ApplicationController::class, 'resolveInconsistencies'])->name('admin.applications.resolve-inconsistencies');
         Route::apiResource('application_outcomes', ApplicationOutcomeController::class)->only(['index', 'show'])->names('admin.applications');
         Route::apiResource('users', UserController::class)->only(['index', 'show']);
         Route::apiResource('enem_scores', EnemScoreController::class)->only(['index', 'show'])->names('enem_scores.api');;
