@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\ConvocationListController;
 use App\Http\Controllers\Admin\ConvocationListSeatAllocationController;
 use App\Http\Controllers\Admin\ConvocationListSeatController;
 use App\Http\Controllers\Admin\ConvocationListSeatGenerationController;
+use App\Http\Controllers\Admin\ConvocationListSeatRedistributionController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\EnemScoreController;
@@ -59,7 +60,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::post('convocation_lists/{list}/generate-seats',[ConvocationListSeatGenerationController::class, 'store'])->name('admin.super_user.cconvocation_lists.generate_seats');
         Route::post('convocation_lists/{convocationList}/generate-applications',[ConvocationListApplicationGenerationController::class, 'store'])->name('convocation_lists.generate_applications');
         Route::post('convocation_lists/{convocationList}/allocate-seats',[ConvocationListSeatAllocationController::class, 'store'])->name('convocation_lists.allocate_seats');
-
+        Route::post('convocation_lists/{convocationList}/redistribute-seats',[ConvocationListSeatRedistributionController::class, 'store'])->name('convocation_lists.redistribute_seats');
 
         Route::post('process_selections/{selection}/outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
         // Route::post('process_selections/{selection}/outcomes_without_pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);

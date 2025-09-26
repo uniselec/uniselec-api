@@ -17,6 +17,7 @@ class ConvocationListApplication extends Model
         'admission_category_id',
         'seat_id',
         'ranking_at_generation',
+        'ranking_in_category',
         'status',
     ];
 
