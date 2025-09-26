@@ -70,7 +70,7 @@ class ConvocationListApplicationController extends BasicCrudController
     {
         return parent::queryBuilder()->with([
             'application:id,form_data',
-            'course:id,name,modality',
+            'course:id,name,modality,academic_unit',
             'category:id,name',
             'seat:id,seat_code,status',
             'application' => function ($q) {
