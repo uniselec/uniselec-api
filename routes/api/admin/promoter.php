@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\BonusOptionController;
 use App\Http\Controllers\Admin\ConvocationListApplicationController;
 use App\Http\Controllers\Admin\ConvocationListController;
 use App\Http\Controllers\Admin\ConvocationListSeatController;
+use App\Http\Controllers\Admin\ConvocationListSeatRedistributionController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\EnemScoreController;
@@ -52,6 +53,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::apiResource('convocation_list_applications', ConvocationListApplicationController::class)->names('admin.promoter.convocation_list_applications');
         Route::apiResource('convocation_lists', ConvocationListController::class)->names('admin.promoter.convocation_lists');
         Route::apiResource('convocation_list_seats', ConvocationListSeatController::class)->names('admin.promoter.convocation_list_seats');
+        Route::post('convocation_lists/{convocationList}/redistribute-seats',[ConvocationListSeatRedistributionController::class, 'store'])->name('convocation_lists.redistribute_seats');
 
         Route::post('process_selections/{selection}/outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
         // Route::post('process_selections/{selection}/outcomes_without_pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);
