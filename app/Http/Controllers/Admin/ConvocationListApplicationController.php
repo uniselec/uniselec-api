@@ -73,6 +73,13 @@ class ConvocationListApplicationController extends BasicCrudController
             'course:id,name,modality',
             'category:id,name',
             'seat:id,seat_code,status',
+            'application' => function ($q) {
+                $q->select('id', 'form_data', 'process_selection_id')
+                    ->with([
+                        'enemScore:id,application_id,scores,original_scores',
+                        'applicationOutcome:id,application_id,status,classification_status,convocation_status,average_score,final_score,ranking,reason',
+                    ]);
+            },
         ]);
     }
 }
