@@ -24,6 +24,10 @@ class ProcessSelection extends Model
         'currenty_step',
         'bonus_options',
         'last_applications_processed_at',
+        'preliminary_result_date',
+        'appeal_start_date',
+        'appeal_end_date',
+        'final_result_date',
     ];
 
     protected $casts = [

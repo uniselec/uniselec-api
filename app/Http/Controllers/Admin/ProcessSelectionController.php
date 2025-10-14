@@ -20,6 +20,10 @@ class ProcessSelectionController extends BasicCrudController
         'description' => "",
         'start_date' => "",
         'end_date' => "",
+        'preliminary_result_date' => "",
+        'appeal_start_date' => "",
+        'appeal_end_date' => "",
+        'final_result_date' => "",
         'type' => "",
         'courses' => "",
         'admission_categories' => "",
@@ -27,6 +31,7 @@ class ProcessSelectionController extends BasicCrudController
         'allowed_enem_years' => "",
         'bonus_options' => "",
         'currenty_step' => "",
+        'last_applications_processed_at' => "",
     ];
 
     public function show($id)
