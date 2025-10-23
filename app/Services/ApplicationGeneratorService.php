@@ -22,9 +22,6 @@ class ApplicationGeneratorService
     {
         $psId = $convocationList->process_selection_id;
 
-        /* -----------------------------------------------------------------
-         | 1. Recupera outcomes aprovados + ordenação global desejada
-         * -----------------------------------------------------------------*/
         $outcomes = ApplicationOutcome::query()
             ->where('status', 'approved')
             ->whereHas('application', fn ($q) => $q->where('process_selection_id', $psId))
@@ -38,16 +35,10 @@ class ApplicationGeneratorService
             ->orderByDesc('average_score')
             ->orderBy('application_id');
 
-        /* -----------------------------------------------------------------
-         | 2. Contadores
-         * -----------------------------------------------------------------*/
-        $globalRank       = 0;              // ranking_at_generation
-        $categoryCounters = [];             // catId => current rank
+        $globalRank       = 0;   // ranking_at_generation
+        $categoryCounters = [];  // catId => current rank
         $totalInserted    = 0;
 
-        /* -----------------------------------------------------------------
-         | 3. Processa em chunks para não estourar memória
-         * -----------------------------------------------------------------*/
         DB::transaction(function () use (
             $outcomes,
             $convocationList,
@@ -64,16 +55,27 @@ class ApplicationGeneratorService
                 $rows = [];
 
                 foreach ($chunk as $outcome) {
-                    $app       = $outcome->application;
-                    $formData  = $app->form_data;
+                    $app = $outcome->application;
 
-                    $courseId  = $formData['position']['id'];
+                    // garante array independente do tipo vindo do banco
+                    $formData = is_array($app->form_data)
+                        ? $app->form_data
+                        : (json_decode($app->form_data ?? '[]', true) ?? []);
+
+                    $courseId  = $formData['position']['id'] ?? null;
                     $cats      = $formData['admission_categories'] ?? [];
+
+                    if (!$courseId || empty($cats)) {
+                        continue;
+                    }
+
+                    // ranking global só 1x por application
+                    $globalRank++;
 
                     foreach ($cats as $cat) {
                         $catId = $cat['id'];
 
-                        // ranking na categoria
+                        // ranking por categoria
                         $categoryCounters[$catId] = ($categoryCounters[$catId] ?? 0) + 1;
 
                         $rows[] = [
@@ -81,7 +83,7 @@ class ApplicationGeneratorService
                             'application_id'        => $app->id,
                             'course_id'             => $courseId,
                             'admission_category_id' => $catId,
-                            'ranking_at_generation' => ++$globalRank,
+                            'ranking_at_generation' => $globalRank,
                             'ranking_in_category'   => $categoryCounters[$catId],
                             'status'                => 'eligible',
                             'created_at'            => now(),
@@ -90,8 +92,10 @@ class ApplicationGeneratorService
                     }
                 }
 
-                ConvocationListApplication::insert($rows);
-                $totalInserted += count($rows);
+                if ($rows) {
+                    ConvocationListApplication::insert($rows);
+                    $totalInserted += count($rows);
+                }
             });
         });
 

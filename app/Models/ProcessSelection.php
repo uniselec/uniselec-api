@@ -21,7 +21,8 @@ class ProcessSelection extends Model
         'knowledge_areas',
         'allowed_enem_years',
         'currenty_step',
-        'bonus_options'
+        'bonus_options',
+        'remap_rules'
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class ProcessSelection extends Model
         'knowledge_areas'=> 'array',
         'bonus_options'=> 'array',
         'allowed_enem_years'=> 'array',
+        'remap_rules'  => 'array',
     ];
 
     public function applications()
