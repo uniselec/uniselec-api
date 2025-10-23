@@ -15,13 +15,11 @@ class ConvocationList extends Model
         'name',
         'status',
         'published_at',
-        'generated_by',
-        'remap_rules',
+        'generated_by'
     ];
 
     protected $casts = [
-        'published_at' => 'datetime',
-        'remap_rules'  => 'array',
+        'published_at' => 'datetime'
     ];
 
 

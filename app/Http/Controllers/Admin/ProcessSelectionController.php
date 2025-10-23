@@ -8,6 +8,7 @@ use App\Models\ProcessSelection;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use EloquentFilter\Filterable;
+use Illuminate\Support\Facades\Validator;
 use ReflectionClass;
 
 
@@ -27,6 +28,7 @@ class ProcessSelectionController extends BasicCrudController
         'allowed_enem_years' => "",
         'bonus_options' => "",
         'currenty_step' => "",
+        'remap_rules'          => 'nullable|array',
     ];
 
     public function show($id)
@@ -56,6 +58,32 @@ class ProcessSelectionController extends BasicCrudController
             ? new $resourceCollectionClass($data)
             : $resourceCollectionClass::collection($data);
     }
+    private function buildDefaultRules(array $categoryNames): array
+    {
+        $rules = [];
+        foreach ($categoryNames as $name) {
+            $rules[$name] = array_values(
+                array_filter($categoryNames, fn($n) => $n !== $name)
+            );
+        }
+        return $rules;
+    }
+    public function store(Request $request)
+    {
+        $data = Validator::make($request->all(), $this->rulesStore())
+            ->validate();
+        if (empty($data['remap_rules']) && !empty($data['admission_categories'])) {
+            $names = collect($data['admission_categories'])
+                ->pluck('name')
+                ->all();
+            $data['remap_rules'] = $this->buildDefaultRules($names);
+        }
+
+
+        $process = ProcessSelection::create($data)->refresh();
+        return new ProcessSelectionResource($process);
+    }
+
     protected function model()
     {
         return ProcessSelection::class;
