@@ -18,11 +18,11 @@ class ConvocationListSeatGenerationController extends Controller
         $convList = ConvocationList::findOrFail($list);
 
         // (opcional) impedir duplicação total:
-        // if ($convList->seats()->exists()) {
-        //     return response()->json([
-        //         'message' => 'Esta lista já possui vagas geradas.'
-        //     ], 422);
-        // }
+        if ($convList->seats()->exists()) {
+            return response()->json([
+                'message' => 'Esta lista já possui vagas geradas.'
+            ], 422);
+        }
 
         $total = $service->generate($convList, $request->input('seats'));
 

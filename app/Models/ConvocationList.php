@@ -13,7 +13,11 @@ class ConvocationList extends Model
     protected $fillable = [
         'process_selection_id',
         'name',
-        'status',
+        'convocation_status',
+        'result_status',
+        'response_status',
+        'category_ranking',
+        'general_ranking',
         'published_at',
         'generated_by'
     ];

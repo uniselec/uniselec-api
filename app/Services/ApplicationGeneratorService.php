@@ -35,7 +35,7 @@ class ApplicationGeneratorService
             ->orderByDesc('average_score')
             ->orderBy('application_id');
 
-        $globalRank       = 0;   // ranking_at_generation
+        $globalRank       = 0;
         $categoryCounters = [];  // catId => current rank
         $totalInserted    = 0;
 
@@ -83,9 +83,9 @@ class ApplicationGeneratorService
                             'application_id'        => $app->id,
                             'course_id'             => $courseId,
                             'admission_category_id' => $catId,
-                            'ranking_at_generation' => $globalRank,
-                            'ranking_in_category'   => $categoryCounters[$catId],
-                            'status'                => 'eligible',
+                            'general_ranking' => $globalRank,
+                            'category_ranking'   => $categoryCounters[$catId],
+                            // 'status'                => 'eligible',
                             'created_at'            => now(),
                             'updated_at'            => now(),
                         ];

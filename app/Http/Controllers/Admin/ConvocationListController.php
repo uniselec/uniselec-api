@@ -6,15 +6,20 @@ use App\Http\Controllers\BasicCrudController;
 use App\Http\Resources\ConvocationListResource;
 use App\Models\ConvocationList;
 use App\Models\ProcessSelection;
+use App\Services\ApplicationGeneratorService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use EloquentFilter\Filterable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use ReflectionClass;
 
 
 class ConvocationListController extends BasicCrudController
 {
+    public function __construct(
+        private ApplicationGeneratorService $applicationGeneratorService
+    ) {}
 
     private $rules = [
         'process_selection_id' => 'required|exists:process_selections,id',
@@ -44,32 +49,32 @@ class ConvocationListController extends BasicCrudController
     }
 
     /* ------------------------------------------------------------------ */
-    public function store(Request $request)
+    public function store(Request $request) // <-- assinatura mantida
     {
-        $data = Validator::make($request->all(), $this->rulesStore())
-            ->validate();
-
+        $data = Validator::make($request->all(), $this->rulesStore())->validate();
         $data['generated_by'] = $request->user()->id;
 
-        $list = ConvocationList::create($data)->refresh();
-        return new ConvocationListResource($list);
+        [$list, $created] = DB::transaction(function () use ($data) {
+            /** @var ConvocationList $list */
+            $list = ConvocationList::create($data)->refresh();
+
+            // Gera as aplicações logo após criar a lista
+            $created = 0;
+            if (!$list->applications()->exists()) {
+                $created = $this->applicationGeneratorService->generate($list);
+            }
+
+            return [$list, $created];
+        });
+
+        return (new ConvocationListResource($list))
+            ->additional([
+                'message' => 'Lista criada e aplicações geradas com sucesso.',
+                'created' => $created,
+            ]);
     }
 
-   /** Gera:
-     *  "AC"    => ["LB - Q","LI - Q"],
-     *  "LB - Q"=> ["AC","LI - Q"],
-     *  …
-     */
-    private function buildDefaultRules(array $categoryNames): array
-    {
-        $rules = [];
-        foreach ($categoryNames as $name) {
-            $rules[$name] = array_values(
-                array_filter($categoryNames, fn ($n) => $n !== $name)
-            );
-        }
-        return $rules;
-    }
+
     protected function model()
     {
         return ConvocationList::class;
