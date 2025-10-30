@@ -3,61 +3,66 @@
 namespace App\Services;
 
 use App\Models\{
-    ConvocationList, ConvocationListSeat, Course, AdmissionCategory
+    ConvocationList,
+    ConvocationListSeat,
+    Course,
+    AdmissionCategory
 };
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SeatGeneratorService
 {
-    public function generate(ConvocationList $list, array $seatData): int
+    public function generateFromProcessSelection(ConvocationList $list): int
     {
-        $categories     = AdmissionCategory::pluck('id', 'name'); // "AC" => 9 …
-        $createdCounter = 0;
+        $ps = $list->processSelection;
+        // Pega última lista published
+        $last = ConvocationList::where('process_selection_id', $ps->id)
+            ->where('status', 'published')
+            ->latest('published_at')
+            ->first();
 
-        DB::transaction(function () use ($list, $seatData, $categories, &$createdCounter) {
+        $categories = AdmissionCategory::pluck('id', 'name');
+        $created = 0;
 
-            foreach ($seatData as $courseBlock) {
-                $course     = Course::findOrFail($courseBlock['course_id']);
-                $vacancies  = $courseBlock['vacanciesByCategory'] ?? [];
+        DB::transaction(function () use ($list, $ps, $last, $categories, &$created) {
+            // percorre cada bloco de curso no JSON de courses
+            foreach ($ps->courses as $block) {
+                $courseId  = $block['id'];
+                $vacByCat  = $block['vacanciesByCategory'] ?? [];
 
-                foreach ($vacancies as $catName => $qty) {
+                foreach ($vacByCat as $catName => $total) {
                     $catId = $categories[$catName] ?? null;
-                    if (!$catId || $qty <= 0) {
-                        continue;                     // cat inexistente? ignora
+                    if (!$catId || $total <= 0) {
+                        continue;
                     }
 
-                    // quantos já existem p/ definir sequência
-                    $already = ConvocationListSeat::where([
-                        'convocation_list_id'        => $list->id,
-                        'course_id'                  => $course->id,
-                        'origin_admission_category_id'=> $catId,
-                    ])->count();
+                    // já preenchidas na última published
+                    $filled = $last
+                        ? $last->seats()
+                        ->where('course_id', $courseId)
+                        ->where('origin_admission_category_id', $catId)
+                        ->where('status', 'filled')
+                        ->count()
+                        : 0;
 
-                    // cria N linhas
-                    for ($i = 1; $i <= $qty; $i++) {
-                        $seq = $already + $i;
+                    $toCreate = max(0, $total - $filled);
 
+                    for ($i = 1; $i <= $toCreate; $i++) {
                         ConvocationListSeat::create([
-                            'convocation_list_id'         => $list->id,
-                            'course_id'                   => $course->id,
-                            'origin_admission_category_id'=> $catId,
-                            'current_admission_category_id'=> $catId,
-                            'status'                      => 'open',
-                            'seat_code'                   => ConvocationListSeat::makeSeatCode(
-                                $list->process_selection_id,
-                                $list->id,
-                                $course->name,
-                                $catName,
-                                $seq
-                            ),
+                            'convocation_list_id'          => $list->id,
+                            'course_id'                    => $courseId,
+                            'origin_admission_category_id' => $catId,
+                            'current_admission_category_id' => $catId,
+                            'status'                       => 'open',
+                            // seat_code será gerado no booted()
                         ]);
-                        $createdCounter++;
+                        $created++;
                     }
                 }
             }
         });
 
-        return $createdCounter;    // para retornar ao controller
+        return $created;
     }
 }

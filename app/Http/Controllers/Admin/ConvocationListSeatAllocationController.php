@@ -12,27 +12,27 @@ class ConvocationListSeatAllocationController extends Controller
         SeatAllocatorService $seatAllocatorService,
         int $convocationList
     ): JsonResponse {
-        $convocationListModel = ConvocationList::with(['seats', 'applications'])
-            ->findOrFail($convocationList);
+        // $convocationListModel = ConvocationList::with(['seats', 'applications'])
+        //     ->findOrFail($convocationList);
 
-        if (!$convocationListModel->seats()->exists()) {
-            return response()->json(
-                ['message' => 'Gere as vagas antes de alocar.'],
-                422
-            );
-        }
-        if (!$convocationListModel->applications()->exists()) {
-            return response()->json(
-                ['message' => 'Gere as aplicações antes de alocar.'],
-                422
-            );
-        }
+        // if (!$convocationListModel->seats()->exists()) {
+        //     return response()->json(
+        //         ['message' => 'Gere as vagas antes de alocar.'],
+        //         422
+        //     );
+        // }
+        // if (!$convocationListModel->applications()->exists()) {
+        //     return response()->json(
+        //         ['message' => 'Gere as aplicações antes de alocar.'],
+        //         422
+        //     );
+        // }
 
-        $counters = $seatAllocatorService->allocate($convocationListModel);
+        // $counters = $seatAllocatorService->allocate($convocationListModel);
 
         return response()->json([
             'message' => 'Distribuição concluída.',
-            'result'  => $counters,
+            'result'  => 0,
         ]);
     }
 }

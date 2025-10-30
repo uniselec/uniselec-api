@@ -7,6 +7,7 @@ use App\Http\Resources\ConvocationListResource;
 use App\Models\ConvocationList;
 use App\Models\ProcessSelection;
 use App\Services\ApplicationGeneratorService;
+use App\Services\SeatGeneratorService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use EloquentFilter\Filterable;
@@ -17,9 +18,15 @@ use ReflectionClass;
 
 class ConvocationListController extends BasicCrudController
 {
+    private SeatGeneratorService $seatGeneratorService;
+    private ApplicationGeneratorService $applicationGeneratorService;
     public function __construct(
-        private ApplicationGeneratorService $applicationGeneratorService
-    ) {}
+        ApplicationGeneratorService $applicationGeneratorService,
+        SeatGeneratorService       $seatGeneratorService
+    ) {
+        $this->applicationGeneratorService = $applicationGeneratorService;
+        $this->seatGeneratorService        = $seatGeneratorService;
+    }
 
     private $rules = [
         'process_selection_id' => 'required|exists:process_selections,id',
@@ -51,26 +58,36 @@ class ConvocationListController extends BasicCrudController
     /* ------------------------------------------------------------------ */
     public function store(Request $request) // <-- assinatura mantida
     {
+
+        // 1) Bloqueia múltiplos draft
+        $ps = ProcessSelection::findOrFail($request->input('process_selection_id'));
+        if ($ps->convocationLists()->where('status', 'draft')->exists()) {
+            return response()->json([
+                'message' => 'Já existe uma lista em rascunho para este processo. '
+                    . 'Publique ou descarte antes de criar outra.'
+            ], 422);
+        }
+
+        // 2) Valida e cria lista + aplicações
         $data = Validator::make($request->all(), $this->rulesStore())->validate();
         $data['generated_by'] = $request->user()->id;
 
-        [$list, $created] = DB::transaction(function () use ($data) {
-            /** @var ConvocationList $list */
+        [$list, $createdApps] = DB::transaction(function () use ($data) {
             $list = ConvocationList::create($data)->refresh();
-
-            // Gera as aplicações logo após criar a lista
-            $created = 0;
-            if (!$list->applications()->exists()) {
-                $created = $this->applicationGeneratorService->generate($list);
-            }
-
-            return [$list, $created];
+            $createdApps = $this->applicationGeneratorService->generate($list);
+            return [$list, $createdApps];
         });
 
-        return (new ConvocationListResource($list))
+        // 3) Gera vagas automaticamente
+        $createdSeats = $this->seatGeneratorService->generateFromProcessSelection($list);
+
+        // 4) Retorno
+        $resource = $this->resource();
+        return (new $resource($list))
             ->additional([
-                'message' => 'Lista criada e aplicações geradas com sucesso.',
-                'created' => $created,
+                'message' => 'Lista criada, aplicações e vagas geradas com sucesso.',
+                'created_applications' => $createdApps,
+                'created_seats'        => $createdSeats,
             ]);
     }
 

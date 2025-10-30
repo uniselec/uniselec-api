@@ -24,11 +24,11 @@ class ConvocationListSeatGenerationController extends Controller
             ], 422);
         }
 
-        $total = $service->generate($convList, $request->input('seats'));
+        // $total = $service->generate($convList, $request->input('seats'));
 
         return response()->json([
             'message' => "Gerado com sucesso",
-            'created' => $total
+            // 'created' => $total
         ], 201);
     }
 }

@@ -1,104 +1,126 @@
 <?php
-// app/Services/ApplicationGeneratorService.php
 
 namespace App\Services;
 
-use App\Models\{
-    ApplicationOutcome,
-    ConvocationList,
-    ConvocationListApplication
-};
+use App\Models\ApplicationOutcome;
+use App\Models\ConvocationList;
+use App\Models\ConvocationListApplication;
 use Illuminate\Support\Facades\DB;
 
 class ApplicationGeneratorService
 {
     /**
-     * Gera registros em convocation_list_applications.
-     * Cria uma linha por (application x categoria selecionada).
+     * Gera registros em convocation_list_applications:
+     * - agrupa por curso e categoria (usando o nome)
+     * - ordena pelo final_score e average_score
+     * - define general e category ranking
+     * - seta convocation_status, result_status e response_status
      *
      * @return int  Total de linhas inseridas
      */
-    public function generate(ConvocationList $convocationList): int
+    public function generate(ConvocationList $list): int
     {
-        $psId = $convocationList->process_selection_id;
+        $ps        = $list->processSelection;
+        $psId      = $ps->id;
+        $courses   = collect($ps->courses)->keyBy('id'); // bloqueios por curso
+        // quais listas anteriores já existem
+        $prevListIds = $ps->convocationLists()
+                          ->where('id', '<', $list->id)
+                          ->pluck('id')
+                          ->all();
 
-        $outcomes = ApplicationOutcome::query()
+        // 1) busca todos outcomes aprovados e ainda não inseridos
+        $outcomes = ApplicationOutcome::with('application')
             ->where('status', 'approved')
-            ->whereHas('application', fn ($q) => $q->where('process_selection_id', $psId))
-            ->whereNotExists(function ($sub) use ($convocationList) {
-                $sub->selectRaw(1)
+            ->whereHas('application', fn($q) => $q->where('process_selection_id', $psId))
+            ->whereNotExists(function($sub) use($list) {
+                $sub->selectRaw('1')
                     ->from('convocation_list_applications as cla')
-                    ->whereColumn('cla.application_id', 'application_outcomes.application_id')
-                    ->where('cla.convocation_list_id', $convocationList->id);
+                    ->whereColumn('cla.application_id','application_outcomes.application_id')
+                    ->where('cla.convocation_list_id',$list->id);
             })
-            ->orderByDesc('final_score')
-            ->orderByDesc('average_score')
-            ->orderBy('application_id');
+            ->get();
 
-        $globalRank       = 0;
-        $categoryCounters = [];  // catId => current rank
-        $totalInserted    = 0;
+        // 2) agrupa em memória: [curso][categoriaNome] => lista de outcomes
+        $grouped = [];
+        foreach ($outcomes as $outcome) {
+            $appData   = $outcome->application->form_data;
+            $courseId  = $appData['position']['id'] ?? null;
+            $categories = $appData['admission_categories'] ?? [];
 
-        DB::transaction(function () use (
-            $outcomes,
-            $convocationList,
-            &$globalRank,
-            &$categoryCounters,
-            &$totalInserted
-        ) {
-            $outcomes->chunk(500, function ($chunk) use (
-                $convocationList,
-                &$globalRank,
-                &$categoryCounters,
-                &$totalInserted
-            ) {
-                $rows = [];
+            if (!$courseId) {
+                continue;
+            }
 
-                foreach ($chunk as $outcome) {
-                    $app = $outcome->application;
+            foreach ($categories as $cat) {
+                $catId   = $cat['id'];
+                $catName = $cat['name'];
+                $grouped[$courseId][$catName][] = $outcome;
+            }
+        }
 
-                    // garante array independente do tipo vindo do banco
-                    $formData = is_array($app->form_data)
-                        ? $app->form_data
-                        : (json_decode($app->form_data ?? '[]', true) ?? []);
+        $rows          = [];
+        $globalRank    = 0;
 
-                    $courseId  = $formData['position']['id'] ?? null;
-                    $cats      = $formData['admission_categories'] ?? [];
-
-                    if (!$courseId || empty($cats)) {
-                        continue;
+        // 3) percorre cada grupo, ordena e monta linhas
+        foreach ($grouped as $courseId => $byCatName) {
+            foreach ($byCatName as $catName => $chunk) {
+                // ordenação
+                usort($chunk, function($a, $b) {
+                    if ($a->final_score !== $b->final_score) {
+                        return $b->final_score <=> $a->final_score;
                     }
+                    return $b->average_score <=> $a->average_score;
+                });
 
-                    // ranking global só 1x por application
+                // cota do edital
+                $quota = $courses[$courseId]['vacanciesByCategory'][$catName] ?? 0;
+
+                foreach ($chunk as $index => $outcome) {
                     $globalRank++;
+                    $categoryRank = $index + 1;
 
-                    foreach ($cats as $cat) {
-                        $catId = $cat['id'];
+                    // checa se recusou antes
+                    $declinedPrev = ConvocationListApplication::whereIn('convocation_list_id', $prevListIds)
+                        ->where('application_id', $outcome->application_id)
+                        ->where('response_status', 'declined')
+                        ->exists();
 
-                        // ranking por categoria
-                        $categoryCounters[$catId] = ($categoryCounters[$catId] ?? 0) + 1;
-
-                        $rows[] = [
-                            'convocation_list_id'   => $convocationList->id,
-                            'application_id'        => $app->id,
-                            'course_id'             => $courseId,
-                            'admission_category_id' => $catId,
-                            'general_ranking' => $globalRank,
-                            'category_ranking'   => $categoryCounters[$catId],
-                            // 'status'                => 'eligible',
-                            'created_at'            => now(),
-                            'updated_at'            => now(),
-                        ];
-                    }
+                    $rows[] = [
+                        'convocation_list_id'   => $list->id,
+                        'application_id'        => $outcome->application_id,
+                        'course_id'             => $courseId,
+                        'admission_category_id' => $outcome->application
+                                                       ->form_data['admission_categories']
+                                                       [array_search($catName,
+                                                           array_column(
+                                                               $outcome->application
+                                                                   ->form_data['admission_categories'], 'name')
+                                                           )
+                                                       ]['id'],
+                        'general_ranking'       => $globalRank,
+                        'category_ranking'      => $categoryRank,
+                        'convocation_status'    => 'pending',
+                        'result_status'         => ($categoryRank <= $quota)
+                                                   ? 'classified'
+                                                   : 'classifiable',
+                        'response_status'       => $declinedPrev
+                                                   ? 'declined_other_list'
+                                                   : 'pending',
+                        'created_at'            => now(),
+                        'updated_at'            => now(),
+                    ];
                 }
+            }
+        }
 
-                if ($rows) {
-                    ConvocationListApplication::insert($rows);
-                    $totalInserted += count($rows);
-                }
-            });
+        // 4) insere tudo de uma vez
+        DB::transaction(function() use($rows) {
+            if (!empty($rows)) {
+                ConvocationListApplication::insert($rows);
+            }
         });
 
-        return $totalInserted;
+        return count($rows);
     }
 }

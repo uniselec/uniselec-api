@@ -17,11 +17,11 @@ return new class extends Migration {
 
             $table->dropColumn(['ranking_at_generation', 'ranking_in_category', 'status']);
 
-            $table->unsignedInteger('category_ranking')
-                  ->after('admission_category_id');
+            $table->unsignedInteger('category_ranking')->nullable()->default(null)
+                ->after('admission_category_id');
 
-            $table->unsignedInteger('general_ranking')
-                  ->after('category_ranking');
+            $table->unsignedInteger('general_ranking')->nullable()->default(null)
+                ->after('category_ranking');
 
 
             $table->enum('convocation_status', [
@@ -30,15 +30,15 @@ return new class extends Migration {
                 'called_out_of_quota',
                 'skipped',
             ])
-            ->default('pending')
-            ->after('category_ranking');
+                ->default('pending')
+                ->after('category_ranking');
 
             // Result status
             $table->enum('result_status', [
                 'classified',
                 'classifiable',
             ])
-            ->after('convocation_status')->default('classifiable');
+                ->after('convocation_status')->default('classifiable');
 
             // Candidate response status
             $table->enum('response_status', [
@@ -47,11 +47,9 @@ return new class extends Migration {
                 'declined',
                 'declined_other_list',
             ])
-            ->default("pending")
-            ->after('result_status');
+                ->default("pending")
+                ->after('result_status');
         });
-
-
     }
 
     /**
@@ -64,13 +62,13 @@ return new class extends Migration {
         Schema::table('convocation_list_applications', function (Blueprint $table) {
             // Restore old columns
             $table->enum('status', ['eligible', 'convoked', 'skipped'])
-                  ->default('eligible')
-                  ->after('admission_category_id');
+                ->default('eligible')
+                ->after('admission_category_id');
             $table->unsignedInteger('ranking_at_generation')
-                  ->after('seat_id');
+                ->after('seat_id');
             $table->unsignedInteger('ranking_in_category')
-                  ->nullable()
-                  ->after('ranking_at_generation');
+                ->nullable()
+                ->after('ranking_at_generation');
 
             // Remove new columns
             $table->dropColumn([
@@ -80,6 +78,5 @@ return new class extends Migration {
                 'response_status',
             ]);
         });
-
     }
 };
