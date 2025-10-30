@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AdmissionCategoryController;
 use App\Http\Controllers\Admin\ApplicationController;
 use App\Http\Controllers\Admin\ApplicationOutcomeController;
 use App\Http\Controllers\Admin\BonusOptionController;
+use App\Http\Controllers\Admin\ConvocationCallerController;
 use App\Http\Controllers\Admin\ConvocationListApplicationController;
 use App\Http\Controllers\Admin\ConvocationListApplicationGenerationController;
 use App\Http\Controllers\Admin\ConvocationListController;
@@ -57,10 +58,15 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::apiResource('convocation_lists', ConvocationListController::class)->names('admin.super_user.convocation_lists');
         Route::apiResource('convocation_list_seats', ConvocationListSeatController::class)->names('admin.super_user.convocation_list_seats');
 
-        Route::post('convocation_lists/{list}/generate-seats',[ConvocationListSeatGenerationController::class, 'store'])->name('admin.super_user.cconvocation_lists.generate_seats');
-        Route::post('convocation_lists/{convocationList}/generate-applications',[ConvocationListApplicationGenerationController::class, 'store'])->name('convocation_lists.generate_applications');
-        Route::post('convocation_lists/{convocationList}/allocate-seats',[ConvocationListSeatAllocationController::class, 'store'])->name('convocation_lists.allocate_seats');
-        Route::post('convocation_lists/{convocationList}/redistribute-seats',[ConvocationListSeatRedistributionController::class, 'store'])->name('convocation_lists.redistribute_seats');
+        Route::post('convocation_lists/{list}/generate-seats', [ConvocationListSeatGenerationController::class, 'store'])->name('admin.super_user.cconvocation_lists.generate_seats');
+        Route::post('convocation_lists/{convocationList}/generate-applications', [ConvocationListApplicationGenerationController::class, 'store'])->name('convocation_lists.generate_applications');
+        Route::post('convocation_lists/{convocationList}/allocate-seats', [ConvocationListSeatAllocationController::class, 'store'])->name('convocation_lists.allocate_seats');
+        Route::post('convocation_lists/{convocationList}/redistribute-seats', [ConvocationListSeatRedistributionController::class, 'store'])->name('convocation_lists.redistribute_seats');
+        Route::post(
+            'convocation_list_applications/{cla}/call',
+            ConvocationCallerController::class
+        )->name('admin.super_user.convocation_list_applications.call');
+
 
         Route::post('process_selections/{selection}/outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
         // Route::post('process_selections/{selection}/outcomes_without_pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);
