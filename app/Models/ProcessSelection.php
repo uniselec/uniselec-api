@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-
+use Illuminate\Database\Eloquent\Relations\HasMany;
 class ProcessSelection extends Model
 {
     use HasFactory;
@@ -27,10 +27,10 @@ class ProcessSelection extends Model
 
     protected $casts = [
         'courses' => 'array',
-        'admission_categories'=> 'array',
-        'knowledge_areas'=> 'array',
-        'bonus_options'=> 'array',
-        'allowed_enem_years'=> 'array',
+        'admission_categories' => 'array',
+        'knowledge_areas' => 'array',
+        'bonus_options' => 'array',
+        'allowed_enem_years' => 'array',
         'remap_rules'  => 'array',
     ];
 
@@ -42,5 +42,9 @@ class ProcessSelection extends Model
     public function documents()
     {
         return $this->hasMany(Document::class);
+    }
+    public function convocationLists(): HasMany
+    {
+        return $this->hasMany(ConvocationList::class);
     }
 }
