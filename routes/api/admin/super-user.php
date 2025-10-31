@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\BonusOptionController;
 use App\Http\Controllers\Admin\ConvocationCallerController;
 use App\Http\Controllers\Admin\ConvocationListApplicationController;
 use App\Http\Controllers\Admin\ConvocationListApplicationGenerationController;
+use App\Http\Controllers\Admin\ConvocationListApplicationResponseController;
 use App\Http\Controllers\Admin\ConvocationListController;
 use App\Http\Controllers\Admin\ConvocationListSeatAllocationController;
 use App\Http\Controllers\Admin\ConvocationListSeatController;
@@ -28,7 +29,6 @@ use App\Http\Controllers\Auth\RegisterController;
 
 
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Carbon;
 
 Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
     Route::middleware(['abilities:super_user'])->prefix('super_user')->group(function () {
@@ -67,6 +67,13 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
             ConvocationCallerController::class
         )->name('admin.super_user.convocation_list_applications.call');
 
+
+        Route::prefix('convocation_list_applications')->group(function () {
+            Route::post('{cla}/call',    [ConvocationListApplicationResponseController::class, 'call']);
+            Route::post('{cla}/accept',  [ConvocationListApplicationResponseController::class, 'accept']);
+            Route::post('{cla}/decline', [ConvocationListApplicationResponseController::class, 'decline']);
+            Route::post('{cla}/reject',  [ConvocationListApplicationResponseController::class, 'reject']);
+        });
 
         Route::post('process_selections/{selection}/outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
         // Route::post('process_selections/{selection}/outcomes_without_pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);
