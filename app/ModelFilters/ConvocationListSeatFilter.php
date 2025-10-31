@@ -19,6 +19,11 @@ class ConvocationListSeatFilter extends DefaultModelFilter
     {
         $this->where('current_admission_category_id', $id);
     }
+    public function convocationList($id): void
+    {
+        $this->where('convocation_list_id', $id);
+    }
+
     /**
      * Related Models that have ModelFilters as well as the method on the ModelFilter
      * As [relationMethod => [input_key1, input_key2]].
