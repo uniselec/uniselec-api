@@ -87,4 +87,5 @@ class ConvocationListSeat extends Model
     {
         return $this->belongsTo(Application::class);
     }
+
 }

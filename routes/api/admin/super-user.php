@@ -67,6 +67,10 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
             ConvocationCallerController::class
         )->name('admin.super_user.convocation_list_applications.call');
 
+        Route::post(
+            'convocation_list_seats/{seat}/redistribute',
+            [ConvocationListSeatRedistributionController::class, 'redistribute']
+        )->name('convocation_list_seats.redistribute');
 
         Route::prefix('convocation_list_applications')->group(function () {
             Route::post('{cla}/call',    [ConvocationListApplicationResponseController::class, 'call']);
