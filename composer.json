@@ -15,7 +15,6 @@
         "tucker-eric/eloquentfilter": "^3.4"
     },
     "require-dev": {
-        "lanin/laravel-api-debugger": "^4.0",
         "fakerphp/faker": "^1.23",
         "laravel/pail": "^1.1",
         "laravel/pint": "^1.13",
