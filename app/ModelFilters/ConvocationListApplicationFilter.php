@@ -19,6 +19,9 @@ class ConvocationListApplicationFilter extends DefaultModelFilter
     {
         $this->where('admission_category_id', $id);
     }
-
+    public function convocationList($id): void
+    {
+        $this->where('convocation_list_id', $id);
+    }
     public $relations = [];
 }
