@@ -1,31 +1,29 @@
 <?php
-
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\ConvocationList;
+use App\Models\ConvocationListSeat;
 use App\Services\SeatRedistributionService;
 use Illuminate\Http\JsonResponse;
 
 class ConvocationListSeatRedistributionController extends Controller
 {
-    /**
-     * Executa o serviço de redistribuição até que:
-     *   – não haja mais inscrições elegíveis, OU
-     *   – todas as vagas estejam preenchidas.
-     */
-    public function store(
-        SeatRedistributionService $service,
-        int $convocationList
-    ): JsonResponse {
-        $list = ConvocationList::with(['seats', 'applications'])->findOrFail($convocationList);
+    public function redistribute(int $seat, SeatRedistributionService $service): JsonResponse
+    {
+        $seat = ConvocationListSeat::findOrFail($seat);
 
-        [$filled, $leftOpen] = $service->redistribute($list);
+        $updated = $service->redistributeSeat($seat);
+
+        if (! $updated) {
+            return response()->json([
+                'message' => 'Vaga não pôde ser redistribuída (status ou sem regras aplicáveis).'
+            ], 422);
+        }
 
         return response()->json([
-            'message'       => 'Redistribuição concluída.',
-            'seats_filled'  => $filled,
-            'seats_open'    => $leftOpen,
-        ]);
+            'message'    => 'Vaga redistribuída com sucesso.',
+            'seat_id'    => $seat->id,
+            'new_category_id' => $seat->current_admission_category_id,
+        ], 200);
     }
 }
