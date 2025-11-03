@@ -7,6 +7,7 @@ use App\Models\ApplicationOutcome;
 use App\Models\EnemScore;
 use App\Models\KnowledgeArea;
 use App\Models\ProcessSelection;
+use Carbon\Carbon;
 
 class ProcessApplicationOutcome
 {
@@ -17,6 +18,8 @@ class ProcessApplicationOutcome
         $this->ensureAllApplicationsHaveOutcomes();
         $this->processEnemScores();
         $this->markDuplicateApplications();
+        ProcessSelection::find($this->processSelectionId)
+            ->update(['last_applications_processed_at' => Carbon::now()]);
     }
 
     /* ---------------------------------------------------------------------- */
@@ -89,25 +92,27 @@ class ProcessApplicationOutcome
             /* --- consistências -------------------------------------------- */
             $reasons = [];
 
-            if (($enemScore->scores['cpf'] ?? '') !== ($applicationData['cpf'] ?? '')) {
+            if ((($enemScore->scores['cpf'] ?? '') !== ($applicationData['cpf'] ?? '')) && !$application->cpf_source) {
                 $reasons[] = 'Inconsistência no CPF';
             }
 
-            if ($this->normalizeString($enemScore->scores['name'] ?? '') !==
-                $this->normalizeString($applicationData['name'] ?? '')) {
+            if (($this->normalizeString($enemScore->scores['name'] ?? '') !==
+                $this->normalizeString($applicationData['name'] ?? '') && !$application->name_source)) {
                 $reasons[] = 'Inconsistência no Nome';
             }
 
             $birthdateInconsistency = false;
-            if (($applicationData['birthdate'] ?? null) && ($enemScore->scores['birthdate'] ?? null)) {
-                $appDate  = \DateTime::createFromFormat('Y-m-d', $applicationData['birthdate']);
-                $enemDate = \DateTime::createFromFormat('d/m/Y', $enemScore->scores['birthdate']);
-                if (!$appDate || !$enemDate || $appDate->format('Y-m-d') !== $enemDate->format('Y-m-d')) {
-                    $reasons[] = 'Inconsistência na Data de Nascimento';
-                    $birthdateInconsistency = true;
+            if (!$application->name_source) {
+                if (($applicationData['birthdate'] ?? null) && ($enemScore->scores['birthdate'] ?? null)) {
+                    $appDate  = \DateTime::createFromFormat('Y-m-d', $applicationData['birthdate']);
+                    $enemDate = \DateTime::createFromFormat('d/m/Y', $enemScore->scores['birthdate']);
+                    if (!$appDate || !$enemDate || $appDate->format('Y-m-d') !== $enemDate->format('Y-m-d')) {
+                        $reasons[] = 'Inconsistência na Data de Nascimento';
+                        $birthdateInconsistency = true;
+                    }
+                } else {
+                    $reasons[] = 'Data de Nascimento ausente ou inconsistente';
                 }
-            } else {
-                $reasons[] = 'Data de Nascimento ausente ou inconsistente';
             }
 
             /* --- análise da nota mínima ------------------------------ */

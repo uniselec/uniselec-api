@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Services\NotifyApplicationsByStatusService;
 use App\Http\Controllers\Controller;
 use App\Models\ProcessSelection;
-use App\Services\NotifyApplicationsByStatusService;
+use Illuminate\Http\Request;
 
 class ProcessSelectionNotifyController extends Controller
 {
@@ -13,16 +14,32 @@ class ProcessSelectionNotifyController extends Controller
            
     }
 
-    public function notifyByStatus(int $selection) {
-
-        $processSelection = ProcessSelection::find($selection);
-
-        if ($processSelection) {
-            $this->sevice->run($processSelection);
-        } else {
-            return response()->json(['error' => 'O processo de seleção informado não existe.']);
+    public function notifyByStatus(Request $request, int $selectionId)
+    {
+        $statusForNotification = $request->query('status');
+        if (!$statusForNotification) {
+            return response()->json([
+                'error' => 'Não há status selecionado para envio de notificação.'
+            ], 400);
         }
 
-        return response()->json(['message' => 'Notificações enviadas com sucesso.']);
+        $processSelection = ProcessSelection::find($selectionId);
+        if (!$processSelection) {
+            return response()->json([
+                'error' => 'O processo de seleção informado não existe.'
+            ], 404);
+        }
+
+        $resultNotifications = $this->sevice->run($processSelection, $statusForNotification);
+        if ($resultNotifications->isFailure()) {
+            return response()->json([
+                'error' => $resultNotifications->getMessage()
+            ], $resultNotifications->getCode() ?: 500);
+        }
+
+        return response()->json([
+            'message' => $resultNotifications->getMessage(),
+            'data'    => $resultNotifications->getData(),
+        ]);
     }
 }
