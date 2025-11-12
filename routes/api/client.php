@@ -5,6 +5,8 @@ use App\Http\Controllers\Admin\ProcessSelectionController;
 use App\Http\Controllers\Client\ApplicationController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Client\AppealController;
+use App\Http\Controllers\Client\AppealDocumentController;
 use App\Http\Controllers\Public\EnrollmentVerificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,6 +19,12 @@ Route::middleware(['auth:sanctum'])->prefix('client')->group(function () {
     Route::apiResource('process_selections', ProcessSelectionController::class)->only(['index', 'show'])->names('admin.processSelection');
     Route::apiResource('documents', DocumentController::class)->only(['index', 'show'])->names('admin.documents');
     Route::apiResource('applications', ApplicationController::class)->only(['index', 'show', 'store'])->names('admin.documents');
+    Route::apiResource('appeals', AppealController::class)->names('client.appeals');
+    Route::prefix('appeals/{appeal}')->group(function () {
+        Route::post('/document', [AppealDocumentController::class, 'store'])->name('appeal.document.store');
+        Route::delete('/document/{document}', [AppealDocumentController::class, 'destroy'])->name('appeal.document.destroy');
+    });
+
 
     Route::put('profile', [RegisterController::class, 'updateProfileClient'])->name('client.profile.update');
 

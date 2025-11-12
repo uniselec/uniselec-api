@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AcademicUnitController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdmissionCategoryController;
+use App\Http\Controllers\Admin\AppealController;
 use App\Http\Controllers\Admin\ApplicationController;
 use App\Http\Controllers\Admin\ApplicationOutcomeController;
 use App\Http\Controllers\Admin\BonusOptionController;
@@ -51,6 +52,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::apiResource('applications', ApplicationController::class)->only(['index', 'show'])->names('admin.applications');
         Route::patch('applications/{id}/resolve-inconsistencies', [ApplicationController::class, 'resolveInconsistencies'])->name('admin.applications.resolve-inconsistencies');
         Route::apiResource('application_outcomes', ApplicationOutcomeController::class)->only(['index', 'show'])->names('admin.applications');
+        Route::apiResource('appeals', AppealController::class)->names('admin.appeals');
         Route::apiResource('users', UserController::class)->only(['index', 'show']);
         Route::apiResource('enem_scores', EnemScoreController::class)->only(['index', 'show'])->names('enem_scores.api');;
         Route::put('profile', [RegisterController::class, 'updateProfileAdmin'])->name('admin.super_user.profile.update');
