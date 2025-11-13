@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: uniselec-api
+spec:
+  rules:
+    - host: uniselec-api-staging.unilab.edu.br  # Host de staging
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: uniselec-api
+                port:
+                  number: 80

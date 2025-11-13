@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: uniselec-api-config
+data:
+  .env: |
+    MESSAGE="Serviço Seleções."
+    LOG_LEVEL="info"

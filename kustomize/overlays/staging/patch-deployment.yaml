@@ -1,0 +1,10 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uniselec-api
+spec:
+  replicas: 2  # réplicas para staging
+  template:
+    metadata:
+      labels:
+        environment: staging

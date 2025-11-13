@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: ${APP_NAME}-${DEPLOY_ENV}-as
+  namespace: argocd
+  labels:
+    environment: ${DEPLOY_ENV}
+    app: ${APP_NAME}-${DEPLOY_ENV}
+
+spec:
+  generators:
+    - list:
+        elements:
+          - name: ${APP_NAME}-${DEPLOY_ENV}
+            repoURL: ${REPO_URL}
+            path: ${KUSTOMIZE_PATH}
+            cluster: https://${CLUSTER_REMOTE1_DOMAIN}:6443
+            namespace: ${APP_NAMESPACE}
+
+  template:
+    metadata:
+      name: '{{name}}'
+      labels:
+        environment: ${DEPLOY_ENV}
+        app: ${APP_NAME}
+
+    spec:
+      project: ${APP_NAME}-${DEPLOY_ENV}-ap
+
+      source:
+        repoURL: '{{repoURL}}'
+        targetRevision: main  # Branch principal
+        path: '{{path}}'      # kustomize/overlays/staging ou production
+
+      destination:
+        server: '{{cluster}}'
+        namespace: '{{namespace}}'
+
+      syncPolicy:
+        automated:
+          prune: true      # Remove recursos deletados do Git
+          selfHeal: true   # Corrige drift automaticamente
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+          - ApplyOutOfSyncOnly=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
