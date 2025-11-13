@@ -281,9 +281,10 @@ tests:sonarqube:
         -Dsonar.projectVersion=${CI_COMMIT_SHA} \
         -Dsonar.host.url=${SONAR_HOST_URL} \
         -Dsonar.token=${SONAR_TOKEN} \
-        -Dsonar.language=js \
         -Dsonar.sources=./ \
-        -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info \
+        -Dsonar.exclusions="vendor/**,storage/**,bootstrap/**,public/**" \
+        -Dsonar.php.coverage.reportPaths=coverage.xml \
+        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
         -Dsonar.qualitygate.wait=true \
         -Dsonar.qualitygate.timeout=300
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Quality gate passou"
