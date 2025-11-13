@@ -282,7 +282,7 @@ tests:sonarqube:
         -Dsonar.host.url=${SONAR_HOST_URL} \
         -Dsonar.token=${SONAR_TOKEN} \
         -Dsonar.language=js \
-        -Dsonar.sources=src \
+        -Dsonar.sources=./ \
         -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info \
         -Dsonar.qualitygate.wait=true \
         -Dsonar.qualitygate.timeout=300
