@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uniselec-api
+  labels:
+    app: uniselec-api
+spec:
+  selector:
+    matchLabels:
+      app: uniselec-api
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: uniselec-api
+    spec:
+      containers:
+      - name: uniselec-api
+        image: dti-registro.unilab.edu.br/unilab/uniselec-api:latest
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        envFrom:
+        - configMapRef:
+            name: uniselec-api-config
+        env:
+        - name: TZ
+          value: "America/Fortaleza"
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: KUBERNETES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBERNETES_CONTAINER_CPU_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              containerName: uniselec-api
+              resource: limits.cpu
+              divisor: 1m
+        - name: KUBERNETES_CONTAINER_MEMORY_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              containerName: uniselec-api
+              resource: limits.memory
+        volumeMounts:
+        - name: localtime
+          mountPath: /etc/localtime
+          readOnly: true
+        - name: timezone
+          mountPath: /etc/timezone
+          readOnly: true
+        - name: env-volume
+          mountPath: /app/.env
+          subPath: .env
+      volumes:
+      - name: localtime
+        hostPath:
+          path: /usr/share/zoneinfo/America/Fortaleza
+          type: File
+      - name: timezone
+        hostPath:
+          path: /etc/timezone
+          type: File
+      - name: env-volume
+        configMap:
+          name: uniselec-api-config
+          items:
+            - key: .env
+              path: .env
+      imagePullSecrets:
+      - name: regcred
