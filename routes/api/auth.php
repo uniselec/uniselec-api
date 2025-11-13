@@ -143,7 +143,7 @@ Route::post('/admin/password/forgot', function (Request $request) {
     return $status === Password::RESET_LINK_SENT
         ? response()->json(['message' => __($status)])
         : response()->json(['message' => __($status)], 400);
-})->name('password.forgot');
+})->name('admin.password.forgot');
 
 
 // Admin password reset
