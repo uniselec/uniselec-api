@@ -1,0 +1,80 @@
+---
+# =====================================================================-
+# API Version: v1
+# Kind:       Service
+# Metadata:
+#   Name:     mariadb-ha
+# ----------------------------------------------------------------------
+# Author:     erivandosena@gmail.com
+# Created:    2025-04-45
+# Version:    1.0.0
+# ----------------------------------------------------------------------
+# Description: Serviço para expor o cluster MariaDB Galera em modo
+#              altamente disponível (HA) dentro do cluster Kubernetes.
+# ----------------------------------------------------------------------
+# Usage:      kubectl apply -f svc-mariadb-ha.yaml
+# =====================================================================-
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+spec:
+  clusterIP: None
+  selector:
+    app: mariadb
+  ports:
+  - name: mysql
+    port: 3306
+  - name: replication
+    port: 4567
+  - name: sst
+    port: 4444
+  - name: ist
+    port: 4568
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-primary
+  labels:
+    app: mariadb
+    role: primary
+spec:
+  clusterIP: None
+  selector:
+    statefulset.kubernetes.io/pod-name: mariadb-0
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: mysql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-replicas
+  labels:
+    app: mariadb
+    role: replica
+spec:
+  clusterIP: None
+  selector:
+    app: mariadb
+    mariadb/replication-role: member
+    wsrep_ready: "ON" # Filtra apenas nós prontos
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: mysql
+---
+# Service para aplicações
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-app
+spec:
+  selector:
+    app: mariadb
+    wsrep_ready: "ON" # Balanceia entre todos os nós prontos
+  ports:
+  - name: mysql
+    port: 3306

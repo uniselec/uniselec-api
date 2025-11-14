@@ -1,0 +1,74 @@
+---
+# =====================================================================-
+# API Version: v1
+# Kind:       ConfigMap
+# Metadata:
+#   Name:     mariadb-galera-config
+# ----------------------------------------------------------------------
+# Author:     erivandosena@gmail.com
+# Created:    2025-04-01
+# Version:    1.0.0
+# ----------------------------------------------------------------------
+# Description: Configurações específicas para o cluster MariaDB Galera,
+#              incluindo parâmetros de replicação e inicialização.
+# ----------------------------------------------------------------------
+# Usage:      kubectl apply -f configmap-mariadb-galera.yaml
+# =====================================================================-
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mariadb-config
+  labels:
+    app: mariadb
+    component: config
+    managed-by: k8s
+    role: galera
+data:
+  custom.cnf: |
+    # The MariaDB configuration file
+    #
+    # The MariaDB/MySQL tools read configuration files in the following order:
+    # 0. "/etc/mysql/my.cnf" symlinks to this file, reason why all the rest is read.
+    # 1. "/etc/mysql/mariadb.cnf" (this file) to set global defaults,
+    # 2. "/etc/mysql/conf.d/*.cnf" to set global options.
+    # 3. "/etc/mysql/mariadb.conf.d/*.cnf" to set MariaDB-only options.
+    # 4. "~/.my.cnf" to set user-specific options.
+    #
+    # If the same option is defined multiple times, the last one will apply.
+    #
+    # One can use all long options that the program supports.
+    # Run program with --help to get a list of available options and with
+    # --print-defaults to see which it would actually understand and use.
+    #
+    # If you are new to MariaDB, check out https://mariadb.com/kb/en/basic-mariadb-articles/
+    [mysqld]
+    # skip-slave-start
+    character-set-server = utf8mb4
+    collation-server = utf8mb4_unicode_ci
+    bind-address = 0.0.0.0
+    sql_mode = STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION
+    log_bin = mysql-bin
+    binlog_format = ROW
+    server_id = _SERVER_ID
+    binlog_row_image = FULL
+    log_slave_updates = ON
+    gtid_strict_mode = ON
+    expire_logs_days = 7
+    sync_binlog = 1
+    innodb_flush_log_at_trx_commit = 1
+    max_connect_errors = 1000
+
+    [galera]
+    wsrep_on = ON
+    wsrep_provider = /usr/lib/galera/libgalera_smm.so
+    wsrep_cluster_name = _MARIADB_CLUSTER_NAME
+    wsrep_cluster_address = _MARIADB_CLUSTER_ADDRESS
+    wsrep_node_address = _POD_IP
+    wsrep_sst_auth = _SST_USER:_SST_PASSWORD
+    wsrep_sst_method = mariabackup
+    wsrep_slave_threads = 16
+
+    [mariadb]
+    transaction-isolation = READ-COMMITTED
+    default_storage_engine = InnoDB
+    innodb_autoinc_lock_mode = 2

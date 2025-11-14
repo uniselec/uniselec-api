@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mariadb
+  labels:
+    environment: staging
+spec:
+  replicas: 3  # nós para staging
+  template:
+    metadata:
+      labels:
+        environment: staging
+    spec:
+      containers:
+      - name: mariadb
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+  volumeClaimTemplates:
+  - metadata:
+      name: database
+    spec:
+      resources:
+        requests:
+          storage: 5Gi  # Storage menor para staging

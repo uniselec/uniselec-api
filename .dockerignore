@@ -9,3 +9,4 @@ README.md
 /pipeline
 /vault
 stress.sh
+kustomize/base/secret-regcred.yaml

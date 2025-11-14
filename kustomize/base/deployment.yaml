@@ -14,6 +14,33 @@ spec:
       labels:
         app: uniselec-api
     spec:
+      # inicio - Init container para aguardar MariaDB
+      initContainers:
+      - name: wait-for-mariadb
+        image: mariadb:11.3.2
+        command:
+        - bash
+        - -c
+        - |
+          echo "Aguardando MariaDB Galera Cluster..."
+          for i in {1..60}; do
+            if mariadb -h mariadb-app -u ${DB_USERNAME} -p"${MYSQL_ROOT_PASSWORD}" \
+                       -e "SELECT 1" >/dev/null 2>&1; then
+              echo "MariaDB disponível!"
+              exit 0
+            fi
+            echo "Tentativa $i/60..."
+            sleep 5
+          done
+          echo "Timeout: MariaDB não disponível"
+          exit 1
+        envFrom:
+        - configMapRef:
+            name: mariadb-env
+        - secretRef:
+            name: mariadb-secret-env
+      # fim - Init container
+
       containers:
       - name: uniselec-api
         image: dti-registro.unilab.edu.br/unilab/uniselec-api:latest
@@ -32,6 +59,12 @@ spec:
         envFrom:
         - configMapRef:
             name: uniselec-api-config
+        # inicio - variáveis do MariaDB
+        - configMapRef:
+            name: mariadb-env
+        - secretRef:
+            name: mariadb-secret-env
+        # fim - Variáveis do MariaDB
         env:
         - name: TZ
           value: "America/Fortaleza"

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mariadb
+  labels:
+    environment: production
+spec:
+  replicas: 3  # nós para production
+  template:
+    metadata:
+      labels:
+        environment: production
+    spec:
+      containers:
+      - name: mariadb
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+  volumeClaimTemplates:
+  - metadata:
+      name: database
+    spec:
+      resources:
+        requests:
+          storage: 25Gi  # Storage maior para production
