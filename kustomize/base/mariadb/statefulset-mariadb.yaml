@@ -262,12 +262,14 @@ spec:
   volumeClaimTemplates:
   - metadata:
       name: database
+      labels:
+        app: mariadb
       annotations:
-        nfs.io/storage-path: "data"
+        nfs.io/storage-path: ""
     spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
         requests:
           storage: 10Gi
-      storageClassName: nfs-storage
+      storageClassName: nfs-storage-k8s-v1
       volumeMode: Filesystem
