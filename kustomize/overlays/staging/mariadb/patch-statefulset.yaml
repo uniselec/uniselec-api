@@ -32,19 +32,32 @@ spec:
   #         storage: 5Gi
   #     storageClassName: nfs-storage-k8s-v1
 
+  # volumeClaimTemplates:
+  # - metadata:
+  #     name: database
+  #     labels:
+  #       app: mariadb
+  #       annotations:
+  #         nfs.io/storage-path: ""
+  #   spec:
+  #     accessModes:
+  #     - ReadWriteOnce
+  #     storageClassName: nfs-storage-k8s-v1
+  #     resources:
+  #       requests:
+  #         storage: 5Gi
+
   volumeClaimTemplates:
   - metadata:
       name: database
       labels:
         app: mariadb
-        annotations:
-          nfs.io/storage-path: ""
     spec:
       accessModes:
-      - ReadWriteOnce
-      storageClassName: nfs-storage-k8s-v1
+        - ReadWriteOnce
       resources:
         requests:
           storage: 5Gi
+      storageClassName: nfs-storage-k8s-v1
 
 
