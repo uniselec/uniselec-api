@@ -22,6 +22,7 @@ RUN apt-get update \
        libfreetype6-dev \
        libjpeg62-turbo-dev \
        libpng-dev \
+       default-mysql-client \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 
