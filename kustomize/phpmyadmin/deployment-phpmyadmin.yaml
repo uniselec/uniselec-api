@@ -5,13 +5,27 @@ metadata:
   namespace: uniselec-api-stg
   labels:
     app: phpmyadmin
+  annotations:
+    metallb.universe.tf/address-pool: int-pool
+    metallb.universe.tf/loadBalancerIPs: "10.130.0.161"
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   ports:
   - port: 80
     targetPort: 80
+    protocol: TCP 
   selector:
     app: phpmyadmin
+  externalTrafficPolicy: Cluster
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: phpmyadmin-credentials
+  namespace: uniselec-api-stg
+type: Opaque
+data:
+  password: UGFzc3dvcmQxMjM=  # "Password123" em base64
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -32,14 +46,17 @@ spec:
     spec:
       containers:
       - name: phpmyadmin
-        image: phpmyadmin/phpmyadmin:latest
+        image: phpmyadmin/phpmyadmin:5.2.1
         env:
         - name: PMA_HOST
           value: "mariadb-app.uniselec-api-stg.svc.cluster.local"
         - name: PMA_USER
           value: "root"
         - name: PMA_PASSWORD
-          value: "Password123"
+          valueFrom:
+            secretKeyRef:
+              name: phpmyadmin-credentials
+              key: password
         ports:
         - containerPort: 80
           name: http
@@ -50,3 +67,25 @@ spec:
           limits:
             cpu: 250m
             memory: 256Mi
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: phpmyadmin
+  namespace: uniselec-api-stg
+  annotations:
+    haproxy.org/forwarded-for: "enabled"
+    haproxy.org/load-balance: "roundrobin"
+    haproxy.org/ssl-redirect: "false"
+spec:
+  rules:
+  - host: 10.130.0.161.nip.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: phpmyadmin
+            port:
+              number: 80

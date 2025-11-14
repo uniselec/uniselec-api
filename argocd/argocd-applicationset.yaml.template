@@ -36,6 +36,13 @@ spec:
         server: '{{cluster}}'
         namespace: '{{namespace}}'
 
+      ignoreDifferences:
+      - group: autoscaling
+        kind: HorizontalPodAutoscaler
+        jsonPointers:
+        - /status
+        - /metadata/annotations/autoscaling.alpha.kubernetes.io~1metrics
+
       syncPolicy:
         automated:
           prune: true      # Remove recursos deletados do Git
@@ -44,6 +51,8 @@ spec:
           - CreateNamespace=true
           - PruneLast=true
           - ApplyOutOfSyncOnly=true
+          - SkipDryRunOnMissingResource=true
+          - RespectIgnoreDifferences=true
         retry:
           limit: 5
           backoff:
