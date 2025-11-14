@@ -8,11 +8,11 @@ resources:
 - ../../base
 - namespace.yaml
 
+# inicio - staging do MariaDB
 patches:
 - path: patch-deployment.yaml
 - path: patch-ingress.yaml
 - path: patch-hpa.yaml
-# inicio - staging do MariaDB
 - path: mariadb/patch-statefulset.yaml
   target:
     kind: StatefulSet
@@ -21,8 +21,7 @@ patches:
 
 # inicio - Override de variáveis do MariaDB para staging
 configMapGenerator:
-- name: mariadb-env
-  behavior: merge
+- behavior: merge
   literals:
   - DB_DATABASE=uniselec_stag
   - MYSQL_DATABASE=uniselec_stag
@@ -31,6 +30,7 @@ configMapGenerator:
   - MARIADB_MASTER_HOST=mariadb-0.mariadb.uniselec-api-stg.svc.cluster.local
   - MARIADB_MASTER_WORKER1=mariadb-1.mariadb.uniselec-api-stg.svc.cluster.local
   - MARIADB_MASTER_WORKER2=mariadb-2.mariadb.uniselec-api-stg.svc.cluster.local
+  name: mariadb-env
 # fim - Override de variáveis
 
 images:
