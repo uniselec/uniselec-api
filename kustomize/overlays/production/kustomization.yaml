@@ -11,6 +11,7 @@ resources:
 patches:
 - path: patch-deployment.yaml
 - path: patch-ingress.yaml
+- path: patch-hpa.yaml
 # inicio - MariaDB para production
 - path: mariadb/patch-statefulset.yaml
   target:
