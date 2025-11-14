@@ -11,9 +11,9 @@ metadata:
 spec:
   type: LoadBalancer
   ports:
-  - port: 80
-    targetPort: 80
-    protocol: TCP 
+    - port: 80
+      targetPort: 80
+      protocol: TCP
   selector:
     app: phpmyadmin
   externalTrafficPolicy: Cluster
@@ -25,7 +25,8 @@ metadata:
   namespace: uniselec-api-stg
 type: Opaque
 data:
-  password: UGFzc3dvcmQxMjM=  # "Password123" em base64
+  password: UGFzc3dvcmQxMjM=    # "Password123" em base64
+  username: cm9vdA==            # "root" em base64
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -50,13 +51,25 @@ spec:
         env:
         - name: PMA_HOST
           value: "mariadb-app.uniselec-api-stg.svc.cluster.local"
+        - name: PMA_PORT
+          value: "3306"
         - name: PMA_USER
-          value: "root"
+          valueFrom:
+            secretKeyRef:
+              name: phpmyadmin-credentials
+              key: username
         - name: PMA_PASSWORD
           valueFrom:
             secretKeyRef:
               name: phpmyadmin-credentials
               key: password
+        - name: MYSQLI_CLIENT_FLAGS
+          value: "0"
+        - name: MYSQL_ATTR_SSL_CA
+          value: ""
+        - name: MYSQL_ATTR_SSL_VERIFY_SERVER_CERT
+          value: "false"
+
         ports:
         - containerPort: 80
           name: http
@@ -79,13 +92,13 @@ metadata:
     haproxy.org/ssl-redirect: "false"
 spec:
   rules:
-  - host: 10.130.0.161.nip.io
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: phpmyadmin
-            port:
-              number: 80
+    - host: 10.130.0.161.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: phpmyadmin
+                port:
+                  number: 80
