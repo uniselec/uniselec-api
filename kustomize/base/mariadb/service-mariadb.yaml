@@ -78,3 +78,23 @@ spec:
   ports:
   - name: mysql
     port: 3306
+
+---
+# Service para acesso externo
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-lb
+  labels:
+    app: mariadb
+  annotations:
+    metallb.universe.tf/address-pool: int-pool
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    app: mariadb
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: 3306
