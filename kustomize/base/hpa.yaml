@@ -1,4 +1,3 @@
----
 # https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.33.1/controller.yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

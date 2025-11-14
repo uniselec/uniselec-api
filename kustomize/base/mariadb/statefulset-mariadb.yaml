@@ -267,7 +267,8 @@ spec:
       annotations:
         nfs.io/storage-path: ""
     spec:
-      accessModes: [ "ReadWriteOnce" ]
+      accessModes:
+      - ReadWriteOnce
       resources:
         requests:
           storage: 10Gi
