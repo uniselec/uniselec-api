@@ -1,0 +1,103 @@
+---
+# =====================================================================-
+# API Version: v1
+# Kind:       ConfigMap
+# Metadata:
+#   Name:     mariadb-config
+# ----------------------------------------------------------------------
+# Author:     erivandosena@gmail.com
+# Created:    2025-04-02
+# Version:    1.0.0
+# ----------------------------------------------------------------------
+# Description: Configurações gerais do MariaDB, incluindo parâmetros de
+#              inicialização e variáveis de ambiente.
+# ----------------------------------------------------------------------
+# Usage:      kubectl apply -f configmap-mariadb.yaml
+# =====================================================================-
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-init-users
+data:
+  init-users.sql: |
+    -- Criando banco e usuários
+    CREATE DATABASE IF NOT EXISTS `${DB_DATABASE}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
+    GRANT ALL PRIVILEGES ON `${DB_DATABASE}`.* TO '${MYSQL_USER}'@'%';
+
+    CREATE OR REPLACE USER '${DB_USERNAME}'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
+    GRANT ALL PRIVILEGES ON *.* TO '${DB_USERNAME}'@'%' WITH GRANT OPTION;
+
+    -- Configuração de replicação
+    CREATE USER IF NOT EXISTS '${SST_USER}'@'%' IDENTIFIED BY '${SST_PASSWORD}';
+    GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'%';
+
+    CREATE USER IF NOT EXISTS '${MARIADB_REPLICATION_USER}'@'%' IDENTIFIED BY '${MARIADB_REPLICATION_PASSWORD}';
+    GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '${MARIADB_REPLICATION_USER}'@'%';
+
+    -- Para root funcionar dentro do pod
+    CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
+    GRANT ALL PRIVILEGES ON *.* TO '${DB_USERNAME}'@'localhost' WITH GRANT OPTION;
+
+    -- Para outros usuários funcionarem de dentro do pod
+    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';
+    GRANT ALL PRIVILEGES ON *.* TO '${MYSQL_USER}'@'localhost';
+
+    CREATE USER IF NOT EXISTS '${MARIADB_REPLICATION_USER}'@'localhost' IDENTIFIED BY '${MARIADB_REPLICATION_PASSWORD}';
+    GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '${MARIADB_REPLICATION_USER}'@'localhost';
+
+    CREATE USER IF NOT EXISTS '${MARIADB_REPLICATION_USER}'@'${MARIADB_MASTER_HOST}' IDENTIFIED BY '${MARIADB_REPLICATION_PASSWORD}';
+    GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '${MARIADB_REPLICATION_USER}'@'${MARIADB_MASTER_HOST}';
+
+    CREATE USER IF NOT EXISTS '${MARIADB_REPLICATION_USER}'@'${MARIADB_MASTER_WORKER1}' IDENTIFIED BY '${MARIADB_REPLICATION_PASSWORD}';
+    GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '${MARIADB_REPLICATION_USER}'@'${MARIADB_MASTER_WORKER1}';
+
+    CREATE USER IF NOT EXISTS '${MARIADB_REPLICATION_USER}'@'${MARIADB_MASTER_WORKER2}' IDENTIFIED BY '${MARIADB_REPLICATION_PASSWORD}';
+    GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '${MARIADB_REPLICATION_USER}'@'${MARIADB_MASTER_WORKER2}';
+
+    FLUSH PRIVILEGES;
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-ensure-users
+
+data:
+  ensure-users.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    log() { echo "[ensure-users] $*"; }
+
+    ordinal="${HOSTNAME##*-}"
+    if [[ "$ordinal" != "0" ]]; then
+      log "Skip: Só roda em mariadb-0 (atual: $HOSTNAME)"
+      exit 0
+    fi
+
+    log "Aguardando MariaDB aceitar conexões..."
+    for i in {1..30}; do
+      if mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" -h 127.0.0.1 -e "SELECT 1" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 3
+    done
+
+    log "Executando comandos para garantir banco e usuários..."
+    mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" -h 127.0.0.1 <<EOSQL
+    CREATE DATABASE IF NOT EXISTS ${DB_DATABASE} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
+    GRANT ALL PRIVILEGES ON ${DB_DATABASE}.* TO '${MYSQL_USER}'@'%';
+
+    CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
+    GRANT ALL PRIVILEGES ON *.* TO '${DB_USERNAME}'@'%' WITH GRANT OPTION;
+
+    CREATE USER IF NOT EXISTS '${SST_USER}'@'%' IDENTIFIED BY '${SST_PASSWORD}';
+    GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'%';
+
+    CREATE USER IF NOT EXISTS '${MARIADB_REPLICATION_USER}'@'%' IDENTIFIED BY '${MARIADB_REPLICATION_PASSWORD}';
+    GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '${MARIADB_REPLICATION_USER}'@'%';
+
+    FLUSH PRIVILEGES;
+    EOSQL

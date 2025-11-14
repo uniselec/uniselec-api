@@ -9,4 +9,6 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
-  - secret-regcred.yaml
+  - sealed-secret-regcred.yaml
+  - hpa.yaml
+  - mariadb/

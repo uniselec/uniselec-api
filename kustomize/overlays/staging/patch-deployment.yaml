@@ -3,7 +3,6 @@ kind: Deployment
 metadata:
   name: uniselec-api
 spec:
-  replicas: 2  # réplicas para staging
   template:
     metadata:
       labels:

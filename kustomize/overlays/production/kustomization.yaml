@@ -11,6 +11,27 @@ resources:
 patches:
 - path: patch-deployment.yaml
 - path: patch-ingress.yaml
+- path: patch-hpa.yaml
+# inicio - MariaDB para production
+- path: mariadb/patch-statefulset.yaml
+  target:
+    kind: StatefulSet
+    name: mariadb
+# fim - MariaDB
+
+# inicio - Override de variáveis do MariaDB para production
+configMapGenerator:
+- name: mariadb-env
+  behavior: merge
+  literals:
+  - DB_DATABASE=uniselec_prod
+  - MYSQL_DATABASE=uniselec_prod
+  - MARIADB_CLUSTER_NAME=uniselec_prod_galera_cluster
+  - MARIADB_CLUSTER_ADDRESS=gcomm://mariadb-0.mariadb.uniselec-api-prd.svc.cluster.local:4567
+  - MARIADB_MASTER_HOST=mariadb-0.mariadb.uniselec-api-prd.svc.cluster.local
+  - MARIADB_MASTER_WORKER1=mariadb-1.mariadb.uniselec-api-prd.svc.cluster.local
+  - MARIADB_MASTER_WORKER2=mariadb-2.mariadb.uniselec-api-prd.svc.cluster.local
+# fim - Override de variáveis
 
 images:
 - name: dti-registro.unilab.edu.br/unilab/uniselec-api

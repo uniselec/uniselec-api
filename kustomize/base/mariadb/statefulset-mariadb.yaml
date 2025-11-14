@@ -1,0 +1,275 @@
+---
+# =====================================================================-
+# API Version: apps/v1
+# Kind:       StatefulSet
+# Metadata:
+#   Name:     mariadb
+# ----------------------------------------------------------------------
+# Author:     erivandosena@gmail.com
+# Created:    2025-04-14
+# Version:    1.0.0
+# ----------------------------------------------------------------------
+# Description: StatefulSet configuration for MariaDB Galera Cluster with:
+#              - 3-node replication topology
+#              - Automatic bootstrap safety checks
+#              - pt_BR locale configuration
+#              - SST/IST replication settings
+#              - Persistent NFS storage
+#              - Custom resource limits and probes
+# ----------------------------------------------------------------------
+# Usage:      kubectl apply -f mariadb-statefulset.yaml
+# =====================================================================-
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mariadb
+  labels:
+    app: mariadb
+    component: database
+spec:
+  serviceName: mariadb
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mariadb
+  template:
+    metadata:
+      labels:
+        app: mariadb
+        mariadb/replication-role: member
+    spec:
+      serviceAccountName: mariadb
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        fsGroupChangePolicy: "OnRootMismatch"
+      initContainers:
+      - name: mariadb-bootstrap-check
+        image: mariadb:11.3.2
+        command:
+        - /bin/bash
+        - -c
+        - |
+          GR="/var/lib/mysql/grastate.dat"
+          LOG="/var/lib/mysql/wsrep_bootstrap.log"
+
+          echo "[INFO] Checking for safe_to_bootstrap..." > $LOG
+
+          if grep -q 'safe_to_bootstrap: 0' "$GR"; then
+            echo "[INFO] safe_to_bootstrap=0 found" >> $LOG
+
+            ALL_DOWN=true
+
+            for peer in "$MARIADB_MASTER_HOST" "$MARIADB_MASTER_WORKER1" "$MARIADB_MASTER_WORKER2"; do
+              echo "[CHECK] nc -z $peer 4567" >> $LOG
+              if nc -z -w1 "$peer" 4567; then
+                echo "[INFO] Peer $peer is online" >> $LOG
+                ALL_DOWN=false
+                break
+              else
+                echo "[INFO] Peer $peer is offline" >> $LOG
+              fi
+            done
+
+            if $ALL_DOWN; then
+              echo "[BOOTSTRAP] All peers are down, safe to bootstrap" >> $LOG
+              sed -i 's/safe_to_bootstrap: 0/safe_to_bootstrap: 1/' "$GR"
+            else
+              echo "[SKIP] Not safe to bootstrap, peers are alive" >> $LOG
+            fi
+          else
+            echo "[INFO] No need to patch grastate.dat" >> $LOG
+          fi
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 33
+        envFrom:
+        - configMapRef:
+            name: mariadb-env
+        - secretRef:
+            name: mariadb-secret-env
+        volumeMounts:
+        - name: database
+          mountPath: /var/lib/mysql
+
+      containers:
+      - name: mariadb
+        image: mariadb:11.3.2
+        command:
+        - bash
+        - -c
+        - |
+          #!/bin/bash
+          # ======================================================
+          # CONFIGURAÇÃO INICIAL DO MARIADB:
+          # LOCALE PT-BR, CRIAÇÃO DO BANCO PRINCIPAL,
+          # USUÁRIO DE APLICAÇÃO, USUÁRIO DE REPLICAÇÃO,
+          # E PERMISSÕES DE ACESSO ROOT
+          # ======================================================
+
+          set -eo pipefail
+
+          mkdir -p /var/lib/mysql/.sst
+          chown -Rf mysql:mysql /var/lib/mysql/.sst
+          chmod 700 /var/lib/mysql/.sst
+
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          command -v mariabackup || apt-get install -y mariadb-backup
+          command -v galera-4 || apt-get install -y galera-4
+          command -v pv || apt-get install -y pv
+
+          apt-get install -y locales
+          sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
+          locale-gen pt_BR.UTF-8
+          export LANG=pt_BR.UTF-8
+          export LC_ALL=pt_BR.UTF-8
+          export LC_CTYPE=pt_BR.UTF-8
+          export LANGUAGE=pt_BR:pt
+          locale
+
+          echo "[INFO] Iniciando configuração dinâmica do MariaDB Galera"
+          for v in MARIADB_CLUSTER_NAME SST_USER SST_PASSWORD; do
+            if [ -z "${!v}" ]; then
+              echo "[ERROR] Variável de ambiente $v não definida"
+              exit 1
+            fi
+          done
+
+          ordinal="${HOSTNAME##*-}"
+          POD_IP=$(hostname -i)
+          export SERVER_ID=$((100 + ordinal))
+
+          # Namespace dinâmico do Kubernetes
+          NAMESPACE="${POD_NAMESPACE}"
+
+          if [ "$ordinal" = "0" ]; then
+            export CLUSTER_ADDRESS="gcomm://"
+          else
+            export CLUSTER_ADDRESS="${MARIADB_CLUSTER_ADDRESS:-gcomm://mariadb-0.mariadb.${NAMESPACE}.svc.cluster.local:4567}"
+          fi
+
+          CONFIG_FILE="/etc/mysql/mariadb.conf.d/99-custom.cnf"
+          sed -e "s/_SERVER_ID/$SERVER_ID/g" \
+              -e "s|_MARIADB_CLUSTER_NAME|$MARIADB_CLUSTER_NAME|g" \
+              -e "s|_MARIADB_CLUSTER_ADDRESS|$CLUSTER_ADDRESS|g" \
+              -e "s|_POD_IP|$POD_IP|g" \
+              -e "s|_SST_USER|$SST_USER|g" \
+              -e "s|_SST_PASSWORD|$SST_PASSWORD|g" \
+              /etc/mysql/config-template/custom.cnf > $CONFIG_FILE
+
+          # Ajustar gtid_strict_mode apenas nos SLAVES
+          if [[ "$ordinal" != "0" ]]; then
+            echo "gtid_strict_mode = OFF" >> "$CONFIG_FILE"
+          fi
+
+          if [[ "$ordinal" = "0" ]]; then
+            bash /etc/mysql/ensure-users.sh &
+          fi
+
+          echo "[INFO] Inicializando Galera"
+          if [[ "$HOSTNAME" = "mariadb-0" ]]; then
+            echo "[INFO] Inicializando novo cluster Galera"
+            exec docker-entrypoint.sh mariadbd --defaults-file=$CONFIG_FILE --wsrep-new-cluster
+          else
+            echo "[INFO] Conectando ao cluster existente"
+            exec docker-entrypoint.sh mariadbd --defaults-file=$CONFIG_FILE
+          fi
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "1"
+            memory: "2Gi"
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+        ports:
+        - name: mysql
+          containerPort: 3306
+        - name: replication
+          containerPort: 4567
+        - name: sst
+          containerPort: 4444
+        - name: ist
+          containerPort: 4568
+
+        envFrom:
+        - configMapRef:
+            name: mariadb-env
+        - secretRef:
+            name: mariadb-secret-env
+
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        readinessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - |
+              mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" -e "SHOW STATUS LIKE 'wsrep_ready';" | grep -q "ON"
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          failureThreshold: 10
+        livenessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - |
+              mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}"
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: database
+          mountPath: /var/lib/mysql
+        - name: mariadb-config
+          mountPath: /etc/mysql/config-template/custom.cnf
+          subPath: custom.cnf
+        - name: init-users
+          mountPath: /docker-entrypoint-initdb.d/init-users.sql
+          subPath: init-users.sql
+        - name: ensure-users
+          mountPath: /etc/mysql/ensure-users.sh
+          subPath: ensure-users.sh
+      volumes:
+      - name: mariadb-config
+        configMap:
+          name: mariadb-config
+      - name: init-users
+        configMap:
+          name: config-init-users
+      - name: ensure-users
+        configMap:
+          name: config-ensure-users
+          defaultMode: 0755
+  volumeClaimTemplates:
+  - metadata:
+      name: database
+      labels:
+        app: mariadb
+      annotations:
+        nfs.io/storage-path: ""
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi
+      storageClassName: nfs-storage-k8s-v1
+      volumeMode: Filesystem
