@@ -60,7 +60,6 @@ spec:
   selector:
     app: mariadb
     mariadb/replication-role: member
-    wsrep_ready: "ON" # Filtra apenas nós prontos
   ports:
   - name: mysql
     port: 3306
@@ -74,7 +73,6 @@ metadata:
 spec:
   selector:
     app: mariadb
-    wsrep_ready: "ON" # Balanceia entre todos os nós prontos
   ports:
   - name: mysql
     port: 3306
