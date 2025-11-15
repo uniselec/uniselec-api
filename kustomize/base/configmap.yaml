@@ -4,5 +4,5 @@ metadata:
   name: uniselec-api-config
 data:
   .env: |
-    MESSAGE="Serviço Seleções."
+    MESSAGE="Serviço API"
     LOG_LEVEL="info"
