@@ -20,6 +20,7 @@ patches:
 # fim - MariaDB
 
 # inicio - Override de variáveis do MariaDB para staging
+
 configMapGenerator:
 - behavior: merge
   literals:
@@ -33,7 +34,6 @@ configMapGenerator:
   - MESSAGE="Email Production"
   - MAIL_FROM_ADDRESS="noreply@selecoes-staging.unilab.edu.br"
   - MAIL_FROM_NAME="Isto é Um Teste - Seleções - UNILAB"
-
   name: mariadb-env
 # fim - Override de variáveis
 
