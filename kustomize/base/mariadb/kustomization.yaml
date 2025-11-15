@@ -31,3 +31,6 @@ configMapGenerator:
   - MARIADB_GALERA_CLUSTER=ON
   - MARIADB_WSREP_PROVIDER=/usr/lib/galera/libgalera_smm.so
   - MARIADB_CLUSTER_NAME=uniselec_galera_cluster
+  - MARIADB_MASTER_HOST=mariadb-0.mariadb
+  - MARIADB_MASTER_WORKER1=mariadb-1.mariadb
+  - MARIADB_MASTER_WORKER2=mariadb-2.mariadb
