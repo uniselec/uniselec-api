@@ -322,15 +322,15 @@ build:docker:
     - docker --version
     - cd .
   script:
-    - echo "[INFO] Pull da imagem base (cache)..."
+    - echo "[INFO] Pull da imagem base"
     # Definir tags dinamicamente baseado no contexto
     - |
       if [[ -n "${CI_COMMIT_TAG}" ]]; then
-        # SE TEM TAG: build com tag específica e latest
+        # build com tag específica (production)
         DOCKER_TAGS="--tag ${DOCKER_IMAGE}:${CI_COMMIT_TAG} --tag ${DOCKER_IMAGE}:latest"
         echo "[INFO] Build para RELEASE: ${CI_COMMIT_TAG} + latest"
       else
-        # SE NÃO TEM TAG: build apenas com latest (staging)
+        # build apenas com latest (staging)
         DOCKER_TAGS="--tag ${DOCKER_IMAGE}:latest"
         echo "[INFO] Build para STAGING: latest"
       fi
@@ -353,16 +353,11 @@ build:docker:
     # Push dinâmico baseado no contexto
     - |
       if [[ -n "${CI_COMMIT_TAG}" ]]; then
-        # PUSH PARA RELEASE: todas as tags
-        echo "[INFO] Push para RELEASE: ${CI_COMMIT_TAG}, latest"
+        # Só build/push com a tag de release para production
         docker push ${DOCKER_IMAGE}:${CI_COMMIT_TAG}
-        docker push ${DOCKER_IMAGE}:latest
-        echo "[OK] ✓ Imagens pushed: ${CI_COMMIT_TAG}, latest"
       else
-        # PUSH PARA STAGING: apenas latest
-        echo "[INFO] Push para STAGING: latest"
+        # Só build/push como latest para staging
         docker push ${DOCKER_IMAGE}:latest
-        echo "[OK] ✓ Imagens pushed: latest"
       fi
 
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Image build e push concluídos"
