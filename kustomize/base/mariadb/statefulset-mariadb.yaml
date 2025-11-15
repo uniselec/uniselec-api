@@ -110,6 +110,10 @@ spec:
 
           set -eo pipefail
 
+          echo "[INFO] Instalando dependências..."
+          apt-get update -qq >/dev/null
+          apt-get install -y -qq netcat-openbsd >/dev/null
+
           mkdir -p /var/lib/mysql/.sst
           chown -Rf mysql:mysql /var/lib/mysql/.sst
           chmod 700 /var/lib/mysql/.sst
