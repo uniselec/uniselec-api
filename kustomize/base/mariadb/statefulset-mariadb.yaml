@@ -216,16 +216,56 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
+
+        startupProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - |
+              mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}"
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30  # 5min para iniciar
+
         readinessProbe:
           exec:
             command:
             - bash
             - -c
             - |
-              mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" -e "SHOW STATUS LIKE 'wsrep_ready';" | grep -q "ON"
+              # Verifica conexão
+              if ! mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}" 2>/dev/null; then
+                exit 1
+              fi
+
+              # Verifica se está Synced
+              STATE=$(mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" \
+                -e "SHOW STATUS LIKE 'wsrep_local_state_comment';" 2>/dev/null | \
+                awk 'NR==2 {print $2}')
+
+              if [ "$STATE" != "Synced" ]; then
+                echo "Not synced: $STATE"
+                exit 1
+              fi
+
+              # Verifica cluster size >= 2
+              SIZE=$(mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" \
+                -e "SHOW STATUS LIKE 'wsrep_cluster_size';" 2>/dev/null | \
+                awk 'NR==2 {print $2}')
+
+              if [ "$SIZE" -lt 2 ]; then
+                echo "Cluster too small: $SIZE"
+                exit 1
+              fi
+
+              exit 0
           initialDelaySeconds: 60
           periodSeconds: 10
-          failureThreshold: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
         livenessProbe:
           exec:
             command:
@@ -233,9 +273,11 @@ spec:
             - -c
             - |
               mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}"
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          timeoutSeconds: 5
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+
         volumeMounts:
         - name: database
           mountPath: /var/lib/mysql
@@ -259,50 +301,6 @@ spec:
         configMap:
           name: config-ensure-users
           defaultMode: 0755
-  # volumeClaimTemplates:
-  # - metadata:
-  #     name: database
-  #     labels:
-  #       app: mariadb
-  #     annotations:
-  #       nfs.io/storage-path: ""
-  #   spec:
-  #     accessModes:
-  #     - ReadWriteOnce
-  #     resources:
-  #       requests:
-  #         storage: 10Gi
-  #     storageClassName: nfs-storage-k8s-v1
-  #     volumeMode: Filesystem
-
-  # volumeClaimTemplates:
-  # - metadata:
-  #     name: database
-  #     labels:
-  #       app: mariadb
-  #   spec:
-  #     accessModes:
-  #       - ReadWriteOnce
-  #     resources:
-  #       requests:
-  #         storage: 10Gi
-  #     storageClassName: nfs-storage-k8s-v1
-  #     # volumeMode: Filesystem
-
-  # volumeClaimTemplates:
-  # - metadata:
-  #     name: database
-  #     labels:
-  #       app: mariadb
-  #       annotations:
-  #         nfs.io/storage-path: ""
-  #   spec:
-  #     accessModes:
-  #     - ReadWriteOnce
-  #     storageClassName: nfs-storage-k8s-v1
-  #     resources:
-  #       requests:
-  #         storage: 10Gi
 
   volumeClaimTemplates:
   - metadata:
