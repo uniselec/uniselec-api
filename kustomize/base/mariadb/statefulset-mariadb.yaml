@@ -169,9 +169,31 @@ spec:
           fi
 
           echo "[INFO] Inicializando Galera"
+
+          # SEMPRE tentar conectar ao cluster primeiro, SÓ bootstrap se necessário
           if [[ "$HOSTNAME" = "mariadb-0" ]]; then
-            echo "[INFO] Inicializando novo cluster Galera"
-            exec docker-entrypoint.sh mariadbd --defaults-file=$CONFIG_FILE --wsrep-new-cluster
+            # Verificar manualmente se há cluster ativo
+            echo "[INFO] Verificando se há cluster Galera ativo..."
+            CLUSTER_ACTIVE=false
+
+            # Tentar conectar aos peers diretamente
+            for peer in "mariadb-1.mariadb" "mariadb-2.mariadb"; do
+              if nc -z -w5 "$peer" 4567; then
+                echo "[INFO] Cluster ativo detectado em $peer"
+                CLUSTER_ACTIVE=true
+                break
+              else
+                echo "[INFO] Peer $peer não responde"
+              fi
+            done
+
+            if $CLUSTER_ACTIVE; then
+              echo "[INFO] Conectando ao cluster existente"
+              exec docker-entrypoint.sh mariadbd --defaults-file=$CONFIG_FILE
+            else
+              echo "[INFO] Inicializando NOVO cluster (nenhum peer ativo)"
+              exec docker-entrypoint.sh mariadbd --defaults-file=$CONFIG_FILE --wsrep-new-cluster
+            fi
           else
             echo "[INFO] Conectando ao cluster existente"
             exec docker-entrypoint.sh mariadbd --defaults-file=$CONFIG_FILE
@@ -183,8 +205,8 @@ spec:
             cpu: "500m"
             memory: "512Mi"
           limits:
-            cpu: "1"
-            memory: "2Gi"
+            cpu: "2"
+            memory: "3Gi"
         securityContext:
           runAsUser: 0
           runAsGroup: 0
