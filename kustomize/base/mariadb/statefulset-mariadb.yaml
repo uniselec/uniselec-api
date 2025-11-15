@@ -112,7 +112,7 @@ spec:
 
           echo "[INFO] Instalando dependências..."
           apt-get update -qq >/dev/null
-          apt-get install -y -qq netcat-openbsd >/dev/null
+          apt-get install -y -qq netcat-openbsd pv locales >/dev/null
 
           mkdir -p /var/lib/mysql/.sst
           chown -Rf mysql:mysql /var/lib/mysql/.sst
