@@ -176,6 +176,7 @@ spec:
             echo "[INFO] Conectando ao cluster existente"
             exec docker-entrypoint.sh mariadbd --defaults-file=$CONFIG_FILE
           fi
+
         imagePullPolicy: IfNotPresent
         resources:
           requests:
