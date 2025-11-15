@@ -28,16 +28,7 @@ spec:
   selector:
     app: phpmyadmin
   externalTrafficPolicy: Cluster
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: phpmyadmin-credentials
-  namespace: uniselec-api-stg
-type: Opaque
-data:
-  password: UGFzc3dvcmQxMjM=    # "Password123" em base64
-  username: cm9vdA==            # "root" em base64
+
 ---
 apiVersion: apps/v1
 kind: Deployment
