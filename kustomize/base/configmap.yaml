@@ -6,3 +6,11 @@ data:
   .env: |
     MESSAGE="Serviço Seleções."
     LOG_LEVEL="info"
+    MAIL_MAILER: 'smtp'
+    MAIL_HOST: 'smtp.noreply.unilab.edu.br'
+    MAIL_PORT: '25'
+    MAIL_USERNAME: ''
+    MAIL_PASSWORD: ''
+    MAIL_ENCRYPTION: ''
+    MAIL_FROM_ADDRESS="noreply@selecoes.unilab.edu.br"
+    MAIL_FROM_NAME="Isto é Um Teste - Seleções - UNILAB"
