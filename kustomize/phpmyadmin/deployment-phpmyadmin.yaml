@@ -1,12 +1,13 @@
+---
 apiVersion: v1
 kind: Secret
 metadata:
   name: phpmyadmin-credentials
   namespace: uniselec-api-stg
 type: Opaque
-data:
-  username: YWRtaW4=         # admin
-  password: UGFzc3dvcmQxMjM= # Password123
+stringData:
+  username: root
+  password: "Password123"
 
 ---
 apiVersion: v1
@@ -49,10 +50,10 @@ spec:
     spec:
       containers:
       - name: phpmyadmin
-        image: phpmyadmin/phpmyadmin:5.2.1
+        image: phpmyadmin/phpmyadmin:5.2.3
         env:
         - name: PMA_HOST
-          value: "mariadb-app.uniselec-api-stg.svc.cluster.local"
+          value: "mariadb-app"
         - name: PMA_PORT
           value: "3306"
         - name: PMA_USER
@@ -65,13 +66,14 @@ spec:
             secretKeyRef:
               name: phpmyadmin-credentials
               key: password
+        - name: PMA_ARBITRARY
+          value: "1"  # Permite login com outros usuários
         - name: MYSQLI_CLIENT_FLAGS
           value: "0"
         - name: MYSQL_ATTR_SSL_CA
           value: ""
         - name: MYSQL_ATTR_SSL_VERIFY_SERVER_CERT
           value: "false"
-
         ports:
         - containerPort: 80
           name: http
@@ -82,6 +84,7 @@ spec:
           limits:
             cpu: 250m
             memory: 256Mi
+
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
