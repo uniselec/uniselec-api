@@ -49,7 +49,7 @@ data:
     sql_mode = STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION
     log_bin = mysql-bin
     binlog_format = ROW
-    server_id = _SERVER_ID
+    server_id = __SERVER_ID__
     binlog_row_image = FULL
     log_slave_updates = ON
     gtid_strict_mode = ON
@@ -72,7 +72,7 @@ data:
     wsrep_sst_auth = _SST_USER:_SST_PASSWORD
     wsrep_sst_method = mariabackup
     wsrep_slave_threads = 4
-    wsrep_retry_autocommit = 3         
+    wsrep_retry_autocommit = 3
 
     [mariadb]
     transaction-isolation = READ-COMMITTED
