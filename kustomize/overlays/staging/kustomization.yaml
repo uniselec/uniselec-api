@@ -31,7 +31,7 @@ configMapGenerator:
   - MARIADB_MASTER_HOST=mariadb-0.mariadb.uniselec-api-stg.svc.cluster.local
   - MARIADB_MASTER_WORKER1=mariadb-1.mariadb.uniselec-api-stg.svc.cluster.local
   - MARIADB_MASTER_WORKER2=mariadb-2.mariadb.uniselec-api-stg.svc.cluster.local
-  - MESSAGE="Email Production"
+  - MESSAGE="Staging"
   - MAIL_FROM_ADDRESS="noreply@selecoes-staging.unilab.edu.br"
   - MAIL_FROM_NAME="Isto é Um Teste - Seleções - UNILAB"
   name: mariadb-env
