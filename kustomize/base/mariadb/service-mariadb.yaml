@@ -1,25 +1,11 @@
 ---
-# =====================================================================-
-# API Version: v1
-# Kind:       Service
-# Metadata:
-#   Name:     mariadb-ha
-# ----------------------------------------------------------------------
-# Author:     erivandosena@gmail.com
-# Created:    2025-04-45
-# Version:    1.0.0
-# ----------------------------------------------------------------------
-# Description: Serviço para expor o cluster MariaDB Galera em modo
-#              altamente disponível (HA) dentro do cluster Kubernetes.
-# ----------------------------------------------------------------------
-# Usage:      kubectl apply -f svc-mariadb-ha.yaml
-# =====================================================================-
 apiVersion: v1
 kind: Service
 metadata:
   name: mariadb
 spec:
   clusterIP: None
+  publishNotReadyAddresses: false
   selector:
     app: mariadb
   ports:
@@ -41,6 +27,7 @@ metadata:
     role: primary
 spec:
   clusterIP: None
+  publishNotReadyAddresses: false
   selector:
     statefulset.kubernetes.io/pod-name: mariadb-0
   ports:
@@ -57,6 +44,7 @@ metadata:
     role: replica
 spec:
   clusterIP: None
+  publishNotReadyAddresses: false
   selector:
     app: mariadb
     mariadb/replication-role: member
@@ -65,20 +53,22 @@ spec:
     port: 3306
     targetPort: mysql
 ---
-# Service para aplicações
 apiVersion: v1
 kind: Service
 metadata:
   name: mariadb-app
 spec:
+  publishNotReadyAddresses: false
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
   selector:
     app: mariadb
   ports:
   - name: mysql
     port: 3306
-
 ---
-# Service para acesso externo
 apiVersion: v1
 kind: Service
 metadata:
@@ -89,7 +79,8 @@ metadata:
     metallb.universe.tf/address-pool: int-pool
 spec:
   type: LoadBalancer
-  externalTrafficPolicy: Cluster
+  externalTrafficPolicy: Local
+  publishNotReadyAddresses: false
   selector:
     app: mariadb
   ports:

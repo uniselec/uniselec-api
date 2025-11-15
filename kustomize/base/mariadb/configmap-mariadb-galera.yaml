@@ -56,7 +56,12 @@ data:
     expire_logs_days = 7
     sync_binlog = 1
     innodb_flush_log_at_trx_commit = 1
-    max_connect_errors = 1000
+    max_connect_errors = 10000
+    max_connections = 500
+    wait_timeout = 600
+    interactive_timeout = 600
+    innodb_buffer_pool_size = 512M
+    innodb_log_file_size = 128M
 
     [galera]
     wsrep_on = ON
@@ -66,7 +71,8 @@ data:
     wsrep_node_address = _POD_IP
     wsrep_sst_auth = _SST_USER:_SST_PASSWORD
     wsrep_sst_method = mariabackup
-    wsrep_slave_threads = 16
+    wsrep_slave_threads = 4
+    wsrep_retry_autocommit = 3         
 
     [mariadb]
     transaction-isolation = READ-COMMITTED
