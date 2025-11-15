@@ -52,10 +52,20 @@ spec:
       - name: phpmyadmin
         image: phpmyadmin/phpmyadmin:5.2.3
         env:
-        - name: PMA_HOST
-          value: "mariadb-app"
-        - name: PMA_PORT
-          value: "3306"
+        # - name: PMA_HOST
+        #   value: "mariadb-app"
+        # - name: PMA_PORT
+        #   value: "3306"
+
+        - name: PMA_HOSTS
+          value: "mariadb-app.uniselec-api-stg.svc.cluster.local,mariadb-app.uniselec-api-prod.svc.cluster.local"
+
+        - name: PMA_VERBOSES
+          value: "Uniselec Staging,Uniselec Production"
+
+        - name: PMA_PORTS
+          value: "3306,3306"
+
         - name: PMA_USER
           valueFrom:
             secretKeyRef:
@@ -66,8 +76,10 @@ spec:
             secretKeyRef:
               name: phpmyadmin-credentials
               key: password
+
         - name: PMA_ARBITRARY
           value: "1"  # Permite login com outros usuários
+
         - name: MYSQLI_CLIENT_FLAGS
           value: "0"
         - name: MYSQL_ATTR_SSL_CA
@@ -82,8 +94,8 @@ spec:
             cpu: 100m
             memory: 128Mi
           limits:
-            cpu: 250m
-            memory: 256Mi
+            cpu: 500m
+            memory: 512Mi
 
 ---
 apiVersion: networking.k8s.io/v1
