@@ -45,65 +45,88 @@ spec:
         fsGroup: 999
         fsGroupChangePolicy: "OnRootMismatch"
       initContainers:
-      - name: mariadb-bootstrap-check
-        image: mariadb:11.3.2
-        command:
-        - /bin/bash
-        - -c
-        - |
-          GR="/var/lib/mysql/grastate.dat"
-          LOG="/var/lib/mysql/wsrep_bootstrap.log"
+        - name: mariadb-bootstrap-check
+          image: mariadb:11.3.2
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              GR="/var/lib/mysql/grastate.dat"
+              LOG="/var/lib/mysql/wsrep_bootstrap.log"
 
-          echo "[INFO] Checking for safe_to_bootstrap..." > $LOG
+              echo "[INFO] Starting bootstrap check..." > $LOG
 
-          # Criando grastate.dat
-          if [ ! -f "$GR" ]; then
-            echo "[INFO] Creating initial grastate.dat" >> $LOG
-            cat > "$GR" << EOF
-          # GALERA saved state
-          version: 2.1
-          uuid:    00000000-0000-0000-0000-000000000000
-          seqno:   -1
-          safe_to_bootstrap: 0
-          EOF
-          fi
-
-          if grep -q 'safe_to_bootstrap: 0' "$GR"; then
-            echo "[INFO] safe_to_bootstrap=0 found" >> $LOG
-
-            ALL_DOWN=true
-
-            for peer in "$MARIADB_MASTER_HOST" "$MARIADB_MASTER_WORKER1" "$MARIADB_MASTER_WORKER2"; do
-              echo "[CHECK] nc -z $peer 4567" >> $LOG
-              if nc -z -w1 "$peer" 4567; then
-                echo "[INFO] Peer $peer is online" >> $LOG
-                ALL_DOWN=false
-                break
-              else
-                echo "[INFO] Peer $peer is offline" >> $LOG
+              echo "[INFO] Installing netcat" >> $LOG
+              if ! apt-get update -qq >/dev/null 2>&1; then
+                  echo "[ERROR] apt-get update failed" >> $LOG
+                  exit 1
               fi
-            done
 
-            if $ALL_DOWN; then
-              echo "[BOOTSTRAP] All peers are down, safe to bootstrap" >> $LOG
-              sed -i 's/safe_to_bootstrap: 0/safe_to_bootstrap: 1/' "$GR"
-            else
-              echo "[SKIP] Not safe to bootstrap, peers are alive" >> $LOG
-            fi
-          else
-            echo "[INFO] No need to patch grastate.dat" >> $LOG
-          fi
-        securityContext:
-          runAsUser: 0
-          runAsGroup: 33
-        envFrom:
-        - configMapRef:
-            name: mariadb-env
-        - secretRef:
-            name: mariadb-secret-env
-        volumeMounts:
-        - name: database
-          mountPath: /var/lib/mysql
+              if ! apt-get install -y -qq netcat-openbsd >/dev/null 2>&1; then
+                  echo "[ERROR] netcat installation failed" >> $LOG
+                  exit 1
+              fi
+              echo "[SUCCESS] netcat installed" >> $LOG
+
+              if [ ! -f "$GR" ]; then
+                  echo "[INFO] Creating initial grastate.dat" >> $LOG
+                  cat > "$GR" << 'EOF'
+              # GALERA saved state
+              version: 2.1
+              uuid: 00000000-0000-0000-0000-000000000000
+              seqno: -1
+              safe_to_bootstrap: 0
+              EOF
+                  chown 999:999 "$GR"
+              fi
+
+              if grep -q 'safe_to_bootstrap: 0' "$GR" 2>/dev/null; then
+                  echo "[INFO] safe_to_bootstrap=0 found" >> $LOG
+                  ALL_DOWN=true
+
+                  NAMESPACE="${POD_NAMESPACE:-uniselec-api-stg}"
+
+                  for peer in "mariadb-0.mariadb.${NAMESPACE}.svc.cluster.local" \
+                              "mariadb-1.mariadb.${NAMESPACE}.svc.cluster.local" \
+                              "mariadb-2.mariadb.${NAMESPACE}.svc.cluster.local"; do
+                      echo "[CHECK] Testing $peer:4567" >> $LOG
+
+                      # 3 tentativas com timeout 5s
+                      for i in {1..3}; do
+                          if nc -z -w 5 "$peer" 4567 2>/dev/null; then
+                              echo "[SUCCESS] Peer $peer online (attempt $i)" >> $LOG
+                              ALL_DOWN=false
+                              break 2
+                          else
+                              echo "[ATTEMPT $i] $peer unreachable" >> $LOG
+                              sleep 2
+                          fi
+                      done
+                  done
+
+                  if $ALL_DOWN; then
+                      echo "[BOOTSTRAP] All peers down, safe to bootstrap" >> $LOG
+                      sed -i 's/safe_to_bootstrap: 0/safe_to_bootstrap: 1/' "$GR"
+                      echo "[SUCCESS] Cluster can bootstrap" >> $LOG
+                  else
+                      echo "[SKIP] Peers alive, not bootstrapping" >> $LOG
+                  fi
+              else
+                  echo "[INFO] No need to patch grastate.dat" >> $LOG
+              fi
+
+              echo "[COMPLETE] Bootstrap check finished" >> $LOG
+          securityContext:
+            runAsUser: 0
+          envFrom:
+            - configMapRef:
+                name: mariadb-env
+            - secretRef:
+                name: mariadb-secret-env
+          volumeMounts:
+            - name: database
+              mountPath: /var/lib/mysql
 
       containers:
       - name: mariadb
