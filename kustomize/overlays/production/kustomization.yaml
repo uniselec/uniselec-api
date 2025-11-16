@@ -26,12 +26,8 @@ configMapGenerator:
   - DB_DATABASE=uniselec_prod
   - MYSQL_DATABASE=uniselec_prod
   - MARIADB_CLUSTER_NAME=uniselec_prod_galera_cluster
-  - MARIADB_CLUSTER_ADDRESS=gcomm://mariadb-0.mariadb.uniselec-api-prd.svc.cluster.local:4567
-  - MARIADB_MASTER_HOST=mariadb-0.mariadb.uniselec-api-prd.svc.cluster.local
-  - MARIADB_MASTER_WORKER1=mariadb-1.mariadb.uniselec-api-prd.svc.cluster.local
-  - MARIADB_MASTER_WORKER2=mariadb-2.mariadb.uniselec-api-prd.svc.cluster.local
-  - MESSAGE="Production"
-  - MAIL_FROM_NAME="Isto é Um Teste do Ambiente de Produção - Seleções - UNILAB"
+  - MESSAGE=Production
+  - MAIL_FROM_NAME="Seleções - UNILAB"
   - MAIL_FROM_ADDRESS="noreply@selecoes.unilab.edu.br"
 
   name: mariadb-env
