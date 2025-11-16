@@ -56,6 +56,18 @@ spec:
 
           echo "[INFO] Checking for safe_to_bootstrap..." > $LOG
 
+          # Criando grastate.dat
+          if [ ! -f "$GR" ]; then
+            echo "[INFO] Creating initial grastate.dat" >> $LOG
+            cat > "$GR" << EOF
+          # GALERA saved state
+          version: 2.1
+          uuid:    00000000-0000-0000-0000-000000000000
+          seqno:   -1
+          safe_to_bootstrap: 0
+          EOF
+          fi
+
           if grep -q 'safe_to_bootstrap: 0' "$GR"; then
             echo "[INFO] safe_to_bootstrap=0 found" >> $LOG
 
@@ -120,12 +132,6 @@ spec:
 
           export DEBIAN_FRONTEND=noninteractive
           command -v mariabackup >/dev/null || apt-get install -y -qq mariadb-backup >/dev/null
-
-          apt-get install -y -qq locales >/dev/null
-          sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
-          locale-gen pt_BR.UTF-8 >/dev/null 2>&1
-          export LANG=pt_BR.UTF-8
-          export LC_ALL=pt_BR.UTF-8
 
           echo "[INFO] Iniciando configuração dinâmica do MariaDB Galera"
 
