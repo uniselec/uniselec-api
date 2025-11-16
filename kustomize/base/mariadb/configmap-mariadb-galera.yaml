@@ -47,21 +47,32 @@ data:
     collation-server = utf8mb4_unicode_ci
     bind-address = 0.0.0.0
     sql_mode = STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION
+
+    # Binlog
     log_bin = mysql-bin
     binlog_format = ROW
-    server_id = __SERVER_ID__
+    server_id = _SERVER_ID
     binlog_row_image = FULL
     log_slave_updates = ON
     gtid_strict_mode = ON
     expire_logs_days = 7
     sync_binlog = 1
+
+    # InnoDB
     innodb_flush_log_at_trx_commit = 1
+    innodb_buffer_pool_size = 512M
+    innodb_log_file_size = 128M
+    innodb_flush_method = O_DIRECT
+
+    # Connections
     max_connect_errors = 10000
     max_connections = 500
     wait_timeout = 600
     interactive_timeout = 600
-    innodb_buffer_pool_size = 512M
-    innodb_log_file_size = 128M
+
+    # Query Cache (disable for Galera)
+    query_cache_size = 0
+    query_cache_type = 0
 
     [galera]
     wsrep_on = ON
@@ -73,6 +84,7 @@ data:
     wsrep_sst_method = mariabackup
     wsrep_slave_threads = 4
     wsrep_retry_autocommit = 3
+    wsrep_provider_options = "gcache.size=512M;evs.suspect_timeout=PT10S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S"
 
     [mariadb]
     transaction-isolation = READ-COMMITTED
