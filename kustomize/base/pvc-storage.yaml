@@ -6,7 +6,7 @@ metadata:
     app: uniselec-api
     component: storage
   annotations:
-    nfs.io/storage-path: "storage"
+    nfs.io/storage-path: ""
 spec:
   storageClassName: nfs-storage-k8s-v1
   accessModes:
