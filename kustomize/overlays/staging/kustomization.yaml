@@ -19,23 +19,23 @@ patches:
     name: mariadb
 # fim - MariaDB
 
-configMapGenerator:
-- name: uniselec-api-config
-  behavior: replace
-  options:
-    disableNameSuffixHash: true
-  files:
-  - .env=env-stg.conf
 
 # inicio - Override de variáveis do MariaDB para staging
-- name: mariadb-env
-  behavior: merge
+configMapGenerator:
+- behavior: replace
+  files:
+  - .env=env-stg.conf
+  name: uniselec-api-config
   options:
     disableNameSuffixHash: true
+- behavior: merge
   literals:
   - DB_DATABASE=uniselec_stag
   - MYSQL_DATABASE=uniselec_stag
   - MARIADB_CLUSTER_NAME=uniselec_stag_galera_cluster
+  name: mariadb-env
+  options:
+    disableNameSuffixHash: true
 # fim - Override de variáveis
 
 images:
