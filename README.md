@@ -138,6 +138,23 @@ kubeseal --validate < base/sealed-secret-regcred.yaml
 ```sh
 argocd login argocd.unilab.edu.br --username admin --password "pass" --grpc-web
 kubectl get applicationset -A
-kubectl -n argocd patch applicationset APPLICATION-NAME-stg-as --type='merge' -p '{"spec":{"generators":[{"list":{"elements":[]}}]}}'
-argocd app list | grep APPLICATION-NAME-stg
+kubectl -n argocd patch applicationset uniselec-api-stg-as --type='merge' -p '{"spec":{"generators":[{"list":{"elements":[]}}]}}
+argocd app list | grep uniselec-api-stg
 ```
+
+### Re-Provisionar Deproy
+```text
+┌───────────────────────────────────────────────────────────────────────────┐
+│                       Inital Pipeline Execution Flow                      │
+└───────────────────────────────────────────────────────────────────────────┘
+┌──────────────┐  ┌───────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐
+│   validate   │─>│   tests   │─>│  build   │─>│ staging  │─>│ notification │
+└──────────────┘  └───────────┘  └──────────┘  └──────────┘  └──────────────┘
+│                 │              │             │             │
+├─ docker         ├─ dependency  └─ docker     └─ deploy     └─ staging
+├─ environment    ├─ sast_scan                 (re-run aqui)
+└─ kustomize      ├─ sonarqube
+                  └─ unit
+```
+**Ação necessária**: Rodar o Job `staging` da Pipeline GitLab CI/CD GitOps
+
