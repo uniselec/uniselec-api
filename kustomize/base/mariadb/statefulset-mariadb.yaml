@@ -271,11 +271,18 @@ spec:
                 exit 1
               fi
 
-              # Verifica cluster size >= 2
+              # Verifica cluster size
               SIZE=$(mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" \
                 -e "SHOW STATUS LIKE 'wsrep_cluster_size';" 2>/dev/null | \
                 awk 'NR==2 {print $2}')
 
+              # mariadb-0 pode ter cluster_size=1 (bootstrap)
+              ordinal="${HOSTNAME##*-}"
+              if [ "$ordinal" = "0" ] && [ "$SIZE" -ge 1 ]; then
+                exit 0  # mariadb-0 OK com cluster_size >= 1
+              fi
+
+              # mariadb-1 e mariadb-2 precisam cluster_size >= 2
               if [ "$SIZE" -lt 2 ]; then
                 echo "Cluster too small: $SIZE"
                 exit 1
