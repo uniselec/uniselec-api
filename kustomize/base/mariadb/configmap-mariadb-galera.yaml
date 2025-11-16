@@ -42,7 +42,7 @@ data:
     #
     # If you are new to MariaDB, check out https://mariadb.com/kb/en/basic-mariadb-articles/
     [mysqld]
-    # skip-slave-start
+    skip-slave-start
     character-set-server = utf8mb4
     collation-server = utf8mb4_unicode_ci
     bind-address = 0.0.0.0
