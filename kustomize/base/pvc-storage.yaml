@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-uniselec-storage
+  labels:
+    app: uniselec-api
+    component: storage
+  annotations:
+    nfs.io/storage-path: "storage"
+spec:
+  storageClassName: nfs-storage-k8s-v1
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi

@@ -6,6 +6,8 @@ namespace: uniselec-api
 
 resources:
   - configmap.yaml
+  - pvc-storage.yaml
+  - pvc-logs.yaml
   - deployment.yaml
   - service.yaml
   - ingress.yaml
