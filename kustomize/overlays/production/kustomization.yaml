@@ -21,7 +21,10 @@ patches:
 
 # inicio - Override de variáveis do MariaDB para production
 configMapGenerator:
-- behavior: merge
+- name: mariadb-env
+  behavior: merge
+  options:
+    disableNameSuffixHash: true
   literals:
   - DB_DATABASE=uniselec_prod
   - MYSQL_DATABASE=uniselec_prod
@@ -29,8 +32,6 @@ configMapGenerator:
   - MESSAGE=Production
   - MAIL_FROM_NAME="Seleções - UNILAB"
   - MAIL_FROM_ADDRESS="noreply@selecoes.unilab.edu.br"
-
-  name: mariadb-env
 # fim - Override de variáveis
 
 images:
