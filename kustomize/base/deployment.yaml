@@ -8,26 +8,56 @@ spec:
   selector:
     matchLabels:
       app: uniselec-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   template:
     metadata:
       labels:
         app: uniselec-api
     spec:
+      initContainers:
+      - name: init-storage
+        image: busybox:latest
+        command:
+        - sh
+        - -c
+        - |
+          echo "Criando estrutura de diretórios Laravel"
+          mkdir -p /storage/app/public
+          mkdir -p /storage/framework/cache/data
+          mkdir -p /storage/framework/sessions
+          mkdir -p /storage/framework/testing
+          mkdir -p /storage/framework/views
+          mkdir -p /storage/logs
+          chmod -R 777 /storage
+          echo "Estrutura criada"
+        volumeMounts:
+        - name: storage-volume
+          mountPath: /storage
       containers:
       - name: uniselec-api
         image: dti-registro.unilab.edu.br/unilab/uniselec-api:latest
         imagePullPolicy: Always
-        # inicialização para garantir permissões
         command: ["/bin/sh"]
         args:
         - -c
         - |
-          # permissões  no storage
+          echo "Configurando permissões Laravel"
+
+          # Permissões para storage
           chown -R www-data:www-data /var/www/html/storage
-          chown -R www-data:www-data /var/www/html/bootstrap/cache
           chmod -R 775 /var/www/html/storage
+
+          # Permissões para bootstrap/cache
+          chown -R www-data:www-data /var/www/html/bootstrap/cache
           chmod -R 775 /var/www/html/bootstrap/cache
-          # Iniciar o servidor web
+
+          echo "Permissões configuradas. Iniciando Apache..."
+
+          # Iniciar Apache em foreground
           exec apache2-foreground
         resources:
           requests:
@@ -40,15 +70,35 @@ spec:
         - name: http
           containerPort: 80
           protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /up
+            port: 80
+            httpHeaders:
+            - name: Accept
+              value: application/json
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /up
+            port: 80
+            httpHeaders:
+            - name: Accept
+              value: application/json
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
         envFrom:
         - configMapRef:
             name: uniselec-api-config
-        # inicio - variáveis do MariaDB
         - configMapRef:
             name: mariadb-env
         - secretRef:
             name: mariadb-secret-env
-        # fim - Variáveis do MariaDB
         env:
         - name: TZ
           value: "America/Fortaleza"
@@ -60,6 +110,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: KUBERNETES_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         - name: KUBERNETES_CONTAINER_CPU_LIMIT
           valueFrom:
             resourceFieldRef:
@@ -71,57 +125,25 @@ spec:
             resourceFieldRef:
               containerName: uniselec-api
               resource: limits.memory
+              divisor: 1Mi
         volumeMounts:
-        - name: localtime
-          mountPath: /etc/localtime
-          readOnly: true
-        - name: timezone
-          mountPath: /etc/timezone
-          readOnly: true
         - name: env-volume
-          mountPath: /app/.env
+          mountPath: /var/www/html/.env
           subPath: .env
+          readOnly: true
         - name: storage-volume
           mountPath: /var/www/html/storage
-          subPath: storage
-          readOnly: false
-        - name: logs-volume
-          mountPath: /var/www/html/storage/logs
-          subPath: logs
-          readOnly: false
-        - name: bootstrap-cache-volume
-          mountPath: /var/www/html/bootstrap/cache
-          subPath: bootstrap-cache
-        # garantir permissões para arquivos públicos (se necessário)
-        - name: public-volume
-          mountPath: /var/www/html/storage/app/public
-          subPath: public
       volumes:
-      - name: localtime
-        hostPath:
-          path: /usr/share/zoneinfo/America/Fortaleza
-          type: File
-      - name: timezone
-        hostPath:
-          path: /etc/timezone
-          type: File
       - name: env-volume
         configMap:
           name: uniselec-api-config
           items:
-            - key: .env
-              path: .env
+          - key: .env
+            path: .env
       - name: storage-volume
-        persistentVolumeClaim:
-          claimName: pvc-uniselec-storage
-      - name: logs-volume
-        persistentVolumeClaim:
-          claimName: pvc-uniselec-logs
-      - name: bootstrap-cache-volume
-        persistentVolumeClaim:
-          claimName: pvc-uniselec-storage
-      - name: public-volume
         persistentVolumeClaim:
           claimName: pvc-uniselec-storage
       imagePullSecrets:
       - name: regcred
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
