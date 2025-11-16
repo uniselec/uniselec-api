@@ -13,37 +13,22 @@ spec:
       labels:
         app: uniselec-api
     spec:
-      # # inicio - Init container para aguardar MariaDB
-      # initContainers:
-      # - name: wait-for-mariadb
-      #   image: mariadb:11.3.2
-      #   command:
-      #   - bash
-      #   - -c
-      #   - |
-      #     echo "Aguardando MariaDB Galera Cluster..."
-      #     for i in {1..60}; do
-      #       if mariadb -h mariadb-app -u ${DB_USERNAME} -p"${MYSQL_ROOT_PASSWORD}" \
-      #                  -e "SELECT 1" >/dev/null 2>&1; then
-      #         echo "MariaDB disponível!"
-      #         exit 0
-      #       fi
-      #       echo "Tentativa $i/60..."
-      #       sleep 5
-      #     done
-      #     echo "Timeout: MariaDB não disponível"
-      #     exit 1
-      #   envFrom:
-      #   - configMapRef:
-      #       name: mariadb-env
-      #   - secretRef:
-      #       name: mariadb-secret-env
-      # # fim - Init container
-
       containers:
       - name: uniselec-api
         image: dti-registro.unilab.edu.br/unilab/uniselec-api:latest
         imagePullPolicy: Always
+        # inicialização para garantir permissões
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          # permissões  no storage
+          chown -R www-data:www-data /var/www/html/storage
+          chown -R www-data:www-data /var/www/html/bootstrap/cache
+          chmod -R 775 /var/www/html/storage
+          chmod -R 775 /var/www/html/bootstrap/cache
+          # Iniciar o servidor web
+          exec apache2-foreground
         resources:
           requests:
             cpu: 100m
@@ -96,6 +81,19 @@ spec:
         - name: env-volume
           mountPath: /app/.env
           subPath: .env
+        - name: storage-volume
+          mountPath: /var/www/html/storage
+          subPath: storage
+        - name: logs-volume
+          mountPath: /var/www/html/storage/logs
+          subPath: logs
+        - name: bootstrap-cache-volume
+          mountPath: /var/www/html/bootstrap/cache
+          subPath: bootstrap-cache
+        # garantir permissões para arquivos públicos (se necessário)
+        - name: public-volume
+          mountPath: /var/www/html/storage/app/public
+          subPath: public
       volumes:
       - name: localtime
         hostPath:
@@ -111,5 +109,17 @@ spec:
           items:
             - key: .env
               path: .env
+      - name: storage-volume
+        persistentVolumeClaim:
+          claimName: pvc-uniselec-storage
+      - name: logs-volume
+        persistentVolumeClaim:
+          claimName: pvc-uniselec-logs
+      - name: bootstrap-cache-volume
+        persistentVolumeClaim:
+          claimName: pvc-uniselec-storage
+      - name: public-volume
+        persistentVolumeClaim:
+          claimName: pvc-uniselec-storage
       imagePullSecrets:
       - name: regcred

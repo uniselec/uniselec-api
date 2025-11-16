@@ -19,19 +19,23 @@ patches:
     name: mariadb
 # fim - MariaDB
 
-# inicio - Override de variáveis do MariaDB para staging
 configMapGenerator:
-- behavior: merge
+- name: uniselec-api-config
+  behavior: replace
+  options:
+    disableNameSuffixHash: true
+  files:
+  - .env=env-stg.conf
+
+# inicio - Override de variáveis do MariaDB para staging
+- name: mariadb-env
+  behavior: merge
+  options:
+    disableNameSuffixHash: true
   literals:
   - DB_DATABASE=uniselec_stag
   - MYSQL_DATABASE=uniselec_stag
   - MARIADB_CLUSTER_NAME=uniselec_stag_galera_cluster
-  - MESSAGE=Staging
-  - MAIL_FROM_ADDRESS="noreply@selecoes-staging.unilab.edu.br"
-  - MAIL_FROM_NAME="[Treinamento] Seleções - UNILAB"
-  name: mariadb-env
-  options:
-    disableNameSuffixHash: true
 # fim - Override de variáveis
 
 images:
