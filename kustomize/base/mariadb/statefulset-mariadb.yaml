@@ -213,8 +213,8 @@ spec:
           containerPort: 4568
 
         envFrom:
-        - configMapRef:
-            name: mariadb-env
+        # - configMapRef:
+        #     name: mariadb-env
         - secretRef:
             name: mariadb-secret-env
 
