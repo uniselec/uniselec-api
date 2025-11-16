@@ -112,47 +112,64 @@ spec:
 
           echo "[INFO] Instalando dependências..."
           apt-get update -qq >/dev/null
-          apt-get install -y -qq netcat-openbsd pv locales >/dev/null
+          apt-get install -y -qq netcat-openbsd pv >/dev/null
 
           mkdir -p /var/lib/mysql/.sst
           chown -Rf mysql:mysql /var/lib/mysql/.sst
           chmod 700 /var/lib/mysql/.sst
 
           export DEBIAN_FRONTEND=noninteractive
-          apt-get update
-          command -v mariabackup || apt-get install -y mariadb-backup
-          command -v galera-4 || apt-get install -y galera-4
-          command -v pv || apt-get install -y pv
+          command -v mariabackup >/dev/null || apt-get install -y -qq mariadb-backup >/dev/null
 
-          apt-get install -y locales
+          apt-get install -y -qq locales >/dev/null
           sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
-          locale-gen pt_BR.UTF-8
+          locale-gen pt_BR.UTF-8 >/dev/null 2>&1
           export LANG=pt_BR.UTF-8
           export LC_ALL=pt_BR.UTF-8
-          export LC_CTYPE=pt_BR.UTF-8
-          export LANGUAGE=pt_BR:pt
-          locale
 
           echo "[INFO] Iniciando configuração dinâmica do MariaDB Galera"
+
           for v in MARIADB_CLUSTER_NAME SST_USER SST_PASSWORD; do
             if [ -z "${!v}" ]; then
-              echo "[ERROR] Variável de ambiente $v não definida"
+              echo "[ERROR] Variável $v não definida"
               exit 1
             fi
           done
 
           ordinal="${HOSTNAME##*-}"
           POD_IP=$(hostname -i)
-          export SERVER_ID=$((100 + ordinal))
+          SERVER_ID=$((100 + ordinal))
 
-          # Namespace dinâmico do Kubernetes
-          NAMESPACE="${POD_NAMESPACE}"
+          echo "[INFO] Pod: $HOSTNAME | Ordinal: $ordinal | ServerID: $SERVER_ID"
+
+          NAMESPACE="${POD_NAMESPACE:-uniselec-api-stg}"
 
           if [ "$ordinal" = "0" ]; then
-            export CLUSTER_ADDRESS="gcomm://"
+            CLUSTER_ACTIVE=false
+
+            for peer in "mariadb-1.mariadb.${NAMESPACE}.svc.cluster.local" \
+                        "mariadb-2.mariadb.${NAMESPACE}.svc.cluster.local"; do
+              if nc -z -w2 "$peer" 4567 2>/dev/null; then
+                echo "[INFO] Cluster ativo: $peer"
+                CLUSTER_ACTIVE=true
+                CLUSTER_ADDRESS="gcomm://$peer:4567"
+                break
+              fi
+            done
+
+            if [ "$CLUSTER_ACTIVE" = "false" ]; then
+              echo "[INFO] Bootstrap mode"
+              CLUSTER_ADDRESS="gcomm://"
+              BOOTSTRAP_FLAG="--wsrep-new-cluster"
+            else
+              BOOTSTRAP_FLAG=""
+            fi
           else
-            export CLUSTER_ADDRESS="${MARIADB_CLUSTER_ADDRESS:-gcomm://mariadb-0.mariadb.${NAMESPACE}.svc.cluster.local:4567}"
+            CLUSTER_ADDRESS="gcomm://mariadb-0.mariadb.${NAMESPACE}.svc.cluster.local:4567"
+            BOOTSTRAP_FLAG=""
           fi
+
+          echo "[INFO] CLUSTER_ADDRESS: $CLUSTER_ADDRESS"
 
           CONFIG_FILE="/etc/mysql/mariadb.conf.d/99-custom.cnf"
           sed -e "s/_SERVER_ID/$SERVER_ID/g" \
@@ -163,45 +180,16 @@ spec:
               -e "s|_SST_PASSWORD|$SST_PASSWORD|g" \
               /etc/mysql/config-template/custom.cnf > $CONFIG_FILE
 
-          # Ajustar gtid_strict_mode apenas nos SLAVES
-          if [[ "$ordinal" != "0" ]]; then
+          if [ "$ordinal" != "0" ]; then
             echo "gtid_strict_mode = OFF" >> "$CONFIG_FILE"
           fi
 
-          if [[ "$ordinal" = "0" ]]; then
+          if [ "$ordinal" = "0" ]; then
             bash /etc/mysql/ensure-users.sh &
           fi
 
-          echo "[INFO] Inicializando Galera"
-
-          # SEMPRE tentar conectar ao cluster primeiro, SÓ bootstrap se necessário
-          if [[ "$HOSTNAME" = "mariadb-0" ]]; then
-            # Verificar manualmente se há cluster ativo
-            echo "[INFO] Verificando se há cluster Galera ativo..."
-            CLUSTER_ACTIVE=false
-
-            # Tentar conectar aos peers diretamente
-            for peer in "mariadb-1.mariadb" "mariadb-2.mariadb"; do
-              if nc -z -w5 "$peer" 4567; then
-                echo "[INFO] Cluster ativo detectado em $peer"
-                CLUSTER_ACTIVE=true
-                break
-              else
-                echo "[INFO] Peer $peer não responde"
-              fi
-            done
-
-            if $CLUSTER_ACTIVE; then
-              echo "[INFO] Conectando ao cluster existente"
-              exec docker-entrypoint.sh mariadbd --defaults-file=$CONFIG_FILE
-            else
-              echo "[INFO] Inicializando NOVO cluster (nenhum peer ativo)"
-              exec docker-entrypoint.sh mariadbd --defaults-file=$CONFIG_FILE --wsrep-new-cluster
-            fi
-          else
-            echo "[INFO] Conectando ao cluster existente"
-            exec docker-entrypoint.sh mariadbd --defaults-file=$CONFIG_FILE
-          fi
+          echo "[INFO] Iniciando MariaDB"
+          exec docker-entrypoint.sh mariadbd --defaults-file=$CONFIG_FILE $BOOTSTRAP_FLAG
 
         imagePullPolicy: IfNotPresent
         resources:
