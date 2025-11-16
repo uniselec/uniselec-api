@@ -84,9 +84,11 @@ spec:
         - name: storage-volume
           mountPath: /var/www/html/storage
           subPath: storage
+          readOnly: false
         - name: logs-volume
           mountPath: /var/www/html/storage/logs
           subPath: logs
+          readOnly: false
         - name: bootstrap-cache-volume
           mountPath: /var/www/html/bootstrap/cache
           subPath: bootstrap-cache
