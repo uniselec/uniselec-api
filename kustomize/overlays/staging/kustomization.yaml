@@ -21,10 +21,7 @@ patches:
 
 # inicio - Override de variáveis do MariaDB para staging
 configMapGenerator:
-- name: mariadb-env
-  behavior: merge
-  options:
-    disableNameSuffixHash: true
+- behavior: merge
   literals:
   - DB_DATABASE=uniselec_stag
   - MYSQL_DATABASE=uniselec_stag
@@ -32,6 +29,9 @@ configMapGenerator:
   - MESSAGE=Staging
   - MAIL_FROM_ADDRESS="noreply@selecoes-staging.unilab.edu.br"
   - MAIL_FROM_NAME="[Treinamento] Seleções - UNILAB"
+  name: mariadb-env
+  options:
+    disableNameSuffixHash: true
 # fim - Override de variáveis
 
 images:
