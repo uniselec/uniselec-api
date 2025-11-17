@@ -7,6 +7,12 @@ use App\Http\Controllers\Public\ProcessSelectionController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HealthController;
 
+Route::get('/', function () {
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'API is working'
+    ]);
+});
 Route::get('health/ready', [HealthController::class, 'ready']);
 Route::apiResource('process_selections', ProcessSelectionController::class)->only(['index', 'show'])->names('admin.processSelection');
 Route::apiResource('documents', DocumentController::class)->only(['index', 'show'])->names('admin.documents');
