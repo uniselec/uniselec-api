@@ -52,7 +52,7 @@ configMapGenerator:
   - DB_PORT=3306
   - DB_DATABASE=uniselec_stag
   - DB_USERNAME=root
-  - DB_PASSWORD="${MYSQL_PASSWORD}"
+  - DB_PASSWORD=Password123
   - BROADCAST_DRIVER=log
   - CACHE_DRIVER=file
   - FILESYSTEM_DISK=local

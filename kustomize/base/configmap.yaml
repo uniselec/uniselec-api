@@ -17,8 +17,8 @@ data:
   DB_HOST: mariadb-app.uniselec-api-stg.svc.cluster.local
   DB_PORT: 3306
   DB_DATABASE: uniselec_stag
-  DB_USERNAME: uniselec_user
-  DB_PASSWORD: ${DB_PASSWORD}
+  DB_USERNAME: 'root'
+  DB_PASSWORD: 'Password123'
   BROADCAST_DRIVER: log
   CACHE_DRIVER: file
   FILESYSTEM_DISK: local
