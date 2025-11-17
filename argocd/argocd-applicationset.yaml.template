@@ -23,6 +23,8 @@ spec:
       labels:
         environment: ${DEPLOY_ENV}
         app: ${APP_NAME}
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
 
     spec:
       project: ${APP_NAME}-${DEPLOY_ENV}-ap
@@ -53,9 +55,11 @@ spec:
           - ApplyOutOfSyncOnly=true
           - SkipDryRunOnMissingResource=true
           - RespectIgnoreDifferences=true
+          - ServerSideApply=false
+          - Replace=false
         retry:
-          limit: 5
+          limit: 10
           backoff:
-            duration: 5s
+            duration: 10s
             factor: 2
-            maxDuration: 3m
+            maxDuration: 5m
