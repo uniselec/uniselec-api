@@ -57,6 +57,11 @@ spec:
 
           echo "Permissões configuradas. Iniciando Apache..."
 
+          source /var/www/html/.env
+
+          php artisan config:cache
+          php artisan route:cache
+
           # Iniciar Apache em foreground
           exec apache2-foreground
         resources:
@@ -79,7 +84,7 @@ spec:
               value: application/json
           initialDelaySeconds: 30
           periodSeconds: 10
-          timeoutSeconds: 5
+          timeoutSeconds: 11
           failureThreshold: 3
         readinessProbe:
           httpGet:
@@ -90,7 +95,7 @@ spec:
               value: application/json
           initialDelaySeconds: 10
           periodSeconds: 5
-          timeoutSeconds: 3
+          timeoutSeconds: 13
           failureThreshold: 3
         envFrom:
         - configMapRef:
