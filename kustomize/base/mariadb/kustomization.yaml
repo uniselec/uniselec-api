@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: uniselec-api
+
+resources:
+- sa-rbac-mariadb.yaml
+- configmap-mariadb.yaml
+- configmap-mariadb-galera.yaml
+- service-mariadb.yaml
+- statefulset-mariadb.yaml
+- sealed-secret-mariadb.yaml
+
+# ConfigMap com variáveis de ambiente base do MariaDB
+configMapGenerator:
+- name: mariadb-env
+  behavior: create
+  options:
+    disableNameSuffixHash: true
+  literals:
+  - DB_CONNECTION=mysql
+  - DB_HOST=mariadb-app
+  - DB_PORT=3306
+  - DB_DATABASE=uniselec
+  - DB_USERNAME=root
+  - MYSQL_DATABASE=uniselec
+  - MYSQL_USER=uniselec
+  - MYSQL_ATTR_SSL_CA=
+  - MYSQL_ATTR_SSL_VERIFY_SERVER_CERT=false
+  - MARIADB_AUTO_UPGRADE=1
+  - MARIADB_INITDB_SKIP_TZINFO=1
+  - MARIADB_GALERA_CLUSTER=ON
+  - MARIADB_WSREP_PROVIDER=/usr/lib/galera/libgalera_smm.so
+  - MARIADB_CLUSTER_NAME=uniselec_galera_cluster
+  - SST_USER=sstuser
+  - MARIADB_REPLICATION_USER=replicator

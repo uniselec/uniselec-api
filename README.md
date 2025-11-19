@@ -128,6 +128,33 @@ O que eu consigo fazer em pouco tempo:
 
         docker exec -it uniselec-api bash -c "php artisan storage:link"
 
+## Segredos (Sealed Secrets)
+```sh
+kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.33.1/controller.yaml
+kubeseal -f regcred-secret.yaml -w base/sealed-secret-regcred.yaml --scope cluster-wide
+kubeseal --validate < base/sealed-secret-regcred.yaml
+```
+### Desprovisionar Deploy
+```sh
+argocd login argocd.unilab.edu.br --username admin --password "pass" --grpc-web
+kubectl get applicationset -A
+kubectl -n argocd patch applicationset uniselec-api-stg-as --type='merge' -p '{"spec":{"generators":[{"list":{"elements":[]}}]}}
+argocd app list | grep uniselec-api-stg
+```
 
-
+### Re-Provisionar Deproy
+```text
+┌───────────────────────────────────────────────────────────────────────────┐
+│                       Inital Pipeline Execution Flow                      │
+└───────────────────────────────────────────────────────────────────────────┘
+┌──────────────┐  ┌───────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐
+│   validate   │─>│   tests   │─>│  build   │─>│ staging  │─>│ notification │
+└──────────────┘  └───────────┘  └──────────┘  └──────────┘  └──────────────┘
+│                 │              │             │             │
+├─ docker         ├─ dependency  └─ docker     └─ deploy     └─ staging
+├─ environment    ├─ sast_scan                 (re-run aqui)
+└─ kustomize      ├─ sonarqube
+                  └─ unit
+```
+**Ação necessária**: Rodar o Job `staging` da Pipeline GitLab CI/CD GitOps
 

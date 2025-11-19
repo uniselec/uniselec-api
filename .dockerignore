@@ -1,0 +1,12 @@
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+docker-compose.build.yml
+README.md
+/vendor
+/kubernetes
+/pipeline
+/vault
+stress.sh
+kustomize/base/secret-regcred.yaml

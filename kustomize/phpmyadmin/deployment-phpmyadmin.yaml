@@ -1,0 +1,121 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: phpmyadmin-credentials
+  namespace: uniselec-api-stg
+type: Opaque
+stringData:
+  username: root
+  password: "Password123"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: phpmyadmin
+  namespace: uniselec-api-stg
+  labels:
+    app: phpmyadmin
+  annotations:
+    metallb.universe.tf/address-pool: int-pool
+    metallb.universe.tf/loadBalancerIPs: "10.130.0.161"
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+  selector:
+    app: phpmyadmin
+  externalTrafficPolicy: Cluster
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: phpmyadmin
+  namespace: uniselec-api-stg
+  labels:
+    app: phpmyadmin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: phpmyadmin
+  template:
+    metadata:
+      labels:
+        app: phpmyadmin
+    spec:
+      containers:
+      - name: phpmyadmin
+        image: phpmyadmin/phpmyadmin:5.2.3
+        env:
+        # - name: PMA_HOST
+        #   value: "mariadb-app"
+        # - name: PMA_PORT
+        #   value: "3306"
+
+        - name: PMA_HOSTS
+          value: "mariadb-app.uniselec-api-stg.svc.cluster.local,mariadb-app.uniselec-api-prod.svc.cluster.local"
+
+        - name: PMA_VERBOSES
+          value: "Uniselec Staging,Uniselec Production"
+
+        - name: PMA_PORTS
+          value: "3306,3306"
+
+        - name: PMA_USER
+          valueFrom:
+            secretKeyRef:
+              name: phpmyadmin-credentials
+              key: username
+        - name: PMA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: phpmyadmin-credentials
+              key: password
+
+        - name: PMA_ARBITRARY
+          value: "1"  # Permite login com outros usuários
+
+        - name: MYSQLI_CLIENT_FLAGS
+          value: "0"
+        - name: MYSQL_ATTR_SSL_CA
+          value: ""
+        - name: MYSQL_ATTR_SSL_VERIFY_SERVER_CERT
+          value: "false"
+        ports:
+        - containerPort: 80
+          name: http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: phpmyadmin
+  namespace: uniselec-api-stg
+  annotations:
+    haproxy.org/forwarded-for: "enabled"
+    haproxy.org/load-balance: "roundrobin"
+    haproxy.org/ssl-redirect: "false"
+spec:
+  rules:
+    - host: 10.130.0.161.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: phpmyadmin
+                port:
+                  number: 80

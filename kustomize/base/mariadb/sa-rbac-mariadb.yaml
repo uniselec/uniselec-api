@@ -1,0 +1,44 @@
+---
+# =====================================================================-
+# API Version: v1
+# Kind:       ServiceAccount
+# Metadata:
+#   Name:     mariadb-sa
+# ----------------------------------------------------------------------
+# Author:     erivandosena@gmail.com
+# Created:    2025-04-22
+# Version:    1.0.0
+# ----------------------------------------------------------------------
+# Description: Conta de serviço e configurações de RBAC para o MariaDB,
+#              garantindo permissões adequadas no cluster Kubernetes.
+# ----------------------------------------------------------------------
+# Usage:      kubectl apply -f sa-rbac-mariadb.yaml
+# =====================================================================-
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mariadb
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mariadb
+rules:
+- apiGroups: [ "" ]
+  resources: [ "pods" ]
+  verbs: [ "get", "list", "watch", "patch", "delete" ]
+- apiGroups: [ "batch" ]
+  resources: [ "jobs" ]
+  verbs: [ "get", "list", "watch" ]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mariadb
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mariadb
+subjects:
+- kind: ServiceAccount
+  name: mariadb

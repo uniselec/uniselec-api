@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ${APP_NAME}-${DEPLOY_ENV}-ap
+  namespace: argocd
+  labels:
+    environment: ${DEPLOY_ENV}
+    app: ${APP_NAME}-${DEPLOY_ENV}
+spec:
+  description: "Projeto para o App ${APP_NAME}-${DEPLOY_ENV} no ambiente ${DEPLOY_ENV}."
+
+  # Repositórios permitidos
+  sourceRepos:
+    - ${REPO_URL}
+
+  destinations:
+    - namespace: ${APP_NAMESPACE}
+      server: https://${CLUSTER_REMOTE1_DOMAIN}:6443
+
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+
+  sourceNamespaces:
+    - "*"
+
+  orphanedResources:
+    warn: true
+
+  syncWindows: []

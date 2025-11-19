@@ -1,0 +1,43 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Define o namespace para todos os recursos
+namespace: uniselec-api-prd
+
+resources:
+- ../../base
+- namespace.yaml
+
+# inicio - MariaDB para production
+patches:
+- path: patch-deployment.yaml
+- path: patch-ingress.yaml
+- path: patch-hpa.yaml
+- path: mariadb/patch-statefulset.yaml
+  target:
+    kind: StatefulSet
+    name: mariadb
+# fim - MariaDB
+
+configMapGenerator:
+- name: uniselec-api-config
+  behavior: replace
+  options:
+    disableNameSuffixHash: true
+  files:
+  - .env=env-prd.conf
+
+# inicio - Override de variáveis do MariaDB para production
+- name: mariadb-env
+  behavior: merge
+  options:
+    disableNameSuffixHash: true
+  literals:
+  - DB_DATABASE=uniselec_prod
+  - MYSQL_DATABASE=uniselec_prod
+  - MARIADB_CLUSTER_NAME=uniselec_prod_galera_cluster
+# fim - Override de variáveis
+
+images:
+- name: dti-registro.unilab.edu.br/unilab/uniselec-api
+  newTag: v1.0.1

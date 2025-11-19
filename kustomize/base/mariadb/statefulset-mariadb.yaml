@@ -1,0 +1,368 @@
+---
+# =====================================================================-
+# API Version: apps/v1
+# Kind:       StatefulSet
+# Metadata:
+#   Name:     mariadb
+# ----------------------------------------------------------------------
+# Author:     erivandosena@gmail.com
+# Created:    2025-04-14
+# Version:    1.0.0
+# ----------------------------------------------------------------------
+# Description: StatefulSet configuration for MariaDB Galera Cluster with:
+#              - 3-node replication topology
+#              - Automatic bootstrap safety checks
+#              - pt_BR locale configuration
+#              - SST/IST replication settings
+#              - Persistent NFS storage
+#              - Custom resource limits and probes
+# ----------------------------------------------------------------------
+# Usage:      kubectl apply -f mariadb-statefulset.yaml
+# =====================================================================-
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mariadb
+  labels:
+    app: mariadb
+    component: database
+spec:
+  serviceName: mariadb
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mariadb
+  template:
+    metadata:
+      labels:
+        app: mariadb
+        mariadb/replication-role: member
+    spec:
+      serviceAccountName: mariadb
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        fsGroupChangePolicy: "OnRootMismatch"
+      initContainers:
+        - name: mariadb-bootstrap-check
+          image: mariadb:11.3.2
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              GR="/var/lib/mysql/grastate.dat"
+              LOG="/var/lib/mysql/wsrep_bootstrap.log"
+
+              echo "[INFO] Starting bootstrap check..." > $LOG
+
+              echo "[INFO] Installing netcat" >> $LOG
+              if ! apt-get update -qq >/dev/null 2>&1; then
+                  echo "[ERROR] apt-get update failed" >> $LOG
+                  exit 1
+              fi
+
+              if ! apt-get install -y -qq netcat-openbsd >/dev/null 2>&1; then
+                  echo "[ERROR] netcat installation failed" >> $LOG
+                  exit 1
+              fi
+              echo "[SUCCESS] netcat installed" >> $LOG
+
+              if [ ! -f "$GR" ]; then
+                  echo "[INFO] Creating initial grastate.dat" >> $LOG
+                  cat > "$GR" << 'EOF'
+              # GALERA saved state
+              version: 2.1
+              uuid: 00000000-0000-0000-0000-000000000000
+              seqno: -1
+              safe_to_bootstrap: 0
+              EOF
+                  chown 999:999 "$GR"
+              fi
+
+              if grep -q 'safe_to_bootstrap: 0' "$GR" 2>/dev/null; then
+                  echo "[INFO] safe_to_bootstrap=0 found" >> $LOG
+                  ALL_DOWN=true
+
+                  NAMESPACE="${POD_NAMESPACE:-uniselec-api-stg}"
+
+                  for peer in "mariadb-0.mariadb.${NAMESPACE}.svc.cluster.local" \
+                              "mariadb-1.mariadb.${NAMESPACE}.svc.cluster.local" \
+                              "mariadb-2.mariadb.${NAMESPACE}.svc.cluster.local"; do
+                      echo "[CHECK] Testing $peer:4567" >> $LOG
+
+                      # 3 tentativas com timeout 5s
+                      for i in {1..3}; do
+                          if nc -z -w 5 "$peer" 4567 2>/dev/null; then
+                              echo "[SUCCESS] Peer $peer online (attempt $i)" >> $LOG
+                              ALL_DOWN=false
+                              break 2
+                          else
+                              echo "[ATTEMPT $i] $peer unreachable" >> $LOG
+                              sleep 2
+                          fi
+                      done
+                  done
+
+                  if $ALL_DOWN; then
+                      echo "[BOOTSTRAP] All peers down, safe to bootstrap" >> $LOG
+                      sed -i 's/safe_to_bootstrap: 0/safe_to_bootstrap: 1/' "$GR"
+                      echo "[SUCCESS] Cluster can bootstrap" >> $LOG
+                  else
+                      echo "[SKIP] Peers alive, not bootstrapping" >> $LOG
+                  fi
+              else
+                  echo "[INFO] No need to patch grastate.dat" >> $LOG
+              fi
+
+              echo "[COMPLETE] Bootstrap check finished" >> $LOG
+          securityContext:
+            runAsUser: 0
+          envFrom:
+            - configMapRef:
+                name: mariadb-env
+            - secretRef:
+                name: mariadb-secret-env
+          volumeMounts:
+            - name: database
+              mountPath: /var/lib/mysql
+
+      containers:
+      - name: mariadb
+        image: mariadb:11.3.2
+        command:
+        - bash
+        - -c
+        - |
+          #!/bin/bash
+          # ======================================================
+          # CONFIGURAÇÃO INICIAL DO MARIADB:
+          # LOCALE PT-BR, CRIAÇÃO DO BANCO PRINCIPAL,
+          # USUÁRIO DE APLICAÇÃO, USUÁRIO DE REPLICAÇÃO,
+          # E PERMISSÕES DE ACESSO ROOT
+          # ======================================================
+
+          set -eo pipefail
+
+          echo "[INFO] Instalando dependências..."
+          apt-get update -qq >/dev/null
+          apt-get install -y -qq netcat-openbsd pv >/dev/null
+
+          mkdir -p /var/lib/mysql/.sst
+          chown -Rf mysql:mysql /var/lib/mysql/.sst
+          chmod 700 /var/lib/mysql/.sst
+
+          export DEBIAN_FRONTEND=noninteractive
+          command -v mariabackup >/dev/null || apt-get install -y -qq mariadb-backup >/dev/null
+
+          echo "[INFO] Iniciando configuração dinâmica do MariaDB Galera"
+
+          for v in MARIADB_CLUSTER_NAME SST_USER SST_PASSWORD; do
+            if [ -z "${!v}" ]; then
+              echo "[ERROR] Variável $v não definida"
+              exit 1
+            fi
+          done
+
+          ordinal="${HOSTNAME##*-}"
+          POD_IP=$(hostname -i)
+          SERVER_ID=$((100 + ordinal))
+
+          echo "[INFO] Pod: $HOSTNAME | Ordinal: $ordinal | ServerID: $SERVER_ID"
+
+          NAMESPACE="${POD_NAMESPACE:-uniselec-api-stg}"
+
+          if [ "$ordinal" = "0" ]; then
+            CLUSTER_ACTIVE=false
+
+            for peer in "mariadb-1.mariadb.${NAMESPACE}.svc.cluster.local" \
+                        "mariadb-2.mariadb.${NAMESPACE}.svc.cluster.local"; do
+              if nc -z -w2 "$peer" 4567 2>/dev/null; then
+                echo "[INFO] Cluster ativo: $peer"
+                CLUSTER_ACTIVE=true
+                CLUSTER_ADDRESS="gcomm://$peer:4567"
+                break
+              fi
+            done
+
+            if [ "$CLUSTER_ACTIVE" = "false" ]; then
+              echo "[INFO] Bootstrap mode"
+              CLUSTER_ADDRESS="gcomm://"
+              BOOTSTRAP_FLAG="--wsrep-new-cluster"
+            else
+              BOOTSTRAP_FLAG=""
+            fi
+          else
+            CLUSTER_ADDRESS="gcomm://mariadb-0.mariadb.${NAMESPACE}.svc.cluster.local:4567"
+            BOOTSTRAP_FLAG=""
+          fi
+
+          echo "[INFO] CLUSTER_ADDRESS: $CLUSTER_ADDRESS"
+
+          CONFIG_FILE="/etc/mysql/mariadb.conf.d/99-custom.cnf"
+          sed -e "s/_SERVER_ID/$SERVER_ID/g" \
+              -e "s|_MARIADB_CLUSTER_NAME|$MARIADB_CLUSTER_NAME|g" \
+              -e "s|_MARIADB_CLUSTER_ADDRESS|$CLUSTER_ADDRESS|g" \
+              -e "s|_POD_IP|$POD_IP|g" \
+              -e "s|_SST_USER|$SST_USER|g" \
+              -e "s|_SST_PASSWORD|$SST_PASSWORD|g" \
+              /etc/mysql/config-template/custom.cnf > $CONFIG_FILE
+
+          if [ "$ordinal" != "0" ]; then
+            echo "gtid_strict_mode = OFF" >> "$CONFIG_FILE"
+          fi
+
+          if [ "$ordinal" = "0" ]; then
+            bash /etc/mysql/ensure-users.sh &
+          fi
+
+          echo "[INFO] Iniciando MariaDB"
+          exec docker-entrypoint.sh mariadbd --defaults-file=$CONFIG_FILE $BOOTSTRAP_FLAG
+
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2"
+            memory: "3Gi"
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+        ports:
+        - name: mysql
+          containerPort: 3306
+        - name: replication
+          containerPort: 4567
+        - name: sst
+          containerPort: 4444
+        - name: ist
+          containerPort: 4568
+
+        envFrom:
+        - configMapRef:
+            name: mariadb-env
+        - secretRef:
+            name: mariadb-secret-env
+
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+
+        startupProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - |
+              mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}"
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30  # 5min para iniciar
+
+        readinessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - |
+              # Verifica conexão
+              if ! mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}" 2>/dev/null; then
+                exit 1
+              fi
+
+              # Verifica se está Synced
+              STATE=$(mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" \
+                -e "SHOW STATUS LIKE 'wsrep_local_state_comment';" 2>/dev/null | \
+                awk 'NR==2 {print $2}')
+
+              if [ "$STATE" != "Synced" ]; then
+                echo "Not synced: $STATE"
+                exit 1
+              fi
+
+              # Verifica cluster size
+              SIZE=$(mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" \
+                -e "SHOW STATUS LIKE 'wsrep_cluster_size';" 2>/dev/null | \
+                awk 'NR==2 {print $2}')
+
+              # mariadb-0 pode ter cluster_size=1 (bootstrap)
+              ordinal="${HOSTNAME##*-}"
+              if [ "$ordinal" = "0" ] && [ "$SIZE" -ge 1 ]; then
+                exit 0  # mariadb-0 OK com cluster_size >= 1
+              fi
+
+              # mariadb-1 e mariadb-2 precisam cluster_size >= 2
+              if [ "$SIZE" -lt 2 ]; then
+                echo "Cluster too small: $SIZE"
+                exit 1
+              fi
+
+              exit 0
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        livenessProbe:
+          exec:
+            command:
+            - bash
+            - -c
+            - |
+              mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}"
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 5
+
+        volumeMounts:
+        - name: database
+          mountPath: /var/lib/mysql
+        - name: mariadb-config
+          mountPath: /etc/mysql/config-template/custom.cnf
+          subPath: custom.cnf
+        - name: init-users
+          mountPath: /docker-entrypoint-initdb.d/init-users.sql
+          subPath: init-users.sql
+        - name: ensure-users
+          mountPath: /etc/mysql/ensure-users.sh
+          subPath: ensure-users.sh
+      volumes:
+      - name: mariadb-config
+        configMap:
+          name: mariadb-config
+      - name: init-users
+        configMap:
+          name: config-init-users
+      - name: ensure-users
+        configMap:
+          name: config-ensure-users
+          defaultMode: 0755
+
+  volumeClaimTemplates:
+  - metadata:
+      name: database
+      labels:
+        app: mariadb
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+      storageClassName: nfs-storage-k8s-v1
+      volumeMode: Filesystem

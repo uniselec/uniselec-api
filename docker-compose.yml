@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: uniselec-api
     container_name: uniselec-api
     restart: unless-stopped
     environment:
@@ -69,7 +68,7 @@ services:
       - .:/var/www/html
     depends_on:
       - redis
-      - db     
+      - db
     networks:
       - shared-network-uniselec
     command: "php artisan queue:work redis --tries=3 --verbose"

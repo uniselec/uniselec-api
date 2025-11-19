@@ -1,0 +1,89 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: false
+  selector:
+    app: mariadb
+  ports:
+  - name: mysql
+    port: 3306
+  - name: replication
+    port: 4567
+  - name: sst
+    port: 4444
+  - name: ist
+    port: 4568
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-primary
+  labels:
+    app: mariadb
+    role: primary
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: false
+  selector:
+    statefulset.kubernetes.io/pod-name: mariadb-0
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: mysql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-replicas
+  labels:
+    app: mariadb
+    role: replica
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: false
+  selector:
+    app: mariadb
+    mariadb/replication-role: member
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: mysql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-app
+spec:
+  publishNotReadyAddresses: false
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  selector:
+    app: mariadb
+  ports:
+  - name: mysql
+    port: 3306
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-lb
+  labels:
+    app: mariadb
+  annotations:
+    metallb.universe.tf/address-pool: int-pool
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  publishNotReadyAddresses: false
+  selector:
+    app: mariadb
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: 3306
