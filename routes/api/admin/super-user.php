@@ -48,10 +48,13 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
 
         Route::patch('documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('admin.super_user.documents.updateStatus');
 
+
         Route::apiResource('applications', ApplicationController::class)->only(['index', 'show'])->names('admin.super_user.applications');
+        Route::patch('applications/{id}/resolve-inconsistencies', [ApplicationController::class, 'resolveInconsistencies'])->name('admin.applications.resolve-inconsistencies');
         Route::apiResource('application_outcomes', ApplicationOutcomeController::class)->only(['index', 'show'])->names('admin.super_user.application_outcomes');
         Route::apiResource('users', UserController::class)->only(['index', 'show'])->names('admin.super_user.users');
         Route::apiResource('enem_scores', EnemScoreController::class)->only(['index', 'show'])->names('admin.super_user.enem_.super_userscores.api');;
+
         Route::put('profile', [RegisterController::class, 'updateProfileAdmin'])->name('admin.super_user.profile.update');
 
         Route::apiResource('convocation_list_applications', ConvocationListApplicationController::class)->names('admin.super_user.super_user.convocation_list_applications');

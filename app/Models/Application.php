@@ -17,7 +17,10 @@ class Application extends Model
         'user_id',
         'form_data',
         'process_selection_id',
-        'verification_code'
+        'verification_code',
+        "name_source",
+        "birthdate_source",
+        "cpf_source",
     ];
 
     protected $casts = [
