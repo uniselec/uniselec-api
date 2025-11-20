@@ -93,12 +93,14 @@ spec:
           timeoutSeconds: 13
           failureThreshold: 3
         envFrom:
-        - configMapRef:
-            name: uniselec-api-config
-        - configMapRef:
-            name: mariadb-env
-        - secretRef:
-            name: mariadb-secret-env
+          - configMapRef:
+              name: uniselec-api-config
+          - configMapRef:
+              name: mariadb-env
+          - secretRef:
+              name: mariadb-credentials
+          - secretRef:
+              name: laravel-secrets
         env:
         - name: TZ
           value: "America/Fortaleza"
@@ -127,19 +129,9 @@ spec:
               resource: limits.memory
               divisor: 1Mi
         volumeMounts:
-        # - name: env-volume
-        #   mountPath: /var/www/html/.env
-        #   subPath: .env
-        #   readOnly: true
         - name: storage-volume
           mountPath: /var/www/html/storage
       volumes:
-      # - name: env-volume
-      #   configMap:
-      #     name: uniselec-api-config
-      #     items:
-      #     - key: .env
-      #       path: .env
       - name: storage-volume
         persistentVolumeClaim:
           claimName: pvc-uniselec-storage

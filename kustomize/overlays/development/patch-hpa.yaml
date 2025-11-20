@@ -3,5 +3,5 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: uniselec-api
 spec:
-  minReplicas: 2
-  maxReplicas: 6
+  minReplicas: 1
+  maxReplicas: 5
