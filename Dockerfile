@@ -6,7 +6,7 @@ ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV CACHE_DRIVER=file
 ENV SESSION_DRIVER=file
 ENV QUEUE_CONNECTION=sync
-
+ENV APP_TIMEZONE=America/Fortaleza
 ENV DEBIAN_FRONTEND noninteractive
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
