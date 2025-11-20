@@ -31,8 +31,8 @@ spec:
 
       source:
         repoURL: '{{repoURL}}'
-        targetRevision: main  # Branch principal
-        path: '{{path}}'      # kustomize/overlays/staging ou production
+        targetRevision: ${GIT_BRANCH}  # Branch develop ou principal
+        path: '{{path}}' # kustomize/overlays/ development|staging|production
 
       destination:
         server: '{{cluster}}'

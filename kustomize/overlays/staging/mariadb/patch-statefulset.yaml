@@ -3,61 +3,21 @@ kind: StatefulSet
 metadata:
   name: mariadb
 spec:
-  # volumeClaimTemplates:
-  #   - metadata:
-  #       name: database
-  #       labels:
-  #         app: mariadb
-  #       annotations:
-  #         nfs.io/storage-path: ""
-  #     spec:
-  #       accessModes:
-  #         - ReadWriteOnce
-  #       resources:
-  #         requests:
-  #           storage: 5Gi
-  #       storageClassName: nfs-storage-k8s-v1
-  #       volumeMode: Filesystem
-
-  # volumeClaimTemplates:
-  # - metadata:
-  #     name: database
-  #     labels:
-  #       app: mariadb
-  #   spec:
-  #     accessModes:
-  #       - ReadWriteOnce
-  #     resources:
-  #       requests:
-  #         storage: 5Gi
-  #     storageClassName: nfs-storage-k8s-v1
-
-  # volumeClaimTemplates:
-  # - metadata:
-  #     name: database
-  #     labels:
-  #       app: mariadb
-  #       annotations:
-  #         nfs.io/storage-path: ""
-  #   spec:
-  #     accessModes:
-  #     - ReadWriteOnce
-  #     storageClassName: nfs-storage-k8s-v1
-  #     resources:
-  #       requests:
-  #         storage: 5Gi
-
-  volumeClaimTemplates:
-  - metadata:
-      name: database
-      labels:
-        app: mariadb
+  template:
     spec:
-      accessModes:
-        - ReadWriteOnce
-      resources:
-        requests:
-          storage: 5Gi
-      storageClassName: nfs-storage-k8s-v1
-
-
+      containers:
+        - name: mariadb
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: database
+      spec:
+        resources:
+          requests:
+            storage: 25Gi

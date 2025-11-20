@@ -19,6 +19,7 @@
 # ----------------------------------------------------------------------
 # Usage:      kubectl apply -f mariadb-statefulset.yaml
 # =====================================================================-
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -38,12 +39,22 @@ spec:
         app: mariadb
         mariadb/replication-role: member
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: mariadb
+              topologyKey: kubernetes.io/hostname
+
       serviceAccountName: mariadb
+
       securityContext:
         runAsUser: 999
         runAsGroup: 999
         fsGroup: 999
         fsGroupChangePolicy: "OnRootMismatch"
+
       initContainers:
         - name: mariadb-bootstrap-check
           image: mariadb:11.3.2
@@ -85,7 +96,7 @@ spec:
                   echo "[INFO] safe_to_bootstrap=0 found" >> $LOG
                   ALL_DOWN=true
 
-                  NAMESPACE="${POD_NAMESPACE:-uniselec-api-stg}"
+                  NAMESPACE="${POD_NAMESPACE}"
 
                   for peer in "mariadb-0.mariadb.${NAMESPACE}.svc.cluster.local" \
                               "mariadb-1.mariadb.${NAMESPACE}.svc.cluster.local" \
@@ -119,11 +130,16 @@ spec:
               echo "[COMPLETE] Bootstrap check finished" >> $LOG
           securityContext:
             runAsUser: 0
+          env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
           envFrom:
             - configMapRef:
                 name: mariadb-env
             - secretRef:
-                name: mariadb-secret-env
+                name: mariadb-credentials
           volumeMounts:
             - name: database
               mountPath: /var/lib/mysql
@@ -171,7 +187,7 @@ spec:
 
           echo "[INFO] Pod: $HOSTNAME | Ordinal: $ordinal | ServerID: $SERVER_ID"
 
-          NAMESPACE="${POD_NAMESPACE:-uniselec-api-stg}"
+          NAMESPACE="${POD_NAMESPACE}"
 
           if [ "$ordinal" = "0" ]; then
             CLUSTER_ACTIVE=false
@@ -245,7 +261,7 @@ spec:
         - configMapRef:
             name: mariadb-env
         - secretRef:
-            name: mariadb-secret-env
+            name: mariadb-credentials
 
         env:
         - name: POD_NAME
