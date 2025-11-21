@@ -34,7 +34,7 @@ variables:
   ARGOCD_SERVER: argocd.unilab.edu.br
   CLUSTER_REMOTE1_DOMAIN: 10.130.0.45
   KUBECONFIG: /tmp/kubeconfig-${CI_PIPELINE_ID}
-  MAIL_PRD: erivandoramos@unilab.edu.br
+  MAIL_PRD: jefponte@unilab.edu.br
   ARGOCD_TIMEOUT: 600
   BASE_IMAGE: dti-registro.unilab.edu.br/unilab/ubuntu-k8s-tools:latest
 
@@ -252,7 +252,6 @@ tests:sast_scan:
   image: ${BASE_IMAGE}
   tags:
     - kubernetes
-  interruptible: true
   retry:
     max: 1
     when:
@@ -271,6 +270,7 @@ tests:sast_scan:
     paths:
       - /tmp/trivy-report.json
     expire_in: 30 days
+  interruptible: true
 
 tests:sonarqube:
   stage: tests
