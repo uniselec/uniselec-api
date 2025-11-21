@@ -11,15 +11,31 @@ use Illuminate\Support\Facades\Storage;
 
 class AppealDocumentController extends Controller
 {
+    public function show(Appeal $appeal, AppealDocument $appealDocument) 
+    {
+        // Ensure the document belongs to the given appeal
+        if ($appealDocument->appeal_id !== $appeal->id) {
+            return response()->json([
+                'message' => 'Este documento não pertence ao recurso especificado.'
+            ], 403);
+        }
+        if($appealDocument) {
+            return new AppealDocumentResource($appealDocument);
+        } else {
+            return response()->json([
+                'message' => 'Arquivo não encontrado.'
+            ], 404);
+        }
+    }
 
     public function store(Request $request, Appeal $appeal)
     {
         $request->validate([
-            'file' => 'required|file|max:10240', // Max 10 MB
+            'file' => 'required|file|mimes:pdf|max:10240', // Apenas PDF (10 MB)
         ]);
 
         $file = $request->file('file');
-        $path = $file->store('appeals', 'public');
+        $path = $file->store('appeal_documents', 'public');
 
         // Delete previous document if one already exists
         if ($appeal->documents()->exists()) {
@@ -40,20 +56,20 @@ class AppealDocumentController extends Controller
         return new AppealDocumentResource($document);
     }
 
-    public function destroy(Appeal $appeal, AppealDocument $document)
+    public function destroy(Appeal $appeal, AppealDocument $appealDocument)
     {
         // Ensure the document belongs to the given appeal
-        if ($document->appeal_id !== $appeal->id) {
+        if ($appealDocument->appeal_id !== $appeal->id) {
             return response()->json([
                 'message' => 'Este documento não pertence ao recurso especificado.'
             ], 403);
         }
 
-        if ($document->path && Storage::disk('public')->exists($document->path)) {
-            Storage::disk('public')->delete($document->path);
+        if ($appealDocument->path && Storage::disk('public')->exists($appealDocument->path)) {
+            Storage::disk('public')->delete($appealDocument->path);
         }
 
-        $document->delete();
+        $appealDocument->delete();
 
         return response()->noContent();
     }

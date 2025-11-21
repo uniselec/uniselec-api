@@ -14,6 +14,7 @@ class AppealDocumentResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'appeal_id' => $this->appeal_id,
             'path' => $this->path,
             'url' => asset('storage/' . $this->path),
             'original_name' => $this->original_name,

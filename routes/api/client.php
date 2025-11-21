@@ -21,8 +21,12 @@ Route::middleware(['auth:sanctum'])->prefix('client')->group(function () {
     Route::apiResource('applications', ApplicationController::class)->only(['index', 'show', 'store'])->names('admin.documents');
     Route::apiResource('appeals', AppealController::class)->names('client.appeals');
     Route::prefix('appeals/{appeal}')->group(function () {
-        Route::post('/document', [AppealDocumentController::class, 'store'])->name('appeal.document.store');
-        Route::delete('/document/{document}', [AppealDocumentController::class, 'destroy'])->name('appeal.document.destroy');
+        Route::get('/appeal_documents/{appealDocument}', [AppealDocumentController::class, 'show'])
+        ->name('appeal.documents.show');
+        Route::post('/appeal_documents', [AppealDocumentController::class, 'store'])
+        ->name('appeal.documents.store');
+        Route::delete('/appeal_documents/{appealDocument}', [AppealDocumentController::class, 'destroy'])
+        ->name('appeal.documents.destroy');
     });
 
 

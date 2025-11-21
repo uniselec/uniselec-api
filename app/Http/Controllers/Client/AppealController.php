@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\BasicCrudController;
 use App\Http\Resources\AppealResource;
 use App\Models\Appeal;
+use App\Models\Application;
+use App\Models\ProcessSelection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,37 +25,41 @@ class AppealController extends BasicCrudController
         $request->validate([
             'application_id' => 'required|exists:applications,id',
             'justification' => 'required|string',
-            'file' => 'nullable|file|max:10240', // max 10MB
         ]);
 
-        try {
-            DB::beginTransaction();
-
-            $appeal = Appeal::create([
-                'application_id' => $request->application_id,
-                'justification' => $request->justification,
-                'status' => 'submitted',
-            ]);
-    
-            if ($request->hasFile('file')) {
-                $file = $request->file('file');
-                $path = $file->store('appeal_documents', 'public');
-    
-                $appeal->documents()->create([
-                    'path' => $path,
-                    'original_name' => $file->getClientOriginalName(),
-                ]);
-            }
-
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
+        $application = Application::find($request->application_id);
+        if (!$application) {
             return response()->json([
-                'message' => 'Erro ao cadastrar o recurso.'
-            ], 500);
+                'message' => 'Não foi possível encontrar a Application.'
+            ], 403);
         }
 
-        // Ensure documents are loaded
+        $process = $application->processSelection;
+        if (!$process) {
+            return response()->json([
+                'message' => 'Processo seletivo não encontrado.'
+            ], 403);
+        }
+
+        // Start and end dates of the appeals period
+        $appeal_start_date = $process->appeal_start_date;
+        $appeal_end_date   = $process->appeal_end_date;
+
+        $now = now();
+
+        // Check if it is within the allowed period
+        if (!($now->greaterThanOrEqualTo($appeal_start_date) && $now->lessThanOrEqualTo($appeal_end_date))) {
+            return response()->json([
+                'message' => 'O período para interpor recurso não está aberto.'
+            ], 403);
+        }
+
+        $appeal = Appeal::create([
+            'application_id' => $request->application_id,
+            'justification' => $request->justification,
+            'status' => 'submitted',
+        ]);
+    
         $appeal->load('documents');
 
         return new AppealResource($appeal);
