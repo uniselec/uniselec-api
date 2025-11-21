@@ -69,7 +69,7 @@ spec:
 
       initContainers:
         - name: mariadb-bootstrap-check
-          image: mariadb:11.3.2
+          image: mariadb:10.6.24
           command:
             - /bin/bash
             - -c
@@ -158,7 +158,7 @@ spec:
 
       containers:
       - name: mariadb
-        image: mariadb:11.3.2
+        image: mariadb:10.6.24
         command:
         - bash
         - -c
