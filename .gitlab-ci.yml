@@ -327,7 +327,7 @@ build:docker:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   before_script:
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Iniciando build Docker..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Iniciando build Docker"
     - |
       echo "${HARBOR_PASSWORD}" | docker login ${HARBOR_REGISTRY} \
         -u "${HARBOR_USERNAME}" \
@@ -338,28 +338,20 @@ build:docker:
         echo "[ERROR] ✗ Falha no Harbor login"
         exit 1
       fi
-    - docker --version
     - cd .
   script:
-    - echo "[INFO] Pull da imagem base"
-    # Definir tags dinamicamente baseado no contexto
     - |
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Tag da imagem docker"
       if [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
-        # build apenas com tag dev (development)
         DOCKER_TAGS="--tag ${DOCKER_IMAGE}:dev"
-        echo "[INFO] Build para DEVELOPMENT: dev"
       elif [[ -n "${CI_COMMIT_TAG}" ]]; then
-        # build com tag específica (production)
-        DOCKER_TAGS="--tag ${DOCKER_IMAGE}:${CI_COMMIT_TAG} --tag ${DOCKER_IMAGE}:latest"
-        echo "[INFO] Build para RELEASE: ${CI_COMMIT_TAG} + latest"
+        DOCKER_TAGS="--tag ${DOCKER_IMAGE}:${CI_COMMIT_TAG}"
       else
-        # build apenas com latest (staging)
         DOCKER_TAGS="--tag ${DOCKER_IMAGE}:latest"
-        echo "[INFO] Build para STAGING: latest"
       fi
 
-    - echo "[INFO] Build da imagem Docker..."
     - |
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Build da imagem docker"
       docker build \
         --no-cache \
         ${DOCKER_TAGS} \
@@ -368,43 +360,39 @@ build:docker:
         --build-arg VERSION=${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}} \
         .
 
-    - echo "[INFO] Scanning de vulnerabilidades..."
     - |
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Scanning de vulnerabilidades"
       if [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
         trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE}:dev || true
+      elif [[ -n "${CI_COMMIT_TAG}" ]]; then
+        trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE}:${CI_COMMIT_TAG} || true
       else
         trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE}:latest || true
       fi
 
-    - echo "[INFO] Push para Harbor registry..."
-
-    # Push dinâmico baseado no contexto
     - |
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Push para Harbor registry"
       if [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
-        # Só build/push com a tag dev para development
         docker push ${DOCKER_IMAGE}:dev
       elif [[ -n "${CI_COMMIT_TAG}" ]]; then
-        # Só build/push com a tag de release para production
         docker push ${DOCKER_IMAGE}:${CI_COMMIT_TAG}
       else
-        # Só build/push como latest para staging
         docker push ${DOCKER_IMAGE}:latest
       fi
 
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Image build e push concluídos"
-    - echo "Tags criadas:"
     - |
       if [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
         echo "  • ${DOCKER_IMAGE}:dev (DEVELOPMENT)"
       elif [[ -n "${CI_COMMIT_TAG}" ]]; then
         echo "  • ${DOCKER_IMAGE}:${CI_COMMIT_TAG} (PRODUCTION)"
-        echo "  • ${DOCKER_IMAGE}:latest (STAGING/PRODUCTION)"
       else
         echo "  • ${DOCKER_IMAGE}:latest (STAGING)"
       fi
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Image build e push concluídos"
   after_script:
-    - echo "[INFO] Limpando credenciais..."
+    - echo "[INFO] Limpeza"
     - docker logout ${HARBOR_REGISTRY} 2>/dev/null || true
+    - docker system prune -f --filter "until=24h"
     - rm -f ~/.docker/config.json
     - rm -f /tmp/.docker-*
   allow_failure: false
