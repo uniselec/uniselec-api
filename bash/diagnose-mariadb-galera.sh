@@ -1,472 +1,350 @@
 #!/bin/bash
-# ============================================================
-# Script para criar Sealed Secrets do projeto UniSelec
-# ============================================================
-# Autor: erivandosena@gmail.com
-# Data: 2025-01-19
-# Versão: 1.0.3
-# ============================================================
+# diagnose-galera-complete.sh
+# Versão ampliada: mantém todo o comportamento original e adiciona testes de latência, flow control,
+# replicação detalhada, testes de carga de inserts/queries concorrentes e distribuição do service.
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
-# Cores
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NAMESPACE="uniselec-api-stg"
+PASSWORD="Password123"
+TEST_DB="uniselec_stag"
+TEST_TABLE="galera_diag_test"
+LB_SERVICE="mariadb-app"
+PODS=(mariadb-0 mariadb-1 mariadb-2)
+LB_TEST_ROUNDS=100
+CONCURRENT_INSERTS=50
+INSERT_ITERATIONS=100
 
-# Diretórios
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-KUSTOMIZE_DIR="${PROJECT_ROOT}/kustomize"
-CERT_FILE="${PROJECT_ROOT}/public-key-cert.pem"
+echo "╔════════════════════════════════════════════════════════════════╗"
+echo "║     Diagnóstico Completo - MariaDB Galera Cluster              ║"
+echo "╚════════════════════════════════════════════════════════════════╝"
+echo ""
 
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+# --- Helpers ---
+kubexec_sql() {
+  # $1 = pod, $2 = SQL (must be quoted)
+  kubectl exec "$1" -n "$NAMESPACE" -- mariadb -u root -p"$PASSWORD" -N -e "$2" 2>/dev/null || true
 }
 
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+kubexec_sh() {
+  # $1 = pod, $2 = comando shell (quoted)
+  kubectl exec "$1" -n "$NAMESPACE" -- sh -c "$2" 2>/dev/null || true
 }
 
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+ms_now() {
+  date +%s%3N
 }
 
-log_step() {
-    echo -e "${BLUE}[STEP]${NC} $1"
+safe_rm_test_table() {
+  for p in "${PODS[@]}"; do
+    kubexec_sql "$p" "DROP TABLE IF EXISTS ${TEST_DB}.${TEST_TABLE};" >/dev/null
+  done
 }
 
-# ============================================================
-# Função: Verificar dependências
-# ============================================================
-check_dependencies() {
-    log_step "Verificando dependências..."
+# Ensure cleanup on exit
+trap 'safe_rm_test_table || true' EXIT
 
-    if ! command -v kubectl &> /dev/null; then
-        log_error "kubectl não encontrado. Instale: https://kubernetes.io/docs/tasks/tools/"
-        exit 1
-    fi
-
-    if ! command -v kubeseal &> /dev/null; then
-        log_error "kubeseal não encontrado. Instale: https://github.com/bitnami-labs/sealed-secrets"
-        exit 1
-    fi
-
-    log_info "Dependências OK ✓"
+# Create test table if DB exists
+create_test_table_if_needed() {
+  # Check DB exists on first pod; if not, skip creating table.
+  local p=${PODS[0]}
+  if kubexec_sql "$p" "SHOW DATABASES;" | grep -q "^${TEST_DB}$"; then
+    kubexec_sql "$p" "CREATE TABLE IF NOT EXISTS ${TEST_DB}.${TEST_TABLE} (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      created TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),
+      payload VARCHAR(255)
+    ) ENGINE=InnoDB;" >/dev/null
+  else
+    echo "   ⚠️  Banco ${TEST_DB} não encontrado em ${p} — pulando criação de tabela de teste."
+  fi
 }
 
-# ============================================================
-# Função: Gerar senha forte
-# ============================================================
-generate_password() {
-    local length=${1:-32}
-    openssl rand -base64 $length | tr -d "=+/" | cut -c1-24
-}
+# --- Main loop por pod (mantendo saída/formatacões originais) ---
+for i in 0 1 2; do
+  POD="mariadb-$i"
 
-# ============================================================
-# Função: Obter certificado público
-# ============================================================
-get_public_cert() {
-    log_step "Obtendo certificado público do Sealed Secrets..."
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "📦 POD: $POD"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    if [ -f "${CERT_FILE}" ]; then
-        log_warn "Certificado público já existe. Reutilizando..."
-        return 0
+  # Info do pod
+  kubectl get pod "$POD" -n "$NAMESPACE" -o wide
+  echo ""
+
+  # 1. Verificar se MariaDB está rodando
+  echo "🔍 Processo MariaDB:"
+  kubectl exec "$POD" -n "$NAMESPACE" -- ps aux | grep -E "mariadbd|mysqld" | grep -v grep | head -3 || true
+  echo ""
+
+  # 2. Portas abertas
+  echo "🔌 Portas Abertas:"
+  kubexec_sh "$POD" "
+    if ! command -v netstat >/dev/null 2>&1 && ! command -v ss >/dev/null 2>&1; then
+      echo '   Instalando ferramentas de rede (silencioso)...'
+      apt-get update >/dev/null 2>&1 && apt-get install -y net-tools >/dev/null 2>&1 || \
+      yum install -y net-tools >/dev/null 2>&1 || \
+      apk add net-tools >/dev/null 2>&1 || \
+      echo '   Não foi possível instalar net-tools'
     fi
 
-    kubeseal --fetch-cert > "${CERT_FILE}"
-
-    if [ ! -f "${CERT_FILE}" ]; then
-        log_error "Falha ao obter certificado público"
-        exit 1
+    if command -v ss >/dev/null 2>&1; then
+      ss -tlnp | grep -E '3306|4567|4444|4568' || echo '   Portas não encontradas (ss)'
+    elif command -v netstat >/dev/null 2>&1; then
+      netstat -tlnp 2>/dev/null | grep -E '3306|4567|4444|4568' || echo '   Portas não encontradas (netstat)'
+    else
+      echo '   Ferramentas de rede não disponíveis'
     fi
+  "
+  echo ""
 
-    log_info "Certificado público obtido: ${CERT_FILE}"
-}
+  # 3. Teste de conexão
+  echo "✅ Teste de Conexão:"
+  if kubexec_sql "$POD" "SELECT 'OK' as status;" | grep -q "OK"; then
+    echo "   ✅ Conexão bem-sucedida"
+  else
+    echo "   ❌ Falha na conexão"
+  fi
+  echo ""
 
-# ============================================================
-# Função: Criar Sealed Secret para Docker Registry
-# ============================================================
-create_regcred_sealed_secret() {
-    log_step "Criando Sealed Secret do Docker Registry (cluster-wide)..."
+  # 4. Status CRÍTICO do Galera
+  echo "🌐 Status Galera (CRÍTICO):"
+  kubexec_sql "$POD" "
+    SELECT CONCAT('   wsrep_cluster_size: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_cluster_size'
+    UNION ALL
+    SELECT CONCAT('   wsrep_cluster_status: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_cluster_status'
+    UNION ALL
+    SELECT CONCAT('   wsrep_local_state_comment: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_local_state_comment'
+    UNION ALL
+    SELECT CONCAT('   wsrep_ready: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_ready'
+    UNION ALL
+    SELECT CONCAT('   wsrep_connected: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_connected'
+    UNION ALL
+    SELECT CONCAT('   wsrep_local_state: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_local_state'
+    UNION ALL
+    SELECT CONCAT('   wsrep_evs_state: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_evs_state';
+  "
+  echo ""
 
-    echo ""
-    log_info "=== Credenciais do Docker Registry ==="
+  # 4b. Métricas avançadas do Galera (flow control, cert failures, incoming addresses, last committed, sst donor)
+  echo "🔎 Métricas Galera detalhadas:"
+  kubexec_sql "$POD" "
+    SELECT CONCAT('   wsrep_flow_control_paused: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_flow_control_paused' UNION ALL
+    SELECT CONCAT('   wsrep_flow_control_sent: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_flow_control_sent' UNION ALL
+    SELECT CONCAT('   wsrep_flow_control_recv: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_flow_control_recv' UNION ALL
+    SELECT CONCAT('   wsrep_local_cert_failures: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_local_cert_failures' UNION ALL
+    SELECT CONCAT('   wsrep_local_bf_aborts: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_local_bf_aborts' UNION ALL
+    SELECT CONCAT('   wsrep_last_committed: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_last_committed' UNION ALL
+    SELECT CONCAT('   wsrep_incoming_addresses: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_incoming_addresses' UNION ALL
+    SELECT CONCAT('   wsrep_sst_donor: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_sst_donor' UNION ALL
+    SELECT CONCAT('   wsrep_evs_repl_latency: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_evs_repl_latency';
+  " 2>/dev/null || true
+  echo ""
 
-    read -p "Digite o Docker Registry Server (padrão: dti-registro.unilab.edu.br): " DOCKER_SERVER
-    DOCKER_SERVER=${DOCKER_SERVER:-dti-registro.unilab.edu.br}
+  # 5. Conexões ativas
+  echo "📊 Conexões Ativas:"
+  kubexec_sql "$POD" "SELECT CONCAT('   Total: ', COUNT(*)) FROM information_schema.PROCESSLIST;" 2>/dev/null
+  echo ""
 
-    read -p "Digite o Docker Registry Username: " DOCKER_USERNAME
-    if [ -z "$DOCKER_USERNAME" ]; then
-        log_error "Username é obrigatório!"
-        return 1
+  # 6. Bancos de dados
+  echo "🗄️  Bancos de Dados:"
+  kubexec_sql "$POD" "SHOW DATABASES;" 2>/dev/null | grep -E "uniselec|Database" | sed 's/^/   /' || true
+  echo ""
+
+  # 7. Tabelas no banco uniselec_stag (se existir)
+  echo "📋 Tabelas em uniselec_stag:"
+  kubexec_sql "$POD" "SELECT COUNT(*) as total_tables FROM information_schema.TABLES WHERE TABLE_SCHEMA='${TEST_DB}';" 2>/dev/null | sed 's/^/   /' || true
+  echo ""
+
+  # 8. Tamanho dos dados
+  echo "💾 Tamanho dos Dados:"
+  kubexec_sql "$POD" "SELECT CONCAT('   ', TABLE_SCHEMA, ': ', ROUND(SUM(data_length + index_length) / 1024 / 1024, 2), ' MB') FROM information_schema.TABLES WHERE TABLE_SCHEMA IN ('${TEST_DB}', 'uniselec_prod') GROUP BY TABLE_SCHEMA;" 2>/dev/null || true
+  echo ""
+
+  # 9. Latência de conectividade entre este nó e os outros nós (ping)
+  echo "📡 Latência de rede entre nós (ping - 4 pacotes):"
+  for target in "${PODS[@]}"; do
+    if [ "$target" != "$POD" ]; then
+      echo -n "   $POD -> $target : "
+      kubexec_sh "$POD" "ping -c 4 ${target} 2>/dev/null | awk -F'/' '/rtt/ {print \"rtt avg=\"\$5\" ms\"} END{if (!found) print \"ping falhou ou ICMP bloqueado\"}'" || kubexec_sh "$POD" "echo 'ping indisponível no container'"
     fi
+  done
+  echo ""
 
-    read -sp "Digite o Docker Registry Password: " DOCKER_PASSWORD
-    echo ""
-    if [ -z "$DOCKER_PASSWORD" ]; then
-        log_error "Password é obrigatório!"
-        return 1
-    fi
+  # 10. RTT de uma query simples (medição cliente-side): SELECT 1
+  echo "⏱️ RTT de uma query simples (SELECT 1) medida no cliente (ms):"
+  START_MS=$(ms_now)
+  kubexec_sql "$POD" "SELECT 1;" >/dev/null
+  END_MS=$(ms_now)
+  ELAPSED=$((END_MS - START_MS))
+  echo "   Tempo de ida e volta (cliente) para SELECT 1: ${ELAPSED} ms"
+  echo ""
 
-    read -p "Digite o Docker Registry Email (padrão: devops@unilab.edu.br): " DOCKER_EMAIL
-    DOCKER_EMAIL=${DOCKER_EMAIL:-devops@unilab.edu.br}
+  # 11. Ver variáveis wsrep específicas adicionais por segurança / diagnóstico
+  echo "🔧 Variáveis adicionais (locks/flow/queus etc) — amostra:"
+  kubexec_sql "$POD" "SHOW VARIABLES LIKE 'wsrep%';" | sed 's/^/   /' | head -n 40 || true
+  echo ""
 
-    # Criar .dockerconfigjson
-    DOCKER_AUTH=$(echo -n "${DOCKER_USERNAME}:${DOCKER_PASSWORD}" | base64 -w 0)
-    DOCKER_CONFIG_JSON=$(cat <<EOF
-{
-  "auths": {
-    "${DOCKER_SERVER}": {
-      "username": "${DOCKER_USERNAME}",
-      "password": "${DOCKER_PASSWORD}",
-      "email": "${DOCKER_EMAIL}",
-      "auth": "${DOCKER_AUTH}"
-    }
-  }
-}
-EOF
-)
+done
 
-    # Criar Secret temporário em memória e selar diretamente
-    local OUTPUT_FILE="${KUSTOMIZE_DIR}/base/sealed-secret-regcred.yaml"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🌐 SERVICES & ENDPOINTS"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+kubectl get svc,endpoints -n "$NAMESPACE" | grep mariadb || true
+echo ""
 
-    cat << EOF | kubeseal --format=yaml --cert="${CERT_FILE}" > "$OUTPUT_FILE"
-apiVersion: v1
-kind: Secret
-metadata:
-  name: regcred
-  annotations:
-    sealedsecrets.bitnami.com/cluster-wide: "true"
-type: kubernetes.io/dockerconfigjson
-data:
-  .dockerconfigjson: $(echo -n "$DOCKER_CONFIG_JSON" | base64 -w 0)
-EOF
+# --- Testes de conectividade via service (ampliado) ---
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🧪 TESTE DE CONECTIVIDADE VIA SERVICE (${LB_TEST_ROUNDS} rodadas)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 
-    log_info "Sealed secret criado: $OUTPUT_FILE"
+echo "Testando ${LB_SERVICE} (service principal):"
 
-    # Salvar credenciais
-    local PASS_FILE="${PROJECT_ROOT}/passwords-regcred.txt"
-    cat > "$PASS_FILE" << EOF
-# ============================================================
-# CREDENCIAIS DO DOCKER REGISTRY (CLUSTER-WIDE)
-# Geradas em: $(date)
-# ============================================================
+declare -A LB_COUNT
+for p in "${PODS[@]}"; do
+  LB_COUNT["$p"]=0
+done
 
-DOCKER_SERVER=${DOCKER_SERVER}
-DOCKER_USERNAME=${DOCKER_USERNAME}
-DOCKER_PASSWORD=${DOCKER_PASSWORD}
-DOCKER_EMAIL=${DOCKER_EMAIL}
-EOF
+for i in $(seq 1 $LB_TEST_ROUNDS); do
+  # obtém o hostname onde a conexão foi atendida
+  POD_NAME=$(kubectl run mysql-test-$RANDOM --rm -i --restart=Never --image=mariadb:10.6.24 -n "$NAMESPACE" -- \
+    mariadb -h "$LB_SERVICE" -u root -p"$PASSWORD" -N -e "SELECT @@hostname;" 2>/dev/null || echo "UNREACHABLE")
+  echo "   Tentativa $i: Conectado em $POD_NAME"
+  if [[ " ${PODS[*]} " =~ " ${POD_NAME} " ]]; then
+    LB_COUNT["$POD_NAME"]=$((LB_COUNT["$POD_NAME"] + 1))
+  else
+    LB_COUNT["_other"]=$((LB_COUNT["_other"] + 1))
+  fi
+  sleep 0.1
+done
 
-    chmod 600 "$PASS_FILE"
-    log_warn "Credenciais salvas em: $PASS_FILE"
-}
+echo ""
+echo "Distribuição das conexões via ${LB_SERVICE}:"
+for p in "${PODS[@]}"; do
+  count=${LB_COUNT["$p"]:-0}
+  percent=$(awk -v c="$count" -v t="$LB_TEST_ROUNDS" 'BEGIN{if(t==0){print "0.00"} else printf("%.2f", (c/t)*100)}')
+  echo "   $p: $count (${percent}%)"
+done
+other=${LB_COUNT["_other"]:-0}
+if [ "$other" -gt 0 ]; then
+  percent=$(awk -v c="$other" -v t="$LB_TEST_ROUNDS" 'BEGIN{printf("%.2f", (c/t)*100)}')
+  echo "   Outros/erros: $other (${percent}%)"
+fi
+echo ""
 
-# ============================================================
-# Função: Criar Sealed Secret Base do MariaDB
-# ============================================================
-create_mariadb_base_sealed_secret() {
-    log_step "Criando Sealed Secret base do MariaDB (cluster-wide)..."
+# --- Cria tabela de teste (se possível) para benchmarks ---
+create_test_table_if_needed
 
-    # Solicitar senhas
-    echo ""
-    read -sp "Digite a senha do MYSQL_ROOT_PASSWORD (ou Enter para gerar): " MYSQL_ROOT_PASS
-    echo ""
-    if [ -z "$MYSQL_ROOT_PASS" ]; then
-        MYSQL_ROOT_PASS=$(generate_password)
-        log_info "MYSQL_ROOT_PASSWORD gerada: $MYSQL_ROOT_PASS"
-    fi
+# --- Benchmark simples: medição de inserts e selects sequenciais e concorrentes ---
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "⚙️  Benchmark de inserts e selects (medições simples)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 
-    read -sp "Digite a senha do MYSQL_PASSWORD (ou Enter para gerar): " MYSQL_PASS
-    echo ""
-    if [ -z "$MYSQL_PASS" ]; then
-        MYSQL_PASS=$(generate_password)
-        log_info "MYSQL_PASSWORD gerada: $MYSQL_PASS"
-    fi
+# 1) Latência média de INSERT sequencial (INSERT_ITERATIONS)
+echo "→ Medindo INSERT sequencial (${INSERT_ITERATIONS} inserts) no service ${LB_SERVICE}:"
+total_ms=0
+successes=0
+for i in $(seq 1 $INSERT_ITERATIONS); do
+  START=$(ms_now)
+  kubectl run mysql-ins-$RANDOM --rm -i --restart=Never --image=mariadb:10.6.24 -n "$NAMESPACE" -- \
+    mariadb -h "$LB_SERVICE" -u root -p"$PASSWORD" -N -e "INSERT INTO ${TEST_DB}.${TEST_TABLE} (payload) VALUES (UUID());" >/dev/null 2>&1 && OK=1 || OK=0
+  END=$(ms_now)
+  if [ "$OK" -eq 1 ]; then
+    elapsed=$((END - START))
+    total_ms=$((total_ms + elapsed))
+    successes=$((successes + 1))
+  fi
+done
 
-    read -sp "Digite a senha do SST_PASSWORD (ou Enter para gerar): " SST_PASS
-    echo ""
-    if [ -z "$SST_PASS" ]; then
-        SST_PASS=$(generate_password)
-        log_info "SST_PASSWORD gerada: $SST_PASS"
-    fi
+if [ "$successes" -gt 0 ]; then
+  avg_insert=$(awk -v s="$total_ms" -v c="$successes" 'BEGIN{printf("%.2f", s/c)}')
+  echo "   Inserts bem-sucedidos: ${successes}/${INSERT_ITERATIONS}, latência média: ${avg_insert} ms"
+else
+  echo "   Nenhum insert bem-sucedido nos testes sequenciais."
+fi
+echo ""
 
-    # Criar Sealed Secret diretamente
-    local OUTPUT_FILE="${KUSTOMIZE_DIR}/base/mariadb/sealed-secret-mariadb.yaml"
+# 2) SELECT simples latência (100 queries)
+echo "→ Medindo SELECT simples (100 queries, SELECT id,payload ORDER BY id DESC LIMIT 10):"
+SEL_ROUNDS=100
+total_sel_ms=0
+sel_success=0
+for i in $(seq 1 $SEL_ROUNDS); do
+  START=$(ms_now)
+  kubectl run mysql-sel-$RANDOM --rm -i --restart=Never --image=mariadb:10.6.24 -n "$NAMESPACE" -- \
+    mariadb -h "$LB_SERVICE" -u root -p"$PASSWORD" -N -e "SELECT id,payload FROM ${TEST_DB}.${TEST_TABLE} ORDER BY id DESC LIMIT 10;" >/dev/null 2>&1 && OK=1 || OK=0
+  END=$(ms_now)
+  if [ "$OK" -eq 1 ]; then
+    elapsed=$((END - START))
+    total_sel_ms=$((total_sel_ms + elapsed))
+    sel_success=$((sel_success + 1))
+  fi
+done
 
-    cat << EOF | kubeseal --format=yaml --cert="${CERT_FILE}" > "$OUTPUT_FILE"
-apiVersion: v1
-kind: Secret
-metadata:
-  name: mariadb-secret-env
-  annotations:
-    sealedsecrets.bitnami.com/cluster-wide: "true"
-type: Opaque
-stringData:
-  MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASS}"
-  MYSQL_PASSWORD: "${MYSQL_PASS}"
-  SST_PASSWORD: "${SST_PASS}"
-  SST_USER: "sstuser"
-  MARIADB_REPLICATION_PASSWORD: "${MYSQL_ROOT_PASS}"
-EOF
+if [ "$sel_success" -gt 0 ]; then
+  avg_sel=$(awk -v s="$total_sel_ms" -v c="$sel_success" 'BEGIN{printf("%.2f", s/c)}')
+  echo "   SELECTs bem-sucedidos: ${sel_success}/${SEL_ROUNDS}, latência média: ${avg_sel} ms"
+else
+  echo "   Nenhum SELECT bem-sucedido nos testes."
+fi
+echo ""
 
-    log_info "Sealed secret criado: $OUTPUT_FILE"
-
-    # Salvar senhas em arquivo seguro
-    local PASS_FILE="${PROJECT_ROOT}/passwords-mariadb-base.txt"
-    cat > "$PASS_FILE" << EOF
-# ============================================================
-# SENHAS DO MARIADB BASE (CLUSTER-WIDE)
-# Geradas em: $(date)
-# ============================================================
-# ATENÇÃO: Guarde este arquivo em local seguro!
-# ============================================================
-
-MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASS}
-MYSQL_PASSWORD=${MYSQL_PASS}
-SST_PASSWORD=${SST_PASS}
-SST_USER=sstuser
-MARIADB_REPLICATION_PASSWORD=${MYSQL_ROOT_PASS}
-EOF
-
-    chmod 600 "$PASS_FILE"
-    log_warn "Senhas salvas em: $PASS_FILE"
-}
-
-# ============================================================
-# Função: Criar Sealed Secret do MariaDB por ambiente
-# ============================================================
-create_mariadb_env_sealed_secret() {
-    local ENVIRONMENT=$1
-    local NAMESPACE=$2
-
-    log_step "Criando Sealed Secret do MariaDB para $ENVIRONMENT..."
-
-    # Solicitar senhas
-    echo ""
-    log_info "=== Senhas para $ENVIRONMENT ==="
-
-    read -sp "Digite DB_PASSWORD (root) (ou Enter para gerar): " DB_PASS
-    echo ""
-    if [ -z "$DB_PASS" ]; then
-        DB_PASS=$(generate_password)
-        log_info "DB_PASSWORD gerada: $DB_PASS"
-    fi
-
-    read -sp "Digite MYSQL_ROOT_PASSWORD (ou Enter usar DB_PASSWORD): " MYSQL_ROOT_PASS
-    echo ""
-    if [ -z "$MYSQL_ROOT_PASS" ]; then
-        MYSQL_ROOT_PASS="$DB_PASS"
-        log_info "MYSQL_ROOT_PASSWORD = DB_PASSWORD"
-    fi
-
-    read -sp "Digite MYSQL_PASSWORD (user app) (ou Enter para gerar): " MYSQL_PASS
-    echo ""
-    if [ -z "$MYSQL_PASS" ]; then
-        MYSQL_PASS=$(generate_password)
-        log_info "MYSQL_PASSWORD gerada: $MYSQL_PASS"
-    fi
-
-    read -p "Digite MYSQL_USER (padrão: uniselec_${ENVIRONMENT}_user): " MYSQL_USER
-    if [ -z "$MYSQL_USER" ]; then
-        case $ENVIRONMENT in
-            staging)
-                MYSQL_USER="uniselec_stag_user"
-                ;;
-            production)
-                MYSQL_USER="uniselec_prod_user"
-                ;;
-        esac
-        log_info "MYSQL_USER: $MYSQL_USER"
-    fi
-
-    read -sp "Digite SST_PASSWORD (ou Enter para gerar): " SST_PASS
-    echo ""
-    if [ -z "$SST_PASS" ]; then
-        SST_PASS=$(generate_password)
-        log_info "SST_PASSWORD gerada: $SST_PASS"
-    fi
-
-    # Criar Sealed Secret diretamente
-    local OUTPUT_DIR="${KUSTOMIZE_DIR}/overlays/${ENVIRONMENT}"
-    local OUTPUT_FILE="${OUTPUT_DIR}/sealed-secret-mariadb-credentials.yaml"
-
-    cat << EOF | kubeseal --format=yaml --cert="${CERT_FILE}" > "$OUTPUT_FILE"
-apiVersion: v1
-kind: Secret
-metadata:
-  name: mariadb-credentials
-  namespace: ${NAMESPACE}
-  annotations:
-    sealedsecrets.bitnami.com/namespace-wide: "true"
-type: Opaque
-stringData:
-  DB_USERNAME: "root"
-  DB_PASSWORD: "${DB_PASS}"
-  MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASS}"
-  MYSQL_PASSWORD: "${MYSQL_PASS}"
-  MYSQL_USER: "${MYSQL_USER}"
-  SST_PASSWORD: "${SST_PASS}"
-EOF
-
-    log_info "Sealed secret criado: $OUTPUT_FILE"
-
-    # Salvar senhas
-    local PASS_FILE="${PROJECT_ROOT}/passwords-mariadb-${ENVIRONMENT}.txt"
-    cat > "$PASS_FILE" << EOF
-# ============================================================
-# SENHAS DO MARIADB - ${ENVIRONMENT^^}
-# Namespace: ${NAMESPACE}
-# Geradas em: $(date)
-# ============================================================
-
-DB_USERNAME=root
-DB_PASSWORD=${DB_PASS}
-MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASS}
-MYSQL_PASSWORD=${MYSQL_PASS}
-MYSQL_USER=${MYSQL_USER}
-SST_PASSWORD=${SST_PASS}
-EOF
-
-    chmod 600 "$PASS_FILE"
-    log_warn "Senhas salvas em: $PASS_FILE"
-}
-
-# ============================================================
-# Função: Criar Sealed Secret do Laravel
-# ============================================================
-create_laravel_sealed_secret() {
-    local ENVIRONMENT=$1
-    local NAMESPACE=$2
-
-    log_step "Criando Sealed Secret do Laravel para $ENVIRONMENT..."
-
-    echo ""
-    read -p "Digite APP_KEY do Laravel (ou Enter para gerar): " APP_KEY
-    if [ -z "$APP_KEY" ]; then
-        # Gerar APP_KEY no formato Laravel
-        APP_KEY="base64:$(openssl rand -base64 32)"
-        log_info "APP_KEY gerada: $APP_KEY"
-    fi
-
-    # Criar Sealed Secret diretamente
-    local OUTPUT_DIR="${KUSTOMIZE_DIR}/overlays/${ENVIRONMENT}"
-    local OUTPUT_FILE="${OUTPUT_DIR}/sealed-secret-laravel-secrets.yaml"
-
-    cat << EOF | kubeseal --format=yaml --cert="${CERT_FILE}" > "$OUTPUT_FILE"
-apiVersion: v1
-kind: Secret
-metadata:
-  name: laravel-secrets
-  namespace: ${NAMESPACE}
-  annotations:
-    sealedsecrets.bitnami.com/namespace-wide: "true"
-type: Opaque
-stringData:
-  APP_KEY: "${APP_KEY}"
-EOF
-
-    log_info "Sealed secret criado: $OUTPUT_FILE"
-
-    # Salvar APP_KEY
-    local PASS_FILE="${PROJECT_ROOT}/passwords-laravel-${ENVIRONMENT}.txt"
-    cat > "$PASS_FILE" << EOF
-# ============================================================
-# APP_KEY DO LARAVEL - ${ENVIRONMENT^^}
-# Namespace: ${NAMESPACE}
-# Gerada em: $(date)
-# ============================================================
-
-APP_KEY=${APP_KEY}
-EOF
-
-    chmod 600 "$PASS_FILE"
-    log_warn "APP_KEY salva em: $PASS_FILE"
-}
-
-# ============================================================
-# Menu principal
-# ============================================================
-show_menu() {
-    echo ""
-    echo "=========================================="
-    echo "  Criar Sealed Secrets - UniSelec"
-    echo "=========================================="
-    echo "1. Criar Sealed Secret REGCRED (cluster-wide)"
-    echo "2. Criar Sealed Secret BASE do MariaDB (cluster-wide)"
-    echo "3. Criar Sealed Secrets para STAGING"
-    echo "4. Criar Sealed Secrets para PRODUCTION"
-    echo "5. Criar TODOS os Sealed Secrets (base + ambientes)"
-    echo "6. Apenas obter certificado público"
-    echo "0. Sair"
-    echo "=========================================="
-}
-
-# ============================================================
-# Main
-# ============================================================
-main() {
-    log_info "=== Criador de Sealed Secrets - UniSelec ==="
-
-    check_dependencies
-
-    while true; do
-        show_menu
-        read -p "Escolha uma opção: " choice
-
-        case $choice in
-            1)
-                get_public_cert
-                create_regcred_sealed_secret
-                log_info "✅ Sealed Secret REGCRED criado com sucesso!"
-                ;;
-            2)
-                get_public_cert
-                create_mariadb_base_sealed_secret
-                log_info "✅ Sealed Secret BASE do MariaDB criado com sucesso!"
-                ;;
-            3)
-                get_public_cert
-                create_mariadb_env_sealed_secret "staging" "uniselec-api-stg"
-                create_laravel_sealed_secret "staging" "uniselec-api-stg"
-                log_info "✅ Sealed Secrets STAGING criados com sucesso!"
-                ;;
-            4)
-                get_public_cert
-                create_mariadb_env_sealed_secret "production" "uniselec-api"
-                create_laravel_sealed_secret "production" "uniselec-api"
-                log_info "✅ Sealed Secrets PRODUCTION criados com sucesso!"
-                ;;
-            5)
-                get_public_cert
-                create_regcred_sealed_secret
-                create_mariadb_base_sealed_secret
-                create_mariadb_env_sealed_secret "staging" "uniselec-api-stg"
-                create_laravel_sealed_secret "staging" "uniselec-api-stg"
-                create_mariadb_env_sealed_secret "production" "uniselec-api"
-                create_laravel_sealed_secret "production" "uniselec-api"
-                log_info "✅ TODOS os Sealed Secrets criados com sucesso!"
-                ;;
-            6)
-                get_public_cert
-                ;;
-            0)
-                log_info "Saindo..."
-                exit 0
-                ;;
-            *)
-                log_error "Opção inválida"
-                ;;
-        esac
-
-        echo ""
-        read -p "Pressione Enter para continuar..."
+# 3) Teste de inserts concorrentes (CONCURRENT_INSERTS workers, cada um com INSERT_ITERATIONS/CONCURRENT_INSERTS inserts)
+echo "→ Teste de inserts concorrentes: ${CONCURRENT_INSERTS} workers (cada worker fará ~$(awk -v a="$INSERT_ITERATIONS" -v b="$CONCURRENT_INSERTS" 'BEGIN{printf("%d", a/b)}') inserts)"
+pids=()
+start_total=$(ms_now)
+for w in $(seq 1 $CONCURRENT_INSERTS); do
+  (
+    for j in $(seq 1 $(awk -v a="$INSERT_ITERATIONS" -v b="$CONCURRENT_INSERTS" 'BEGIN{printf("%d", a/b)}')); do
+      kubectl run mysql-par-$RANDOM --rm -i --restart=Never --image=mariadb:10.6.24 -n "$NAMESPACE" -- \
+        mariadb -h "$LB_SERVICE" -u root -p"$PASSWORD" -N -e "INSERT INTO ${TEST_DB}.${TEST_TABLE} (payload) VALUES (UUID());" >/dev/null 2>&1 || true
     done
-}
+  ) &
+  pids+=($!)
+done
 
-# Executar
-cd "$PROJECT_ROOT"
-main
+# wait for all
+for pid in "${pids[@]}"; do
+  wait "$pid" || true
+done
+end_total=$(ms_now)
+elapsed_total=$((end_total - start_total))
+echo "   Teste de concorrência finalizado em ${elapsed_total} ms (wall-clock)."
+echo ""
+
+# --- Verificação de conflitos/aborts/amostras após carga ---
+echo "🔔 Checando conflitos/aborts e flow control após carga:"
+for p in "${PODS[@]}"; do
+  echo "   Nodo: $p"
+  kubexec_sql "$p" "SELECT CONCAT('      wsrep_local_cert_failures: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_local_cert_failures';"
+  kubexec_sql "$p" "SELECT CONCAT('      wsrep_local_bf_aborts: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_local_bf_aborts';"
+  kubexec_sql "$p" "SELECT CONCAT('      wsrep_flow_control_paused: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_flow_control_paused';"
+done
+echo ""
+
+# --- Resumo do cluster (mantendo a parte original) ---
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📊 RESUMO DO CLUSTER"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+kubectl run mysql-summary --rm -i --restart=Never --image=mariadb:10.6.24 -n "$NAMESPACE" -- \
+  mariadb -h "$LB_SERVICE" -u root -p"$PASSWORD" -e "
+    SELECT
+      '=== CLUSTER STATUS ===' as '';
+    SELECT
+      @@hostname as 'Connected to Pod',
+      @@server_id as 'Server ID',
+      (SELECT VARIABLE_VALUE FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_cluster_size') as 'Cluster Size',
+      (SELECT VARIABLE_VALUE FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_local_state_comment') as 'Node State',
+      (SELECT VARIABLE_VALUE FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_cluster_status') as 'Cluster Status';
+  " 2>/dev/null || true
+
+echo ""
+echo "╔════════════════════════════════════════════════════════════════╗"
+echo "║                    Diagnóstico Concluído                       ║"
+echo "╚════════════════════════════════════════════════════════════════╝"

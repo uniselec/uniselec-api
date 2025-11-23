@@ -20,7 +20,6 @@ IFS=$'\n\t'
 # ✔ dig e nslookup
 # ✔ top + metrics
 
-
 ENV="${1:-dev}"   # dev | stg | prd
 HAPROXY_HOST="${HAPROXY_HOST:-10.130.0.60}"
 SSH_PORT="${SSH_PORT:-37389}"

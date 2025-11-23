@@ -252,10 +252,11 @@ spec:
         resources:
           requests:
             cpu: "500m"
-            memory: "512Mi"
+            memory: "2Gi"
           limits:
             cpu: "2"
-            memory: "3Gi"
+            memory: "4Gi"
+
         securityContext:
           runAsUser: 0
           runAsGroup: 0

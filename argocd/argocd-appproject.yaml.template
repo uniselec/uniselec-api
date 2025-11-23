@@ -9,7 +9,6 @@ metadata:
 spec:
   description: "Projeto para o App ${APP_NAME}-${DEPLOY_ENV} no ambiente ${DEPLOY_ENV}."
 
-  # Repositórios permitidos
   sourceRepos:
     - ${REPO_URL}
 
