@@ -1,10 +1,10 @@
-# ════════════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
 # GitLab CI/CD Pipeline - GitOps
-# ════════════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
 # Padrões: GitLab CE CI/CD, GitOps, Kubernetes Best Practices
-# Arquitetura: K8S (Main/Hub ArgoCD) → K8S (Remote/Workloads)
+# Arquitetura: K8S (Main/Hub ArgoCD), K8S (Remote/Workloads)
 # Projeto: cicd-gitops
-# ════════════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
 
 stages:
   - validate
@@ -17,28 +17,34 @@ stages:
   - production
   - notify
 
-# Variáveis Globais
+# Globais
 variables:
+  # Projeto
+  APP_NAME: uniselec-api
+  GIT_BRANCH: "main"
+  # Repositório Git
   REPO_URL: "https://dti-gitlab.unilab.edu.br/dti/uniselec-api.git"
   REPO_DOMAIN: "dti-gitlab.unilab.edu.br"
   REPO_PATH: "dti/uniselec-api"
-  GIT_BRANCH: "main"
   GIT_AUTHOR_NAME: "GitLab CI"
   GIT_AUTHOR_EMAIL: "gitlab-ci@unilab.edu.br"
-  APP_NAME: uniselec-api
-  DOMAIN_DEV: uniselec-api-development.unilab.edu.br
-  DOMAIN_STAG: uniselec-api-staging.unilab.edu.br
-  DOMAIN_PROD: uniselec-api.unilab.edu.br
-  HARBOR_REGISTRY: dti-registro.unilab.edu.br
+  # Domínios
+  DOMAIN_DEV: "uniselec-api-development.unilab.edu.br"
+  DOMAIN_STAG: "uniselec-api-staging.unilab.edu.br"
+  DOMAIN_PROD: "uniselec-api.unilab.edu.br"
+  # Container Registry
+  HARBOR_REGISTRY: "dti-registro.unilab.edu.br"
   DOCKER_IMAGE: "${HARBOR_REGISTRY}/unilab/${APP_NAME}"
-  ARGOCD_SERVER: argocd.unilab.edu.br
-  CLUSTER_REMOTE1_DOMAIN: 10.130.0.45
-  KUBECONFIG: /tmp/kubeconfig-${CI_PIPELINE_ID}
-  MAIL_PRD: jefponte@unilab.edu.br
-  ARGOCD_TIMEOUT: 600
-  BASE_IMAGE: dti-registro.unilab.edu.br/unilab/ubuntu-k8s-tools:latest
+  BASE_IMAGE: "dti-registro.unilab.edu.br/unilab/ubuntu-k8s-tools:latest"
+  # Kubernetes/ArgoCD
+  ARGOCD_SERVER: "argocd.unilab.edu.br"
+  CLUSTER_REMOTE1_DOMAIN: "10.130.0.45"
+  KUBECONFIG: "/tmp/kubeconfig-${CI_PIPELINE_ID}"
+  ARGOCD_TIMEOUT: "600"
+  # Notificação
+  MAIL_PRD: "jefponte@unilab.edu.br"
 
-# STAGE: Validate
+# STAGE 1
 validate:environment:
   stage: validate
   image: ${BASE_IMAGE}
@@ -54,63 +60,62 @@ validate:environment:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   script:
-    - echo "[INFO] Validando ambiente e pré-requisitos..."
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [CHECK] Verificando variáveis críticas"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Validando ambiente e pré-requisitos"
     - |
       ERRORS=0
 
-      # Variáveis Git
+      # Git
       if [[ -z "${TOKEN_PAT_NAME}" ]]; then
-        echo "[ERROR] ✗ TOKEN_PAT_NAME não está definida"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] TOKEN_PAT_NAME não está definida"
         ERRORS=$((ERRORS+1))
       else
-        echo "[OK] ✓ TOKEN_PAT_NAME presente"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] TOKEN_PAT_NAME presente"
       fi
 
       if [[ -z "${TOKEN_PAT_ACCESS}" ]]; then
-        echo "[ERROR] ✗ TOKEN_PAT_ACCESS não está definida"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] TOKEN_PAT_ACCESS não está definida"
         ERRORS=$((ERRORS+1))
       else
-        echo "[OK] ✓ TOKEN_PAT_ACCESS presente"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] TOKEN_PAT_ACCESS presente"
       fi
 
-      # Variáveis Kubernetes
+      # Kubernetes
       if [[ -z "${KUBECONFIG_C2}" ]]; then
-        echo "[ERROR] ✗ KUBECONFIG_C2 não está definida"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] KUBECONFIG_C2 não está definida"
         ERRORS=$((ERRORS+1))
       else
-        echo "[OK] ✓ KUBECONFIG_C2 presente"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] KUBECONFIG_C2 presente"
       fi
 
-      # Variáveis Harbor
+      # Harbor
       if [[ -z "${HARBOR_USERNAME}" ]]; then
-        echo "[ERROR] ✗ HARBOR_USERNAME não está definida"
+        echo "[ERROR] HARBOR_USERNAME não está definida"
         ERRORS=$((ERRORS+1))
       else
-        echo "[OK] ✓ HARBOR_USERNAME presente"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] HARBOR_USERNAME presente"
       fi
 
       if [[ -z "${HARBOR_PASSWORD}" ]]; then
-        echo "[ERROR] ✗ HARBOR_PASSWORD não está definida"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] HARBOR_PASSWORD não está definida"
         ERRORS=$((ERRORS+1))
       else
-        echo "[OK] ✓ HARBOR_PASSWORD presente"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] HARBOR_PASSWORD presente"
       fi
 
-      # Variáveis SonarQube
+      # SonarQube
       if [[ -z "${SONAR_TOKEN}" ]]; then
-        echo "[ERROR] ✗ SONAR_TOKEN não está definida"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] SONAR_TOKEN não está definida"
         ERRORS=$((ERRORS+1))
       else
-        echo "[OK] ✓ SONAR_TOKEN presente"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] SONAR_TOKEN presente"
       fi
 
       if [[ $ERRORS -gt 0 ]]; then
-        echo "[ERROR] ✗ $ERRORS variáveis críticas faltando!"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] $ERRORS variáveis críticas faltando!"
         exit 1
       fi
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Todas as variáveis críticas estão presentes"
 
+# STAGE 2
 validate:kustomize:
   stage: validate
   image: ${BASE_IMAGE}
@@ -126,23 +131,21 @@ validate:kustomize:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   script:
-    - echo "[INFO] Validando kustomize overlays..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Validando kustomize overlays"
     - |
       if [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [CHECK] Development overlay"
         kubectl kustomize kustomize/overlays/development -o yaml > /tmp/development-manifest.yaml
-        echo "[OK] ✓ Development overlay valid"
       fi
     - |
       if [[ "$CI_COMMIT_BRANCH" == "main" ]] || [[ -n "$CI_COMMIT_TAG" ]]; then
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [CHECK] Staging overlay"
         kubectl kustomize kustomize/overlays/staging -o yaml > /tmp/staging-manifest.yaml
-        echo "[OK] ✓ Staging overlay valid"
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [CHECK] Production overlay"
         kubectl kustomize kustomize/overlays/production -o yaml > /tmp/production-manifest.yaml
-        echo "[OK] ✓ Production overlay valid"
       fi
 
+# STAGE 3
 validate:docker:
   stage: validate
   image: ${BASE_IMAGE}
@@ -158,12 +161,12 @@ validate:docker:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   script:
-    - echo "[INFO] Validando Dockerfile..."
-    - docker build --help > /dev/null 2>&1 && echo "[OK] ✓ Docker CLI disponível"
-    - test -f ./Dockerfile && echo "[OK] ✓ Dockerfile encontrado"
-    - docker run --rm -i hadolint/hadolint < ./Dockerfile && echo "[OK] ✓ Dockerfile lint passed" || true
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Validando Dockerfile"
+    - docker build --help > /dev/null 2>&1 && echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Docker CLI disponível"
+    - test -f ./Dockerfile && echo "[OK] Dockerfile encontrado"
+    - docker run --rm -i hadolint/hadolint < ./Dockerfile && echo "[OK] Dockerfile lint passed" || true
 
-# STAGE: Tests
+# STAGE 4
 tests:unit:
   stage: tests
   image: ${BASE_IMAGE}
@@ -189,21 +192,21 @@ tests:unit:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   before_script:
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Iniciando testes unitários..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Iniciando testes unitários"
     - |
       if [ -d .git ] && [ -f .git/shallow ]; then
-        echo "[INFO] Descarregando git history completo..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Descarregando git history completo"
         git fetch --unshallow
       fi
     - cd .
   script:
-    - echo "[INFO] Limpando cache npm..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Limpezas"
     - npm cache clean --force
-    - echo "[INFO] Instalando dependências..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Instalando dependências"
     - npm install --legacy-peer-deps
-    - echo "[INFO] Executando testes com coverage..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Executando testes com coverage"
     - npm test -- --coverage || true
-    - echo "[INFO] Executando lint..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Executando lint"
     - npm run lint 2>/dev/null || echo "[WARN] Lint não configurado"
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Testes unitários passaram"
   artifacts:
@@ -218,6 +221,7 @@ tests:unit:
     expire_in: 30 days
   allow_failure: true
 
+# STAGE 5
 tests:dependency_check:
   stage: tests
   image: ${BASE_IMAGE}
@@ -238,15 +242,15 @@ tests:dependency_check:
   before_script:
     - cd .
   script:
-    - echo "[INFO] Verificando vulnerabilidades de dependências..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Verificando vulnerabilidades de dependências"
     - npm audit --json > /tmp/npm-audit.json || true
     - npm audit --audit-level=moderate 2>&1 | head -50 || true
-    - echo "[WARN] Dependency check concluído (verificar relatório)"
   artifacts:
     paths:
       - /tmp/npm-audit.json
     expire_in: 30 days
 
+# STAGE 6
 tests:sast_scan:
   stage: tests
   image: ${BASE_IMAGE}
@@ -262,16 +266,16 @@ tests:sast_scan:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   allow_failure: true
   script:
-    - echo "[INFO] Executando SAST scanning..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Executando SAST scanning"
     - cd . || true
     - trivy fs --format json --output /tmp/trivy-report.json . 2>/dev/null || true
-    - echo "[WARN] SAST scanning concluído"
   artifacts:
     paths:
       - /tmp/trivy-report.json
     expire_in: 30 days
   interruptible: true
 
+# STAGE 7
 tests:sonarqube:
   stage: tests
   image: ${BASE_IMAGE}
@@ -291,7 +295,7 @@ tests:sonarqube:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   script:
-    - echo "[INFO] Análise de qualidade SonarQube..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Análise de qualidade SonarQube"
     - |
       sonar-scanner \
         -Dsonar.projectKey=${CI_PROJECT_NAME} \
@@ -302,13 +306,13 @@ tests:sonarqube:
         -Dsonar.sources=./ \
         -Dsonar.exclusions="vendor/**,storage/**,bootstrap/**,public/**" \
         -Dsonar.php.coverage.reportPaths=coverage.xml \
-        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+        -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info \
         -Dsonar.qualitygate.wait=true \
         -Dsonar.qualitygate.timeout=300
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Quality gate passou"
   allow_failure: false
 
-# STAGE: Build
+# STAGE 8
 build:docker:
   stage: build
   image: ${BASE_IMAGE}
@@ -333,9 +337,9 @@ build:docker:
         -u "${HARBOR_USERNAME}" \
         --password-stdin
       if [ $? -eq 0 ]; then
-        echo "[OK] ✓ Harbor login bem-sucedido"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Harbor login bem-sucedido"
       else
-        echo "[ERROR] ✗ Falha no Harbor login"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha no Harbor login"
         exit 1
       fi
     - cd .
@@ -390,14 +394,51 @@ build:docker:
       fi
       echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Image build e push concluídos"
   after_script:
-    - echo "[INFO] Limpeza"
-    - docker logout ${HARBOR_REGISTRY} 2>/dev/null || true
-    - docker system prune -f --filter "until=24h"
-    - rm -f ~/.docker/config.json
-    - rm -f /tmp/.docker-*
+    - |
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Limpeza"
+
+      [[ -z "$HARBOR_USERNAME" ]] && { echo "[WARN] Sem credenciais, pulando limpeza"; exit 0; }
+      curl_harbor() { curl -s -k -u "${HARBOR_USERNAME}:${HARBOR_PASSWORD}" "$@"; }
+
+      for project in $(curl_harbor "https://${HARBOR_REGISTRY}/api/v2.0/projects?page_size=100" | jq -r '.[]?.name // empty'); do
+        [[ -z "$project" ]] && continue
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Verificando projeto: $project"
+
+        for repo in $(curl_harbor "https://${HARBOR_REGISTRY}/api/v2.0/projects/$project/repositories?page_size=100" | jq -r '.[]?.name // empty'); do
+          [[ -z "$repo" ]] && continue
+          repo_name="${repo#*/}"
+          count=0
+
+          artifacts=$(curl_harbor "https://${HARBOR_REGISTRY}/api/v2.0/projects/$project/repositories/$repo_name/artifacts?page_size=100" 2>/dev/null)
+
+          if ! echo "$artifacts" | jq empty 2>/dev/null; then
+            continue
+          fi
+
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Verificar/remover imagens sem tags em $repo"
+
+          while read -r digest; do
+            [[ -z "$digest" ]] && continue
+
+            if curl_harbor -X DELETE "https://${HARBOR_REGISTRY}/api/v2.0/projects/$project/repositories/$repo_name/artifacts/$digest" -o /dev/null -w "%{http_code}" 2>/dev/null | grep -q "^20[0-9]$"; then
+              echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Removido: $repo@${digest:7:12}"
+              count=$((count + 1))
+            else
+              echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao remover: $repo@${digest:7:12}"
+            fi
+          done <<< "$(echo "$artifacts" | jq -r '.[] | select(.tags == null) | .digest // empty' 2>/dev/null)"
+
+          [[ $count -gt 0 ]] && echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] $repo: $count imagens removidas"
+        done
+      done
+    - |
+      docker logout ${HARBOR_REGISTRY} 2>/dev/null || true
+      docker system prune -f --filter "until=24h"
+      rm -f ~/.docker/config.json
+      rm -f /tmp/.docker-*
   allow_failure: false
 
-# STAGE: Development (GitOps - ArgoCD)
+# STAGE 9
 development:deploy:
   stage: development
   image: ${BASE_IMAGE}
@@ -418,138 +459,125 @@ development:deploy:
     - if: '$CI_COMMIT_BRANCH == "develop"'
   before_script:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] GitOps Development Deploy - ArgoCD"
-    - echo "[INFO] Branch ${CI_COMMIT_BRANCH} | Commit ${CI_COMMIT_SHORT_SHA}"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Branch ${CI_COMMIT_BRANCH} | Commit ${CI_COMMIT_SHORT_SHA}"
   script:
-    # Atualizar Image Tag no Git (GitOps)
-    - echo "[INFO] ETAPA 1 - Atualizar Image Tag dev no Git"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 1 - Atualizar Image Tag dev no Git"
     - cd ${CI_PROJECT_DIR}/${KUSTOMIZE_PATH}
     - kustomize edit set image ${DOCKER_IMAGE}:dev
     - |
       if git diff --quiet kustomization.yaml; then
-        echo "[INFO] ✓ Nenhuma mudança em kustomization.yaml"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Nenhuma mudança em kustomization.yaml"
       else
-        echo "[INFO] Garantindo checkout na branch develop..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Garantindo checkout na branch develop"
         git checkout -B develop
 
-        echo "[INFO] Commitando mudança de image tag..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Commitando mudança de image tag"
         git config user.email "${GIT_AUTHOR_EMAIL}"
         git config user.name "${GIT_AUTHOR_NAME}"
         git add kustomization.yaml
         git commit -m "ci: update ${DEPLOY_ENV} image to dev [skip ci]"
 
-        echo "[INFO] Fazendo fetch do remote..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Fazendo fetch do remote"
         git fetch https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git develop
 
-        echo "[INFO] Tentando push com retry..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Tentando push com retry"
         PUSH_OK=false
         for i in {1..3}; do
           if git rebase FETCH_HEAD; then
             if git push https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git develop; then
-              echo "[OK] Image tag atualizada no Git (tentativa $i)"
+              echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Image tag atualizada no Git (tentativa $i)"
               PUSH_OK=true
               break
             fi
           else
-            echo "[WARN] Rebase falhou na tentativa $i"
+            echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Rebase falhou na tentativa $i"
             git rebase --abort 2>/dev/null || true
           fi
           if [ $i -lt 3 ]; then
-            echo "[WARN] Tentativa $i falhou, aguardando..."
+            echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Tentativa $i falhou, aguardando"
             sleep 3
             git fetch https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git develop
           fi
         done
 
         if [ "$PUSH_OK" = false ]; then
-          echo "[ERROR] ✗ Push falhou após 3 tentativas"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Push falhou após 3 tentativas"
           exit 1
         fi
       fi
 
-    # Verificar ArgoCD Server Acessível
     - cd ${CI_PROJECT_DIR}
-    - echo "[INFO] ETAPA 2 - Verificar ArgoCD Server (C2)"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 2 - Verificar ArgoCD Server (C2)"
     - |
       if ! curl -s --max-time 10 https://${ARGOCD_SERVER}/healthz | grep -q "ok"; then
-        echo "[ERROR] ✗ ArgoCD Server (C2) não acessível!"
-        echo "[INFO] URL: https://${ARGOCD_SERVER}/healthz"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] ArgoCD Server (C2) não acessível!"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] URL: https://${ARGOCD_SERVER}/healthz"
         exit 1
       fi
-      echo "[OK] ArgoCD Server (C2) acessível"
 
-    # Gerar Manifests ArgoCD
-    - echo "[INFO] ETAPA 3 - Gerar Manifests ArgoCD"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 3 - Gerar Manifests ArgoCD"
     - envsubst < argocd/argocd-appproject.yaml.template > /tmp/argocd-appproject-${DEPLOY_ENV}.yaml
     - envsubst < argocd/argocd-applicationset.yaml.template > /tmp/argocd-applicationset-${DEPLOY_ENV}.yaml
-    - echo "[OK] ✓ Manifests gerados"
 
-    # Conectar ao Cluster C2 (Kubernetes)
-    - echo "[INFO] ETAPA 4 - Conectar ao Cluster C2"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 4 - Conectar ao Cluster Main K8S"
     - echo "${KUBECONFIG_C2}" | base64 -d > ${KUBECONFIG}
     - chmod 600 ${KUBECONFIG}
     - export KUBECONFIG=${KUBECONFIG}
     - |
       if kubectl cluster-info 2>&1 | grep -q "Kubernetes control plane"; then
-        echo "[OK] Conectado ao cluster C2"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Conectado ao cluster C2"
       else
-        echo "[ERROR] ✗ Falha ao conectar ao cluster"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao conectar ao cluster"
         exit 1
       fi
     - |
       if kubectl get namespace argocd &>/dev/null; then
-        echo "[OK] Namespace argocd existe"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Namespace argocd existe"
       else
-        echo "[ERROR] ✗ Namespace argocd não encontrado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Namespace argocd não encontrado"
         exit 1
       fi
 
-    # Autenticar no ArgoCD
-    - echo "[INFO] ETAPA 5 - Autenticar no ArgoCD"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 5 - Autenticar no ArgoCD"
 
-    # 5.1 - Obter senha do admin do secret k8s
     - |
-      echo "[INFO] Obtendo senha do admin..."
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Obtendo senha do admin"
       ARGOCD_PASSWORD=$(kubectl get secret argocd-initial-admin-secret \
         -n argocd \
         -o jsonpath='{.data.password}' 2>/dev/null | base64 -d)
 
       if [ -z "${ARGOCD_PASSWORD}" ]; then
-        echo "[ERROR] ✗ Senha do admin não encontrada no secret"
-        echo "[INFO] Verificando se secret existe..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Senha do admin não encontrada no secret"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Verificando se secret existe"
         kubectl get secret argocd-initial-admin-secret -n argocd
         exit 1
       fi
-      echo "[OK] ✓ Senha obtida do secret"
 
-    # 5.2 - Validar se ArgoCD CLI está disponível
     - |
       if ! command -v argocd &>/dev/null; then
-        echo "[ERROR] ✗ argocd CLI não está instalado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] argocd CLI não está instalado"
         exit 1
       fi
       ARGOCD_VERSION=$(argocd version --client --short 2>/dev/null || echo 'unknown')
-      echo "[OK] ✓ argocd CLI disponível (versão: ${ARGOCD_VERSION})"
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] argocd CLI disponível (versão: ${ARGOCD_VERSION})"
 
-    # 5.3 - Fazer login com username + password
     - |
-      echo "[INFO] Fazendo login no ArgoCD..."
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Fazendo login no ArgoCD"
       LOGIN_OUTPUT=$(argocd login ${ARGOCD_SERVER} \
         --username admin \
         --password ${ARGOCD_PASSWORD} \
         --grpc-web \
         --insecure 2>&1)
       if [ $? -eq 0 ]; then
-        echo "[OK] Login bem-sucedido"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Login bem-sucedido"
       else
-        echo "[ERROR] ✗ Falha no login do ArgoCD"
-        echo "[DEBUG] ${LOGIN_OUTPUT}"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha no login do ArgoCD"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [DEBUG] ${LOGIN_OUTPUT}"
         exit 1
       fi
 
-    # Adicionar Repositório Git no ArgoCD
-    - echo "[INFO] ETAPA 6 - Adicionar Repositório Git"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 6 - Adicionar Repositório Git"
     - |
-      echo "[INFO] Adicionando repositório ${REPO_URL}..."
       REPO_OUTPUT=$(argocd repo add ${REPO_URL} \
         --username ${TOKEN_PAT_NAME} \
         --password ${TOKEN_PAT_ACCESS} \
@@ -559,45 +587,41 @@ development:deploy:
       echo "${REPO_OUTPUT}" | tee /tmp/repo-add.log
 
       if echo "${REPO_OUTPUT}" | grep -q "already exists"; then
-        echo "[WARN] ⚠ Repositório já existe (ignorando)"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Repositório já existe (ignorando)"
       elif echo "${REPO_OUTPUT}" | grep -qi "error"; then
-        echo "[ERROR] ✗ Falha ao adicionar repositório"
-        echo "[DEBUG] ${REPO_OUTPUT}"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao adicionar repositório"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [DEBUG] ${REPO_OUTPUT}"
         exit 1
       else
-        echo "[OK] Repositório adicionado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Repositório adicionado"
       fi
 
-    # Aplicar AppProject e ApplicationSet
-    - echo "[INFO] ETAPA 7 - Aplicar AppProject e ApplicationSet"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 7 - Aplicar AppProject e ApplicationSet"
     - |
-      echo "[INFO] Aplicando AppProject..."
       if kubectl apply -f /tmp/argocd-appproject-${DEPLOY_ENV}.yaml -n argocd; then
-        echo "[OK] AppProject aplicado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] AppProject aplicado"
       else
-        echo "[ERROR] ✗ Falha ao aplicar AppProject"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao aplicar AppProject"
         exit 1
       fi
     - |
-      echo "[INFO] Aplicando ApplicationSet..."
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Aplicando ApplicationSet"
       if kubectl apply -f /tmp/argocd-applicationset-${DEPLOY_ENV}.yaml -n argocd; then
-        echo "[OK] ApplicationSet aplicado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] ApplicationSet aplicado"
       else
-        echo "[ERROR] ✗ Falha ao aplicar ApplicationSet"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao aplicar ApplicationSet"
         exit 1
       fi
 
-    # Aguardar Application e Sync
-    - echo "[INFO] ETAPA 8 - Aguardar Application e Sync"
-    - echo "[INFO] Aguardando ApplicationSet gerar Application (15s)..."
-    - sleep 15
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 8 - Aguardar Application e Sync"
+    - sleep 17
     - |
-      echo "[INFO] Verificando se Application foi criada..."
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Verificando se Application foi criada"
       TIMEOUT=60
       ELAPSED=0
       while [[ $ELAPSED -lt $TIMEOUT ]]; do
         if kubectl get application ${APP_NAME}-dev -n argocd &>/dev/null; then
-          echo "[OK] Application ${APP_NAME}-dev criada"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Application ${APP_NAME}-dev criada"
           FOUND_APP=1
           break
         fi
@@ -606,55 +630,50 @@ development:deploy:
       done
 
       if [[ -z "${FOUND_APP}" ]]; then
-        echo "[ERROR] ✗ Application não foi criada pelo ApplicationSet após $TIMEOUT segundos"
-        echo "[INFO] Verificando ApplicationSet..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Application não foi criada pelo ApplicationSet após $TIMEOUT segundos"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Verificando ApplicationSet"
         kubectl get applicationset -n argocd | grep ${APP_NAME} || echo "[WARN] ApplicationSet não encontrado"
         exit 1
       fi
 
-      echo "[INFO] Aguardando sync da application..."
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Aguardando sync da application"
       argocd app wait ${APP_NAME}-dev \
         --server ${ARGOCD_SERVER} \
         --grpc-web \
         --timeout ${ARGOCD_TIMEOUT} 2>&1 | tee /tmp/app-wait.log || {
-          echo "[WARN] ⚠ Timeout ao aguardar sync (verificar ArgoCD UI)"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Timeout ao aguardar sync (verificar ArgoCD UI)"
       }
 
-      # Verificar status do health check do Ingress
       APP_STATUS=$(kubectl get application ${APP_NAME}-dev -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
       SYNC_STATUS=$(kubectl get application ${APP_NAME}-dev -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
 
-      echo "[INFO] Application Status Final:"
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Application Status Final:"
       echo "  • Health: ${APP_STATUS}"
       echo "  • Sync: ${SYNC_STATUS}"
 
       if [[ "${SYNC_STATUS}" == "Synced" ]]; then
-        echo "[SUCCESS] Deploy concluído - Application sincronizada"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [SUCCESS] Deploy concluído - Application sincronizada"
         if [[ "${APP_STATUS}" == "Healthy" ]]; then
-          echo "[SUCCESS] Todos os recursos healthy"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [SUCCESS] Todos os recursos healthy"
         elif [[ "${APP_STATUS}" == "Progressing" ]]; then
-          echo "[WARNING] ⚠ Alguns recursos em Progressing (normal para HAProxy Ingress)"
-          echo "[INFO] O Ingress com HAProxy pode permanecer em Progressing devido ao health check externo"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARNING] Alguns recursos em Progressing (normal para HAProxy Ingress)"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] O Ingress com HAProxy pode permanecer em Progressing devido ao health check externo"
         else
-          echo "[WARNING] ⚠ Health status: ${APP_STATUS} - Verificar detalhes no ArgoCD UI"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARNING] Health status: ${APP_STATUS} - Verificar detalhes no ArgoCD UI"
         fi
       else
-        echo "[ERROR] Application não sincronizada - Verificar logs do ArgoCD"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Application não sincronizada - Verificar logs do ArgoCD"
         exit 1
       fi
-
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Deploy development finalizado"
-
   after_script:
-    - echo "[INFO] Limpando recursos temporários..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Limpeza"
     - rm -f ${KUBECONFIG}
     - rm -f /tmp/argocd-*.yaml
     - rm -f /tmp/*.log
-    - echo "[INFO] Pipeline development finalizada com status ${CI_JOB_STATUS}"
-
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Pipeline development finalizada com status ${CI_JOB_STATUS}"
   allow_failure: false
 
-# STAGE: Staging (GitOps - ArgoCD)
+# STAGE 10
 staging:deploy:
   stage: staging
   image: ${BASE_IMAGE}
@@ -674,138 +693,123 @@ staging:deploy:
     - if: '$CI_COMMIT_BRANCH == "main"'
   before_script:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] GitOps Staging Deploy - ArgoCD"
-    - echo "[INFO] Branch ${CI_COMMIT_BRANCH} | Commit ${CI_COMMIT_SHORT_SHA}"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Branch ${CI_COMMIT_BRANCH} | Commit ${CI_COMMIT_SHORT_SHA}"
   script:
-    # Atualizar Image Tag GitOps
-    - echo "[INFO] ETAPA 1 - Atualizar Image Tag latest no Git"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 1 - Atualizar Image Tag latest no Git"
     - cd ${CI_PROJECT_DIR}/${KUSTOMIZE_PATH}
     - kustomize edit set image ${DOCKER_IMAGE}:latest
     - |
       if git diff --quiet kustomization.yaml; then
-        echo "[INFO] ✓ Nenhuma mudança em kustomization.yaml"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Nenhuma mudança em kustomization.yaml"
       else
-        echo "[INFO] Garantindo checkout na branch ${GIT_BRANCH}..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Garantindo checkout na branch ${GIT_BRANCH}"
         git checkout -B ${GIT_BRANCH}
 
-        echo "[INFO] Commitando mudança de image tag..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Commitando mudança de image tag"
         git config user.email "${GIT_AUTHOR_EMAIL}"
         git config user.name "${GIT_AUTHOR_NAME}"
         git add kustomization.yaml
         git commit -m "ci: update ${DEPLOY_ENV} image to latest [skip ci]"
 
-        echo "[INFO] Fazendo fetch do remote..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Fazendo fetch do remote"
         git fetch https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git ${GIT_BRANCH}
 
-        echo "[INFO] Tentando push com retry..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Tentando push com retry"
         PUSH_OK=false
         for i in {1..3}; do
           if git rebase FETCH_HEAD; then
             if git push https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git ${GIT_BRANCH}; then
-              echo "[OK] Image tag atualizada no Git (tentativa $i)"
+              echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Image tag atualizada no Git (tentativa $i)"
               PUSH_OK=true
               break
             fi
           else
-            echo "[WARN] Rebase falhou na tentativa $i"
+            echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Rebase falhou na tentativa $i"
             git rebase --abort 2>/dev/null || true
           fi
           if [ $i -lt 3 ]; then
-            echo "[WARN] Tentativa $i falhou, aguardando..."
+            echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Tentativa $i falhou, aguardando"
             sleep 3
             git fetch https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git ${GIT_BRANCH}
           fi
         done
 
         if [ "$PUSH_OK" = false ]; then
-          echo "[ERROR] ✗ Push falhou após 3 tentativas"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Push falhou após 3 tentativas"
           exit 1
         fi
       fi
 
-    # Verificar ArgoCD Server Acessível
     - cd ${CI_PROJECT_DIR}
-    - echo "[INFO] ETAPA 2 - Verificar ArgoCD Server (C2)"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 2 - Verificar ArgoCD Server (K8S Main)"
     - |
       if ! curl -s --max-time 10 https://${ARGOCD_SERVER}/healthz | grep -q "ok"; then
-        echo "[ERROR] ✗ ArgoCD Server (C2) não acessível!"
-        echo "[INFO] URL: https://${ARGOCD_SERVER}/healthz"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] ArgoCD Server (C2) não acessível!"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] URL: https://${ARGOCD_SERVER}/healthz"
         exit 1
       fi
-      echo "[OK] ArgoCD Server (C2) acessível"
 
-    # Gerar Manifests ArgoCD
-    - echo "[INFO] ETAPA 3 - Gerar Manifests ArgoCD"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 3 - Gerar Manifests ArgoCD"
     - envsubst < argocd/argocd-appproject.yaml.template > /tmp/argocd-appproject-${DEPLOY_ENV}.yaml
     - envsubst < argocd/argocd-applicationset.yaml.template > /tmp/argocd-applicationset-${DEPLOY_ENV}.yaml
-    - echo "[OK] ✓ Manifests gerados"
 
-    # Conectar ao Cluster C2 (Kubernetes)
-    - echo "[INFO] ETAPA 4 - Conectar ao Cluster C2"
+    - echo "[INFO] ETAPA 4 - Conectar ao Cluster K8S Main"
     - echo "${KUBECONFIG_C2}" | base64 -d > ${KUBECONFIG}
     - chmod 600 ${KUBECONFIG}
     - export KUBECONFIG=${KUBECONFIG}
     - |
       if kubectl cluster-info 2>&1 | grep -q "Kubernetes control plane"; then
-        echo "[OK] Conectado ao cluster C2"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Conectado ao cluster C2"
       else
-        echo "[ERROR] ✗ Falha ao conectar ao cluster"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao conectar ao cluster"
         exit 1
       fi
     - |
       if kubectl get namespace argocd &>/dev/null; then
-        echo "[OK] Namespace argocd existe"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Namespace argocd existe"
       else
-        echo "[ERROR] ✗ Namespace argocd não encontrado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Namespace argocd não encontrado"
         exit 1
       fi
 
-    # Autenticar no ArgoCD
-    - echo "[INFO] ETAPA 5 - Autenticar no ArgoCD"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 5 - Autenticar no ArgoCD"
 
-    # 5.1 - Obter senha do admin do secret k8s
     - |
-      echo "[INFO] Obtendo senha do admin..."
       ARGOCD_PASSWORD=$(kubectl get secret argocd-initial-admin-secret \
         -n argocd \
         -o jsonpath='{.data.password}' 2>/dev/null | base64 -d)
 
       if [ -z "${ARGOCD_PASSWORD}" ]; then
-        echo "[ERROR] ✗ Senha do admin não encontrada no secret"
-        echo "[INFO] Verificando se secret existe..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Credenciais admin não encontrada"
         kubectl get secret argocd-initial-admin-secret -n argocd
         exit 1
       fi
-      echo "[OK] ✓ Senha obtida do secret"
 
-    # 5.2 - Validar se ArgoCD CLI está disponível
     - |
       if ! command -v argocd &>/dev/null; then
-        echo "[ERROR] ✗ argocd CLI não está instalado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] argocd CLI não está instalado"
         exit 1
       fi
       ARGOCD_VERSION=$(argocd version --client --short 2>/dev/null || echo 'unknown')
-      echo "[OK] ✓ argocd CLI disponível (versão: ${ARGOCD_VERSION})"
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] argocd CLI disponível (versão: ${ARGOCD_VERSION})"
 
-    # 5.3 - Fazer login com username + password
     - |
-      echo "[INFO] Fazendo login no ArgoCD..."
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Fazendo login no ArgoCD"
       LOGIN_OUTPUT=$(argocd login ${ARGOCD_SERVER} \
         --username admin \
         --password ${ARGOCD_PASSWORD} \
         --grpc-web \
         --insecure 2>&1)
       if [ $? -eq 0 ]; then
-        echo "[OK] Login bem-sucedido"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Login Ok"
       else
-        echo "[ERROR] ✗ Falha no login do ArgoCD"
-        echo "[DEBUG] ${LOGIN_OUTPUT}"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha no login do ArgoCD"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [DEBUG] ${LOGIN_OUTPUT}"
         exit 1
       fi
 
-    # Adicionar Repositório Git no ArgoCD
-    - echo "[INFO] ETAPA 6 - Adicionar Repositório Git"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 6 - Adicionar Repositório Git"
     - |
-      echo "[INFO] Adicionando repositório ${REPO_URL}..."
       REPO_OUTPUT=$(argocd repo add ${REPO_URL} \
         --username ${TOKEN_PAT_NAME} \
         --password ${TOKEN_PAT_ACCESS} \
@@ -815,45 +819,40 @@ staging:deploy:
       echo "${REPO_OUTPUT}" | tee /tmp/repo-add.log
 
       if echo "${REPO_OUTPUT}" | grep -q "already exists"; then
-        echo "[WARN] ⚠ Repositório já existe (ignorando)"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Repositório já existe (ignorando)"
       elif echo "${REPO_OUTPUT}" | grep -qi "error"; then
-        echo "[ERROR] ✗ Falha ao adicionar repositório"
-        echo "[DEBUG] ${REPO_OUTPUT}"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao adicionar repositório"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [DEBUG] ${REPO_OUTPUT}"
         exit 1
       else
-        echo "[OK] Repositório adicionado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Repositório adicionado"
       fi
 
-    # Aplicar AppProject e ApplicationSet
-    - echo "[INFO] ETAPA 7 - Aplicar AppProject e ApplicationSet"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 7 - Aplicar AppProject e ApplicationSet"
     - |
-      echo "[INFO] Aplicando AppProject..."
       if kubectl apply -f /tmp/argocd-appproject-${DEPLOY_ENV}.yaml -n argocd; then
-        echo "[OK] AppProject aplicado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] AppProject aplicado"
       else
-        echo "[ERROR] ✗ Falha ao aplicar AppProject"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao aplicar AppProject"
         exit 1
       fi
     - |
-      echo "[INFO] Aplicando ApplicationSet..."
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Aplicando ApplicationSet"
       if kubectl apply -f /tmp/argocd-applicationset-${DEPLOY_ENV}.yaml -n argocd; then
-        echo "[OK] ApplicationSet aplicado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] ApplicationSet aplicado"
       else
-        echo "[ERROR] ✗ Falha ao aplicar ApplicationSet"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao aplicar ApplicationSet"
         exit 1
       fi
 
-    # Aguardar Application e Sync
-    - echo "[INFO] ETAPA 8 - Aguardar Application e Sync"
-    - echo "[INFO] Aguardando ApplicationSet gerar Application (15s)..."
-    - sleep 15
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 8 - Aguardar Application e Sync"
+    - sleep 17
     - |
-      echo "[INFO] Verificando se Application foi criada..."
       TIMEOUT=60
       ELAPSED=0
       while [[ $ELAPSED -lt $TIMEOUT ]]; do
         if kubectl get application ${APP_NAME}-stg -n argocd &>/dev/null; then
-          echo "[OK] Application ${APP_NAME}-stg criada"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Application ${APP_NAME}-stg criada"
           FOUND_APP=1
           break
         fi
@@ -862,55 +861,52 @@ staging:deploy:
       done
 
       if [[ -z "${FOUND_APP}" ]]; then
-        echo "[ERROR] ✗ Application não foi criada pelo ApplicationSet após $TIMEOUT segundos"
-        echo "[INFO] Verificando ApplicationSet..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Application não foi criada pelo ApplicationSet após $TIMEOUT segundos"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Verificando ApplicationSet"
         kubectl get applicationset -n argocd | grep ${APP_NAME} || echo "[WARN] ApplicationSet não encontrado"
         exit 1
       fi
 
-      echo "[INFO] Aguardando sync da application..."
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Aguardando sync da application"
       argocd app wait ${APP_NAME}-stg \
         --server ${ARGOCD_SERVER} \
         --grpc-web \
         --timeout ${ARGOCD_TIMEOUT} 2>&1 | tee /tmp/app-wait.log || {
-          echo "[WARN] ⚠ Timeout ao aguardar sync (verificar ArgoCD UI)"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Timeout ao aguardar sync (verificar ArgoCD UI)"
       }
 
-      # Verificar status do health check do Ingress
       APP_STATUS=$(kubectl get application ${APP_NAME}-stg -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
       SYNC_STATUS=$(kubectl get application ${APP_NAME}-stg -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
 
-      echo "[INFO] Application Status Final:"
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Application Status Final:"
       echo "  • Health: ${APP_STATUS}"
       echo "  • Sync: ${SYNC_STATUS}"
 
       if [[ "${SYNC_STATUS}" == "Synced" ]]; then
-        echo "[SUCCESS] Deploy concluído - Application sincronizada"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [SUCCESS] Deploy concluído - Application sincronizada"
         if [[ "${APP_STATUS}" == "Healthy" ]]; then
-          echo "[SUCCESS] Todos os recursos healthy"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [SUCCESS] Todos os recursos healthy"
         elif [[ "${APP_STATUS}" == "Progressing" ]]; then
-          echo "[WARNING] ⚠ Alguns recursos em Progressing (normal para HAProxy Ingress)"
-          echo "[INFO] O Ingress com HAProxy pode permanecer em Progressing devido ao health check externo"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARNING] Alguns recursos em Progressing (normal para HAProxy Ingress)"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] O Ingress com HAProxy pode permanecer em Progressing devido ao health check externo"
         else
-          echo "[WARNING] ⚠ Health status: ${APP_STATUS} - Verificar detalhes no ArgoCD UI"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARNING] Health status: ${APP_STATUS} - Verificar detalhes no ArgoCD UI"
         fi
       else
-        echo "[ERROR] Application não sincronizada - Verificar logs do ArgoCD"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Application não sincronizada - Verificar logs do ArgoCD"
         exit 1
       fi
 
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Deploy staging finalizado"
-
   after_script:
-    - echo "[INFO] Limpando recursos temporários..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Limpando recursos temporários"
     - rm -f ${KUBECONFIG}
     - rm -f /tmp/argocd-*.yaml
     - rm -f /tmp/*.log
-    - echo "[INFO] Pipeline staging finalizada com status ${CI_JOB_STATUS}"
-
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Pipeline staging finalizada com status ${CI_JOB_STATUS}"
   allow_failure: false
 
-# STAGE: Notificação pós-staging
+# STAGE 11
 notification:staging:
   stage: notification
   image: ${BASE_IMAGE}
@@ -920,7 +916,7 @@ notification:staging:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   before_script:
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando e-mail staging..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando e-mail staging"
     - service postfix start
   script:
     - |
@@ -958,7 +954,7 @@ notification:staging:
         -s "$EMAIL_SUBJECT" "$MAIL_PRD" <<< "$EMAIL_BODY"
   allow_failure: true
 
-# STAGE: Approval
+# STAGE 12
 approval:production:
   stage: approval
   image: ${BASE_IMAGE}
@@ -977,7 +973,7 @@ approval:production:
     - echo "AGUARDANDO APROVAÇÃO MANUAL PARA PRODUÇÃO"
   allow_failure: false
 
-# STAGE: Production (GitOps ArgoCD)
+# STAGE 13
 production:deploy:
   stage: production
   image: ${BASE_IMAGE}
@@ -1000,136 +996,125 @@ production:deploy:
       optional: false
   before_script:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] GitOps Production Deploy - ArgoCD"
-    - echo "[INFO] Release ${CI_COMMIT_TAG} | Branch ${CI_COMMIT_BRANCH}"
-    - echo "[INFO] Usando tag ${CI_COMMIT_TAG} na imagem"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Release ${CI_COMMIT_TAG} | Branch ${CI_COMMIT_BRANCH}"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Usando tag ${CI_COMMIT_TAG} na imagem"
   script:
-    # Atualizar Image Tag GitOps
-    - echo "[INFO] ETAPA 1 - Atualizar Image Tag ${CI_COMMIT_TAG} no Git"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 1 - Atualizar Image Tag ${CI_COMMIT_TAG} no Git"
     - cd ${CI_PROJECT_DIR}/${KUSTOMIZE_PATH}
     - kustomize edit set image ${DOCKER_IMAGE}:${CI_COMMIT_TAG}
     - |
       if git diff --quiet kustomization.yaml; then
-        echo "[INFO] ✓ Nenhuma mudança em kustomization.yaml"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Nenhuma mudança em kustomization.yaml"
       else
-        echo "[INFO] Garantindo checkout na branch ${GIT_BRANCH}..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Garantindo checkout na branch ${GIT_BRANCH}"
         git checkout -B ${GIT_BRANCH}
 
-        echo "[INFO] Commitando mudança de image tag..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Commitando mudança de image tag"
         git config user.email "${GIT_AUTHOR_EMAIL}"
         git config user.name "${GIT_AUTHOR_NAME}"
         git add kustomization.yaml
         git commit -m "ci: update ${DEPLOY_ENV} image to ${CI_COMMIT_TAG} [skip ci]"
 
-        echo "[INFO] Fazendo fetch do remote..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Fazendo fetch do remote"
         git fetch https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git ${GIT_BRANCH}
 
-        echo "[INFO] Tentando push com retry..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Tentando push com retry"
         PUSH_OK=false
         for i in {1..3}; do
           if git rebase FETCH_HEAD; then
             if git push https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git HEAD:${GIT_BRANCH}; then
-              echo "[OK] Image tag atualizada no Git (tentativa $i)"
+              echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Image tag atualizada no Git (tentativa $i)"
               PUSH_OK=true
               break
             fi
           else
-            echo "[WARN] Rebase falhou na tentativa $i"
+            echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Rebase falhou na tentativa $i"
             git rebase --abort 2>/dev/null || true
           fi
           if [ $i -lt 3 ]; then
-            echo "[WARN] Tentativa $i falhou, aguardando..."
+            echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Tentativa $i falhou, aguardando"
             sleep 3
             git fetch https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git ${GIT_BRANCH}
           fi
         done
 
         if [ "$PUSH_OK" = false ]; then
-          echo "[ERROR] ✗ Push falhou após 3 tentativas"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Push falhou após 3 tentativas"
           exit 1
         fi
       fi
 
-    # Verificar ArgoCD Server Acessível
     - cd ${CI_PROJECT_DIR}
-    - echo "[INFO] ETAPA 2 - Verificar ArgoCD Server (C2)"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 2 - Verificar ArgoCD Server (K8S Main)"
     - |
       if ! curl -s --max-time 10 https://${ARGOCD_SERVER}/healthz | grep -q "ok"; then
-        echo "[ERROR] ✗ ArgoCD Server (C2) não acessível!"
-        echo "[INFO] URL: https://${ARGOCD_SERVER}/healthz"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] ArgoCD Server (C2) não acessível!"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] URL: https://${ARGOCD_SERVER}/healthz"
         exit 1
       fi
-      echo "[OK] ArgoCD Server (C2) acessível"
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] ArgoCD Server (K8S Main) acessível"
 
-    # Gerar Manifests ArgoCD
-    - echo "[INFO] ETAPA 3 - Gerar Manifests ArgoCD"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 3 - Gerar Manifests ArgoCD"
     - envsubst < argocd/argocd-appproject.yaml.template > /tmp/argocd-appproject-${DEPLOY_ENV}.yaml
     - envsubst < argocd/argocd-applicationset.yaml.template > /tmp/argocd-applicationset-${DEPLOY_ENV}.yaml
-    - echo "[OK] ✓ Manifests gerados"
 
-    # Conectar ao Cluster C2 (Kubernetes)
-    - echo "[INFO] ETAPA 4 - Conectar ao Cluster C2"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 4 - Conectar ao Cluster K8S Main"
     - echo "${KUBECONFIG_C2}" | base64 -d > ${KUBECONFIG}
     - chmod 600 ${KUBECONFIG}
     - export KUBECONFIG=${KUBECONFIG}
     - |
       if kubectl cluster-info 2>&1 | grep -q "Kubernetes control plane"; then
-        echo "[OK] Conectado ao cluster C2"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Conectado ao cluster K8S Main"
       else
-        echo "[ERROR] ✗ Falha ao conectar ao cluster"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao conectar ao cluster K8S"
         exit 1
       fi
     - |
       if kubectl get namespace argocd &>/dev/null; then
-        echo "[OK] Namespace argocd existe"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Namespace argocd existe"
       else
-        echo "[ERROR] ✗ Namespace argocd não encontrado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Namespace argocd não encontrado"
         exit 1
       fi
 
-    # Autenticar no ArgoCD
-    - echo "[INFO] ETAPA 5 - Autenticar no ArgoCD"
-
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 5 - Autenticar no ArgoCD"
     - |
-      echo "[INFO] Obtendo senha do admin..."
       ARGOCD_PASSWORD=$(kubectl get secret argocd-initial-admin-secret \
         -n argocd \
         -o jsonpath='{.data.password}' 2>/dev/null | base64 -d)
 
       if [ -z "${ARGOCD_PASSWORD}" ]; then
-        echo "[ERROR] ✗ Senha do admin não encontrada no secret"
-        echo "[INFO] Verificando se secret existe..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Credencial admin não encontrada"
         kubectl get secret argocd-initial-admin-secret -n argocd
         exit 1
       fi
-      echo "[OK] ✓ Senha obtida do secret"
 
     - |
       if ! command -v argocd &>/dev/null; then
-        echo "[ERROR] ✗ argocd CLI não está instalado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] argocd CLI não está instalado"
         exit 1
       fi
       ARGOCD_VERSION=$(argocd version --client --short 2>/dev/null || echo 'unknown')
-      echo "[OK] ✓ argocd CLI disponível (versão: ${ARGOCD_VERSION})"
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] argocd CLI disponível (versão: ${ARGOCD_VERSION})"
 
     - |
-      echo "[INFO] Fazendo login no ArgoCD..."
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Fazendo login no ArgoCD"
       LOGIN_OUTPUT=$(argocd login ${ARGOCD_SERVER} \
         --username admin \
         --password ${ARGOCD_PASSWORD} \
         --grpc-web \
         --insecure 2>&1)
       if [ $? -eq 0 ]; then
-        echo "[OK] Login bem-sucedido"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Login OK"
       else
-        echo "[ERROR] ✗ Falha no login do ArgoCD"
-        echo "[DEBUG] ${LOGIN_OUTPUT}"
-        echo "[INFO] Verificando conectividade..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha no login do ArgoCD"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [DEBUG] ${LOGIN_OUTPUT}"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Verificando conectividade"
         argocd version --server ${ARGOCD_SERVER} --grpc-web --insecure || true
         exit 1
       fi
 
-    # Adicionar Repositório Git no ArgoCD
-    - echo "[INFO] ETAPA 6 - Adicionar Repositório Git"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 6 - Adicionar Repositório Git"
     - |
       REPO_OUTPUT=$(argocd repo add ${REPO_URL} \
         --username ${TOKEN_PAT_NAME} \
@@ -1138,45 +1123,41 @@ production:deploy:
         --insecure 2>&1)
       echo "${REPO_OUTPUT}" | tee /tmp/repo-add.log
       if echo "${REPO_OUTPUT}" | grep -q "already exists"; then
-        echo "[WARN] ⚠ Repositório já existe (ignorando)"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Repositório já existe (ignorando)"
       elif echo "${REPO_OUTPUT}" | grep -qi "error"; then
-        echo "[ERROR] ✗ Falha ao adicionar repositório"
-        echo "[DEBUG] ${REPO_OUTPUT}"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao adicionar repositório"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [DEBUG] ${REPO_OUTPUT}"
         exit 1
       else
-        echo "[OK] Repositório adicionado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Repositório adicionado"
       fi
 
-    # Aplicar AppProject e ApplicationSet
-    - echo "[INFO] ETAPA 7 - Aplicar AppProject e ApplicationSet"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 7 - Aplicar AppProject e ApplicationSet"
     - |
-      echo "[INFO] Aplicando AppProject..."
       if kubectl apply -f /tmp/argocd-appproject-${DEPLOY_ENV}.yaml -n argocd; then
-        echo "[OK] AppProject aplicado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] AppProject aplicado"
       else
-        echo "[ERROR] ✗ Falha ao aplicar AppProject"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao aplicar AppProject"
         exit 1
       fi
     - |
-      echo "[INFO] Aplicando ApplicationSet..."
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Aplicando ApplicationSet"
       if kubectl apply -f /tmp/argocd-applicationset-${DEPLOY_ENV}.yaml -n argocd; then
-        echo "[OK] ApplicationSet aplicado"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] ApplicationSet aplicado"
       else
-        echo "[ERROR] ✗ Falha ao aplicar ApplicationSet"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha ao aplicar ApplicationSet"
         exit 1
       fi
 
-    # Aguardar Application e Sync
-    - echo "[INFO] ETAPA 8 - Aguardar Application e Sync"
-    - echo "[INFO] Aguardando ApplicationSet gerar Application (15s)..."
-    - sleep 15
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 8 - Aguardar Application e Sync"
+    - sleep 17
     - |
-      echo "[INFO] Verificando se Application foi criada..."
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Verificando se Application foi criada"
       TIMEOUT=60
       ELAPSED=0
       while [[ $ELAPSED -lt $TIMEOUT ]]; do
         if kubectl get application ${APP_NAME}-prd -n argocd &>/dev/null; then
-          echo "[OK] Application ${APP_NAME}-prd criada"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Application ${APP_NAME}-prd criada"
           FOUND_APP=1
           break
         fi
@@ -1185,25 +1166,24 @@ production:deploy:
       done
 
       if [[ -z "${FOUND_APP}" ]]; then
-        echo "[ERROR] ✗ Application não foi criada pelo ApplicationSet após $TIMEOUT segundos"
-        echo "[INFO] Verificando ApplicationSet..."
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Application não foi criada pelo ApplicationSet após $TIMEOUT segundos"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Verificando ApplicationSet"
         kubectl get applicationset -n argocd | grep ${APP_NAME} || echo "[WARN] ApplicationSet não encontrado"
         exit 1
       fi
 
-      echo "[INFO] Aguardando sync da application..."
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Aguardando sync da application"
       argocd app wait ${APP_NAME}-prd \
         --server ${ARGOCD_SERVER} \
         --grpc-web \
         --timeout ${ARGOCD_TIMEOUT} 2>&1 | tee /tmp/app-wait.log || {
-          echo "[WARN] ⚠ Timeout ao aguardar sync (verificar ArgoCD UI)"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Timeout ao aguardar sync (verificar ArgoCD UI)"
       }
 
-      # Verificar status do health check do Ingress
       APP_STATUS=$(kubectl get application ${APP_NAME}-prd -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
       SYNC_STATUS=$(kubectl get application ${APP_NAME}-prd -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
 
-      echo "[INFO] Application Status Final:"
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Application Status Final:"
       echo "  • Health: ${APP_STATUS}"
       echo "  • Sync: ${SYNC_STATUS}"
 
@@ -1212,28 +1192,26 @@ production:deploy:
         if [[ "${APP_STATUS}" == "Healthy" ]]; then
           echo "[SUCCESS] Todos os recursos healthy"
         elif [[ "${APP_STATUS}" == "Progressing" ]]; then
-          echo "[WARNING] ⚠ Alguns recursos em Progressing (normal para HAProxy Ingress)"
-          echo "[INFO] O Ingress com HAProxy pode permanecer em Progressing devido ao health check externo"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARNING] Alguns recursos em Progressing (normal para HAProxy Ingress)"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] O Ingress com HAProxy pode permanecer em Progressing devido ao health check externo"
         else
-          echo "[WARNING] ⚠ Health status: ${APP_STATUS} - Verificar detalhes no ArgoCD UI"
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARNING] Health status: ${APP_STATUS} - Verificar detalhes no ArgoCD UI"
         fi
       else
-        echo "[ERROR] Application não sincronizada - Verificar logs do ArgoCD"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Application não sincronizada - Verificar logs do ArgoCD"
         exit 1
       fi
 
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Deploy production finalizado"
-
   after_script:
-    - echo "[INFO] Limpando recursos temporários..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Limpeza"
     - rm -f ${KUBECONFIG}
     - rm -f /tmp/argocd-*.yaml
     - rm -f /tmp/*.log
-    - echo "[INFO] Pipeline production finalizada com status ${CI_JOB_STATUS}"
-
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Pipeline production finalizada com status ${CI_JOB_STATUS}"
   allow_failure: false
 
-# STAGE: Notificações finais production
+# STAGE 14
 notify:success:
   stage: notify
   image: ${BASE_IMAGE}
@@ -1244,7 +1222,7 @@ notify:success:
     - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
       when: on_success
   before_script:
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando e-mail sucesso..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando e-mail sucesso"
     - service postfix start
   script:
     - |
@@ -1270,6 +1248,7 @@ notify:success:
         -s "$EMAIL_SUBJECT" "$MAIL_PRD" <<< "$EMAIL_BODY"
   allow_failure: true
 
+# STAGE 15
 notify:failure:
   stage: notify
   image: ${BASE_IMAGE}
@@ -1280,7 +1259,7 @@ notify:failure:
     - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
       when: on_failure
   before_script:
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando e-mail falha..."
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando e-mail falha"
     - service postfix start
   script:
     - |

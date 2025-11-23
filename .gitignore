@@ -21,5 +21,10 @@ yarn-error.log
 /.zed
 .env-prod
 /docker
-kustomize/base/secret-regcred.yaml
 .env
+kustomize/base/secret-regcred.yaml
+passwords-laravel-*.txt
+passwords-mariadb-*.txt
+passwords-regcred.txt
+public-key-cert.pem
+
