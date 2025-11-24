@@ -22,4 +22,3 @@ configMapGenerator:
       - MARIADB_WSREP_PROVIDER=/usr/lib/galera/libgalera_smm.so
       - MARIADB_REPLICATION_USER=replicator
       - MYSQL_USER=uniselec
-      - SST_USER=sstuser

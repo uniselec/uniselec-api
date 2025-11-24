@@ -89,7 +89,7 @@ configMapGenerator:
       - MARIADB_CLUSTER_NAME=uniselec_dev_galera_cluster
 
 secretGenerator:
-  - name: mariadb-credentials
+  - name: mariadb-secret-env
     options:
       disableNameSuffixHash: true
     literals:
@@ -98,6 +98,8 @@ secretGenerator:
       - MYSQL_ROOT_PASSWORD=Password123
       - MYSQL_PASSWORD=Password123
       - SST_PASSWORD=Password123
+      - SST_USER=sstuser
+      - MARIADB_REPLICATION_PASSWORD=Password123
 
   - name: laravel-secrets
     options:

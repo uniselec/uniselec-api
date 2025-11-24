@@ -40,7 +40,7 @@ if [ -z "$MYSQL_ROOT_PASSWORD" ]; then
   if command -v kubectl >/dev/null 2>&1 ; then
     if [ -n "$KUBECTL_CONTEXT" ]; then KUBECTL_CTX_OPT="--context=$KUBECTL_CONTEXT"; else KUBECTL_CTX_OPT=""; fi
     set +e
-    secret_pw=$(kubectl $KUBECTL_CTX_OPT get secret mariadb-credentials -n "$NAMESPACE" -o jsonpath='{.data.MYSQL_ROOT_PASSWORD}' 2>/dev/null || true)
+    secret_pw=$(kubectl $KUBECTL_CTX_OPT get secret mariadb-secret-env -n "$NAMESPACE" -o jsonpath='{.data.MYSQL_ROOT_PASSWORD}' 2>/dev/null || true)
     set -e
     if [ -n "$secret_pw" ]; then MYSQL_ROOT_PASSWORD="$(echo "$secret_pw" | base64 -d)"; fi
   fi

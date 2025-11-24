@@ -151,7 +151,7 @@ spec:
             - configMapRef:
                 name: mariadb-env
             - secretRef:
-                name: mariadb-credentials
+                name: mariadb-secret-env
           volumeMounts:
             - name: database
               mountPath: /var/lib/mysql
@@ -274,7 +274,7 @@ spec:
         - configMapRef:
             name: mariadb-env
         - secretRef:
-            name: mariadb-credentials
+            name: mariadb-secret-env
 
         env:
         - name: POD_NAME
