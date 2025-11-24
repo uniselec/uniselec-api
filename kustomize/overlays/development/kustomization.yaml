@@ -6,107 +6,107 @@ namespace: uniselec-api-dev
 
 # Recursos base + namespace
 resources:
-  - ../../base
-  - namespace.yaml
+- ../../base
+- namespace.yaml
 
 # Patches específicos de development
+
+
+
+
 patches:
-  - path: patch-deployment.yaml
-    target:
-      kind: Deployment
-      name: uniselec-api
-
-  - path: patch-ingress.yaml
-    target:
-      kind: Ingress
-      name: uniselec-api
-
-  - path: patch-hpa.yaml
-    target:
-      kind: HorizontalPodAutoscaler
-      name: uniselec-api
-
-  - path: mariadb/patch-statefulset.yaml
-    target:
-      kind: StatefulSet
-      name: mariadb
-
-  - path: mariadb/patch-service-loadbalancer.yaml
-    target:
-      kind: Service
-      name: mariadb-lb
+- path: patch-deployment.yaml
+  target:
+    kind: Deployment
+    name: uniselec-api
+- path: patch-ingress.yaml
+  target:
+    kind: Ingress
+    name: uniselec-api
+- path: patch-hpa.yaml
+  target:
+    kind: HorizontalPodAutoscaler
+    name: uniselec-api
+- path: mariadb/patch-statefulset.yaml
+  target:
+    kind: StatefulSet
+    name: mariadb
+- path: mariadb/patch-service-loadbalancer.yaml
+  target:
+    kind: Service
+    name: mariadb-lb
 
 # MERGE com valores específicos de DEVELOPMENT
-configMapGenerator:
-  - name: uniselec-api-config
-    behavior: merge
-    options:
-      disableNameSuffixHash: true
-    literals:
 
       # -------------------------------------------------
       # Application - Development
       # -------------------------------------------------
-      - APP_NAME=UniSelec/Seleções - Development
-      - APP_ENV=development
-      - APP_DEBUG=true
-      - APP_URL=https://uniselec-api-development.unilab.edu.br
-      - FRONTEND_URL=https://selecoes-development.unilab.edu.br
-      - BACKOFFICE_URL=https://uniselec-admin-development.unilab.edu.br
 
       # -------------------------------------------------
       # Logging
       # -------------------------------------------------
-      - LOG_LEVEL=debug
 
       # -------------------------------------------------
       # Email
       # -------------------------------------------------
-      - MAIL_FROM_ADDRESS=noreply@selecoes-development.unilab.edu.br
-      - MAIL_FROM_NAME=[Development] Seleções - UNILAB
 
       # -------------------------------------------------
       # Swagger
       # -------------------------------------------------
-      - L5_SWAGGER_CONST_HOST=https://uniselec-api-development.unilab.edu.br/api
-      - L5_SWAGGER_GENERATE_ALWAYS=true
 
       # -------------------------------------------------
       # Custom
       # -------------------------------------------------
-      - WEB_APPLICATION_LINK=https://selecoes-development.unilab.edu.br
-      - MESSAGE=Development
 
-  - name: mariadb-env
-    behavior: merge
-    options:
-      disableNameSuffixHash: true
-    literals:
-      - DB_HOST=mariadb-app.uniselec-api-dev.svc.cluster.local
-      - DB_DATABASE=uniselec_dev
-      - MYSQL_DATABASE=uniselec_dev
-      - MYSQL_USER=uniselec_dev_user
-      - MARIADB_CLUSTER_NAME=uniselec_dev_galera_cluster
+configMapGenerator:
+- behavior: merge
+  literals:
+  - APP_NAME=UniSelec/Seleções - Development
+  - APP_ENV=development
+  - APP_DEBUG=true
+  - APP_URL=https://uniselec-api-development.unilab.edu.br
+  - FRONTEND_URL=https://selecoes-development.unilab.edu.br
+  - BACKOFFICE_URL=https://uniselec-admin-development.unilab.edu.br
+  - LOG_LEVEL=debug
+  - MAIL_FROM_ADDRESS=noreply@selecoes-development.unilab.edu.br
+  - MAIL_FROM_NAME=[Development] Seleções - UNILAB
+  - L5_SWAGGER_CONST_HOST=https://uniselec-api-development.unilab.edu.br/api
+  - L5_SWAGGER_GENERATE_ALWAYS=true
+  - WEB_APPLICATION_LINK=https://selecoes-development.unilab.edu.br
+  - MESSAGE=Development
+  name: uniselec-api-config
+  options:
+    disableNameSuffixHash: true
+- behavior: merge
+  literals:
+  - DB_HOST=mariadb-app.uniselec-api-dev.svc.cluster.local
+  - DB_DATABASE=uniselec_dev
+  - MYSQL_DATABASE=uniselec_dev
+  - MYSQL_USER=uniselec_dev_user
+  - MARIADB_CLUSTER_NAME=uniselec_dev_galera_cluster
+  name: mariadb-env
+  options:
+    disableNameSuffixHash: true
+
 
 secretGenerator:
-  - name: mariadb-secret-env
-    options:
-      disableNameSuffixHash: true
-    literals:
-      - DB_USERNAME=root
-      - DB_PASSWORD=Password123
-      - MYSQL_ROOT_PASSWORD=Password123
-      - MYSQL_PASSWORD=Password123
-      - SST_PASSWORD=Password123
-      - SST_USER=sstuser
-      - MARIADB_REPLICATION_PASSWORD=Password123
-
-  - name: laravel-secrets
-    options:
-      disableNameSuffixHash: true
-    literals:
-      - APP_KEY=base64:K10kGMbwmuMCIciRc3hjsSr/dQDWSIN1mEFOQ0aVA2M=
+- literals:
+  - DB_USERNAME=root
+  - DB_PASSWORD=Password123
+  - MYSQL_ROOT_PASSWORD=Password123
+  - MYSQL_PASSWORD=Password123
+  - SST_PASSWORD=Password123
+  - SST_USER=sstuser
+  - MARIADB_REPLICATION_PASSWORD=Password123
+  name: mariadb-secret-env
+  options:
+    disableNameSuffixHash: true
+- literals:
+  - APP_KEY=base64:K10kGMbwmuMCIciRc3hjsSr/dQDWSIN1mEFOQ0aVA2M=
+  name: laravel-secrets
+  options:
+    disableNameSuffixHash: true
 
 images:
-  - name: dti-registro.unilab.edu.br/unilab/uniselec-api
-    newTag: dev-latest
+- name: dti-registro.unilab.edu.br/unilab/uniselec-api
+  newTag: dev
