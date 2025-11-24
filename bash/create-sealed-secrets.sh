@@ -323,7 +323,7 @@ create_mariadb_env_sealed_secret() {
 apiVersion: v1
 kind: Secret
 metadata:
-  name: mariadb-credentials
+  name: mariadb-secret-env
   namespace: ${NAMESPACE}
   annotations:
     sealedsecrets.bitnami.com/namespace-wide: "true"

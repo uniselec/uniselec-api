@@ -98,7 +98,7 @@ spec:
           - configMapRef:
               name: mariadb-env
           - secretRef:
-              name: mariadb-credentials
+              name: mariadb-secret-env
           - secretRef:
               name: laravel-secrets
         env:
