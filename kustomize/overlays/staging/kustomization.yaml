@@ -69,4 +69,4 @@ configMapGenerator:
 
 images:
   - name: dti-registro.unilab.edu.br/unilab/uniselec-api
-    newTag: staging-latest
+    newTag: latest
