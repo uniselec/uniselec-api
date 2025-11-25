@@ -11,7 +11,7 @@ resources:
   - pvc-storage.yaml
   - hpa.yaml
   - sealed-secret-regcred.yaml
-  - mariadb/  # inclui TUDO do mariadb/kustomization.yaml
+  - mariadb/
 
 # Variáveis COMUNS do Laravel (não mudam por ambiente)
 configMapGenerator:
@@ -19,44 +19,25 @@ configMapGenerator:
     options:
       disableNameSuffixHash: true
     literals:
-
-      # -------------------------------------------------
-      # Logging
-      # -------------------------------------------------
       - LOG_CHANNEL=stack
       - LOG_DEPRECATIONS_CHANNEL=null
 
-      # -------------------------------------------------
-      # Broadcasting
-      # -------------------------------------------------
       - BROADCAST_DRIVER=log
 
-      # -------------------------------------------------
-      # Cache / Filesystem / Queue / Session
-      # -------------------------------------------------
       - CACHE_DRIVER=file
       - FILESYSTEM_DISK=local
       - QUEUE_CONNECTION=sync
       - SESSION_DRIVER=file
       - SESSION_LIFETIME=120
 
-      # -------------------------------------------------
-      # Database (COMUM)
-      # -------------------------------------------------
       - DB_CONNECTION=mysql
       - DB_PORT=3306
 
-      # -------------------------------------------------
-      # Redis / Memcached
-      # -------------------------------------------------
       - MEMCACHED_HOST=127.0.0.1
       - REDIS_HOST=127.0.0.1
       - REDIS_PASSWORD=null
       - REDIS_PORT=6379
 
-      # -------------------------------------------------
-      # Email (COMUM)
-      # -------------------------------------------------
       - MAIL_MAILER=smtp
       - MAIL_HOST=smtp.noreply.unilab.edu.br
       - MAIL_PORT=25
@@ -64,18 +45,12 @@ configMapGenerator:
       - MAIL_PASSWORD=
       - MAIL_ENCRYPTION=
 
-      # -------------------------------------------------
-      # AWS (S3) - placeholders comuns
-      # -------------------------------------------------
       - AWS_ACCESS_KEY_ID=
       - AWS_SECRET_ACCESS_KEY=
       - AWS_DEFAULT_REGION=us-east-1
       - AWS_BUCKET=
       - AWS_USE_PATH_STYLE_ENDPOINT=false
 
-      # -------------------------------------------------
-      # Pusher (WebSockets)
-      # -------------------------------------------------
       - PUSHER_APP_ID=
       - PUSHER_APP_KEY=
       - PUSHER_APP_SECRET=
@@ -84,9 +59,6 @@ configMapGenerator:
       - PUSHER_SCHEME=https
       - PUSHER_APP_CLUSTER=mt1
 
-      # -------------------------------------------------
-      # Vite (Frontend)
-      # -------------------------------------------------
       - VITE_APP_NAME=${APP_NAME}
       - VITE_PUSHER_APP_KEY=${PUSHER_APP_KEY}
       - VITE_PUSHER_HOST=${PUSHER_HOST}
