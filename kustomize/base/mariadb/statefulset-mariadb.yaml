@@ -78,7 +78,8 @@ spec:
               GR="/var/lib/mysql/grastate.dat"
               LOG="/var/lib/mysql/wsrep_bootstrap.log"
 
-              echo "[INFO] Starting bootstrap check..." > $LOG
+              echo "[INFO] Starting bootstrap... "
+              echo "[INFO] Bootstrap check" > $LOG
 
               echo "[INFO] Installing netcat" >> $LOG
               if ! apt-get update -qq >/dev/null 2>&1; then
@@ -260,6 +261,10 @@ spec:
         securityContext:
           runAsUser: 0
           runAsGroup: 0
+          capabilities:
+            add:
+              - IPC_LOCK
+
         ports:
         - name: mysql
           containerPort: 3306
