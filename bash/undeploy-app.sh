@@ -1,5 +1,14 @@
 #!/bin/bash
+# ============================================================
+# Script para desfazer o deploy com ApplicationSet do ArgoCD
+# ============================================================
+# Autor: erivandosena@gmail.com
+# Data: 2025-11-20
+# Versão: 1.0.0
+# ============================================================
 
+# Uso:
+# kubectl get applicationset -A | grep uniselec
 # ./undeploy-argocd.sh uniselec-api-dev-as
 
 set -euo pipefail
@@ -11,7 +20,7 @@ fi
 
 APPSET_NAME="$1"
 NAMESPACE="argocd"
-APP_NAME="${APPSET_NAME%-as}"  # suposição de nome da App
+APP_NAME="${APPSET_NAME%-as}"
 
 echo "Desfazendo deploy para ApplicationSet: $APPSET_NAME"
 echo "Namespace ArgoCD: $NAMESPACE"

@@ -1,6 +1,11 @@
-#!/usr/bin/env bash
-set -euo pipefail
-IFS=$'\n\t'
+#!/bin/bash
+# ============================================================
+# Script para diagnóstico ponta-a-ponta do ambiente UNISELEC
+# ============================================================
+# Autor: erivandosena@gmail.com
+# Data: 2025-11-20
+# Versão: 1.0.0
+# ============================================================
 
 # troubleshooting-uniselec.sh
 # Automação completa de diagnóstico ponta-a-ponta (HAProxy -> Ingress -> API -> MariaDB Galera)
@@ -19,6 +24,9 @@ IFS=$'\n\t'
 # ✔ curl dentro da API /health
 # ✔ dig e nslookup
 # ✔ top + metrics
+
+set -euo pipefail
+IFS=$'\n\t'
 
 ENV="${1:-dev}"   # dev | stg | prd
 HAPROXY_HOST="${HAPROXY_HOST:-10.130.0.60}"
