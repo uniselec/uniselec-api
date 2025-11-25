@@ -14,7 +14,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m' # Sem Color
 
 # Diretórios
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,38 +23,24 @@ KUSTOMIZE_DIR="${PROJECT_ROOT}/kustomize"
 CERT_FILE="${PROJECT_ROOT}/public-key-cert.pem"
 
 # Funções de log
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-log_step() {
-    echo -e "${BLUE}[STEP]${NC} $1"
-}
+log_info()    { echo -e "${GREEN}[INFO]${NC} $1"; }
+log_warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
+log_step()    { echo -e "${BLUE}[STEP]${NC} $1"; }
 
 # ============================================================
-# Função: Verificar dependências
+# Função: Verificar dependências do ambiente
 # ============================================================
 check_dependencies() {
     log_step "Verificando dependências..."
-
     if ! command -v kubectl &> /dev/null; then
         log_error "kubectl não encontrado. Instale: https://kubernetes.io/docs/tasks/tools/"
         exit 1
     fi
-
     if ! command -v kubeseal &> /dev/null; then
         log_error "kubeseal não encontrado. Instale: https://github.com/bitnami-labs/sealed-secrets"
         exit 1
     fi
-
     log_info "Dependências OK ✓"
 }
 
@@ -67,23 +53,19 @@ generate_password() {
 }
 
 # ============================================================
-# Função: Obter certificado público
+# Função: Obter certificado público do controlador Sealed Secrets
 # ============================================================
 get_public_cert() {
     log_step "Obtendo certificado público do Sealed Secrets..."
-
     if [ -f "${CERT_FILE}" ]; then
         log_warn "Certificado público já existe. Reutilizando..."
         return 0
     fi
-
     kubeseal --fetch-cert > "${CERT_FILE}"
-
     if [ ! -f "${CERT_FILE}" ]; then
         log_error "Falha ao obter certificado público"
         exit 1
     fi
-
     log_info "Certificado público obtido: ${CERT_FILE}"
 }
 
@@ -92,7 +74,6 @@ get_public_cert() {
 # ============================================================
 create_regcred_sealed_secret() {
     log_step "Criando Sealed Secret do Docker Registry (cluster-wide)..."
-
     echo ""
     echo -e "${GREEN}[INFO]${NC} === Credenciais do Docker Registry ==="
 
@@ -115,7 +96,6 @@ create_regcred_sealed_secret() {
     read -p "Digite o Docker Registry Email (padrão: devops@unilab.edu.br): " DOCKER_EMAIL
     DOCKER_EMAIL=${DOCKER_EMAIL:-devops@unilab.edu.br}
 
-    # Criar .dockerconfigjson
     DOCKER_AUTH=$(echo -n "${DOCKER_USERNAME}:${DOCKER_PASSWORD}" | base64 -w 0)
     DOCKER_CONFIG_JSON=$(cat <<EOF
 {
@@ -131,10 +111,7 @@ create_regcred_sealed_secret() {
 EOF
 )
 
-    # Criar arquivo temporário
     TEMP_FILE=$(mktemp)
-
-    # Criar Secret temporário (cluster-wide)
     cat > "${TEMP_FILE}" << EOF
 apiVersion: v1
 kind: Secret
@@ -149,18 +126,12 @@ EOF
 
     echo -e "${GREEN}[INFO]${NC} Secret temporário criado: ${TEMP_FILE}"
 
-    # Criar Sealed Secret
     local OUTPUT_FILE="${KUSTOMIZE_DIR}/base/sealed-secret-regcred.yaml"
-
     kubeseal --format=yaml --cert="${CERT_FILE}" < "$TEMP_FILE" > "$OUTPUT_FILE"
-
     echo -e "${GREEN}[INFO]${NC} Sealed secret criado: $OUTPUT_FILE"
-
-    # Remover arquivo temporário
     rm -f "$TEMP_FILE"
     echo -e "${GREEN}[INFO]${NC} Arquivo temporário removido"
 
-    # Salvar credenciais
     local PASS_FILE="${PROJECT_ROOT}/passwords-regcred.txt"
     cat > "$PASS_FILE" << EOF
 # ============================================================
@@ -173,92 +144,8 @@ DOCKER_USERNAME=${DOCKER_USERNAME}
 DOCKER_PASSWORD=${DOCKER_PASSWORD}
 DOCKER_EMAIL=${DOCKER_EMAIL}
 EOF
-
     chmod 600 "$PASS_FILE"
     echo -e "${YELLOW}[WARN]${NC} Credenciais salvas em: $PASS_FILE"
-}
-
-# ============================================================
-# Função: Criar e selar Secret Base do MariaDB
-# ============================================================
-create_mariadb_base_sealed_secret() {
-    log_step "Criando Sealed Secret base do MariaDB (cluster-wide)..."
-
-    # Solicitar senhas
-    echo ""
-    read -sp "Digite a senha do MYSQL_ROOT_PASSWORD (ou Enter para gerar): " MYSQL_ROOT_PASS
-    echo ""
-    if [ -z "$MYSQL_ROOT_PASS" ]; then
-        MYSQL_ROOT_PASS=$(generate_password)
-        echo -e "${GREEN}[INFO]${NC} MYSQL_ROOT_PASSWORD gerada: $MYSQL_ROOT_PASS"
-    fi
-
-    read -sp "Digite a senha do MYSQL_PASSWORD (ou Enter para gerar): " MYSQL_PASS
-    echo ""
-    if [ -z "$MYSQL_PASS" ]; then
-        MYSQL_PASS=$(generate_password)
-        echo -e "${GREEN}[INFO]${NC} MYSQL_PASSWORD gerada: $MYSQL_PASS"
-    fi
-
-    read -sp "Digite a senha do SST_PASSWORD (ou Enter para gerar): " SST_PASS
-    echo ""
-    if [ -z "$SST_PASS" ]; then
-        SST_PASS=$(generate_password)
-        echo -e "${GREEN}[INFO]${NC} SST_PASSWORD gerada: $SST_PASS"
-    fi
-
-    # Criar arquivo temporário
-    TEMP_FILE=$(mktemp)
-
-    # Criar Secret temporário (cluster-wide)
-    cat > "${TEMP_FILE}" << EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: mariadb-secret-env
-  annotations:
-    sealedsecrets.bitnami.com/cluster-wide: "true"
-type: Opaque
-stringData:
-  MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASS}"
-  MYSQL_PASSWORD: "${MYSQL_PASS}"
-  SST_PASSWORD: "${SST_PASS}"
-  SST_USER: "sstuser"
-  MARIADB_REPLICATION_PASSWORD: "${MYSQL_ROOT_PASS}"
-EOF
-
-    echo -e "${GREEN}[INFO]${NC} Secret temporário criado: ${TEMP_FILE}"
-
-    # Criar Sealed Secret
-    local OUTPUT_FILE="${KUSTOMIZE_DIR}/base/mariadb/sealed-secret-mariadb.yaml"
-
-    kubeseal --format=yaml --cert="${CERT_FILE}" < "$TEMP_FILE" > "$OUTPUT_FILE"
-
-    echo -e "${GREEN}[INFO]${NC} Sealed secret criado: $OUTPUT_FILE"
-
-    # Remover arquivo temporário
-    rm -f "$TEMP_FILE"
-    echo -e "${GREEN}[INFO]${NC} Arquivo temporário removido"
-
-    # Salvar senhas em arquivo seguro
-    local PASS_FILE="${PROJECT_ROOT}/passwords-mariadb-base.txt"
-    cat > "$PASS_FILE" << EOF
-# ============================================================
-# SENHAS DO MARIADB BASE (CLUSTER-WIDE)
-# Geradas em: $(date)
-# ============================================================
-# ATENÇÃO: Guarde este arquivo em local seguro!
-# ============================================================
-
-MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASS}
-MYSQL_PASSWORD=${MYSQL_PASS}
-SST_PASSWORD=${SST_PASS}
-SST_USER=sstuser
-MARIADB_REPLICATION_PASSWORD=${MYSQL_ROOT_PASS}
-EOF
-
-    chmod 600 "$PASS_FILE"
-    echo -e "${YELLOW}[WARN]${NC} Senhas salvas em: $PASS_FILE"
 }
 
 # ============================================================
@@ -295,19 +182,6 @@ create_mariadb_env_sealed_secret() {
         echo -e "${GREEN}[INFO]${NC} MYSQL_PASSWORD gerada: $MYSQL_PASS"
     fi
 
-    read -p "Digite MYSQL_USER (padrão: uniselec_${ENVIRONMENT}_user): " MYSQL_USER
-    if [ -z "$MYSQL_USER" ]; then
-        case $ENVIRONMENT in
-            staging)
-                MYSQL_USER="uniselec_stag_user"
-                ;;
-            production)
-                MYSQL_USER="uniselec_prod_user"
-                ;;
-        esac
-        echo -e "${GREEN}[INFO]${NC} MYSQL_USER: $MYSQL_USER"
-    fi
-
     read -sp "Digite SST_PASSWORD (ou Enter para gerar): " SST_PASS
     echo ""
     if [ -z "$SST_PASS" ]; then
@@ -315,10 +189,14 @@ create_mariadb_env_sealed_secret() {
         echo -e "${GREEN}[INFO]${NC} SST_PASSWORD gerada: $SST_PASS"
     fi
 
-    # Criar arquivo temporário
-    TEMP_FILE=$(mktemp)
+    read -sp "Digite MARIADB_REPLICATION_PASSWORD (ou Enter para gerar): " REPL_PASS
+    echo ""
+    if [ -z "$REPL_PASS" ]; then
+        REPL_PASS=$(generate_password)
+        echo -e "${GREEN}[INFO]${NC} MARIADB_REPLICATION_PASSWORD gerada: $REPL_PASS"
+    fi
 
-    # Criar Secret temporário (namespace-wide)
+    TEMP_FILE=$(mktemp)
     cat > "${TEMP_FILE}" << EOF
 apiVersion: v1
 kind: Secret
@@ -333,25 +211,20 @@ stringData:
   DB_PASSWORD: "${DB_PASS}"
   MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASS}"
   MYSQL_PASSWORD: "${MYSQL_PASS}"
-  MYSQL_USER: "${MYSQL_USER}"
+  SST_USER: "sstuser"
   SST_PASSWORD: "${SST_PASS}"
+  MARIADB_REPLICATION_PASSWORD: "${REPL_PASS}"
 EOF
 
-    echo -e "${GREEN}[INFO]${NC} Secret temporário criado: ${TEMP_FILE}"
+    log_info "Secret temporário criado: ${TEMP_FILE}"
 
-    # Criar Sealed Secret
     local OUTPUT_DIR="${KUSTOMIZE_DIR}/overlays/${ENVIRONMENT}"
     local OUTPUT_FILE="${OUTPUT_DIR}/sealed-secret-mariadb-credentials.yaml"
-
     kubeseal --format=yaml --cert="${CERT_FILE}" < "$TEMP_FILE" > "$OUTPUT_FILE"
-
-    echo -e "${GREEN}[INFO]${NC} Sealed secret criado: $OUTPUT_FILE"
-
-    # Remover arquivo temporário
+    log_info "Sealed secret criado: $OUTPUT_FILE"
     rm -f "$TEMP_FILE"
-    echo -e "${GREEN}[INFO]${NC} Arquivo temporário removido"
+    log_info "Arquivo temporário removido"
 
-    # Salvar senhas
     local PASS_FILE="${PROJECT_ROOT}/passwords-mariadb-${ENVIRONMENT}.txt"
     cat > "$PASS_FILE" << EOF
 # ============================================================
@@ -364,10 +237,10 @@ DB_USERNAME=root
 DB_PASSWORD=${DB_PASS}
 MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASS}
 MYSQL_PASSWORD=${MYSQL_PASS}
-MYSQL_USER=${MYSQL_USER}
+SST_USER=sstuser
 SST_PASSWORD=${SST_PASS}
+MARIADB_REPLICATION_PASSWORD=${REPL_PASS}
 EOF
-
     chmod 600 "$PASS_FILE"
     echo -e "${YELLOW}[WARN]${NC} Senhas salvas em: $PASS_FILE"
 }
@@ -389,10 +262,7 @@ create_laravel_sealed_secret() {
         echo -e "${GREEN}[INFO]${NC} APP_KEY gerada: $APP_KEY"
     fi
 
-    # Criar arquivo temporário
     TEMP_FILE=$(mktemp)
-
-    # Criar Secret temporário (namespace-wide)
     cat > "${TEMP_FILE}" << EOF
 apiVersion: v1
 kind: Secret
@@ -406,21 +276,15 @@ stringData:
   APP_KEY: "${APP_KEY}"
 EOF
 
-    echo -e "${GREEN}[INFO]${NC} Secret temporário criado: ${TEMP_FILE}"
+    log_info "Secret temporário criado: ${TEMP_FILE}"
 
-    # Criar Sealed Secret
     local OUTPUT_DIR="${KUSTOMIZE_DIR}/overlays/${ENVIRONMENT}"
     local OUTPUT_FILE="${OUTPUT_DIR}/sealed-secret-laravel-secrets.yaml"
-
     kubeseal --format=yaml --cert="${CERT_FILE}" < "$TEMP_FILE" > "$OUTPUT_FILE"
-
-    echo -e "${GREEN}[INFO]${NC} Sealed secret criado: $OUTPUT_FILE"
-
-    # Remover arquivo temporário
+    log_info "Sealed secret criado: $OUTPUT_FILE"
     rm -f "$TEMP_FILE"
-    echo -e "${GREEN}[INFO]${NC} Arquivo temporário removido"
+    log_info "Arquivo temporário removido"
 
-    # Salvar APP_KEY
     local PASS_FILE="${PROJECT_ROOT}/passwords-laravel-${ENVIRONMENT}.txt"
     cat > "$PASS_FILE" << EOF
 # ============================================================
@@ -431,7 +295,6 @@ EOF
 
 APP_KEY=${APP_KEY}
 EOF
-
     chmod 600 "$PASS_FILE"
     echo -e "${YELLOW}[WARN]${NC} APP_KEY salva em: $PASS_FILE"
 }
@@ -445,11 +308,10 @@ show_menu() {
     echo "  Criar Sealed Secrets - UniSelec"
     echo "=========================================="
     echo "1. Criar Sealed Secret REGCRED (cluster-wide)"
-    echo "2. Criar Sealed Secret BASE do MariaDB (cluster-wide)"
-    echo "3. Criar Sealed Secrets para STAGING"
-    echo "4. Criar Sealed Secrets para PRODUCTION"
-    echo "5. Criar TODOS os Sealed Secrets (base + ambientes)"
-    echo "6. Apenas obter certificado público"
+    echo "2. Criar Sealed Secrets para STAGING"
+    echo "3. Criar Sealed Secrets para PRODUCTION"
+    echo "4. Criar TODOS os Sealed Secrets (staging + production)"
+    echo "5. Apenas obter certificado público"
     echo "0. Sair"
     echo "=========================================="
 }
@@ -459,7 +321,6 @@ show_menu() {
 # ============================================================
 main() {
     echo -e "${GREEN}[INFO]${NC} === Criador de Sealed Secrets - UniSelec ==="
-
     check_dependencies
 
     while true; do
@@ -470,36 +331,30 @@ main() {
             1)
                 get_public_cert
                 create_regcred_sealed_secret
-                echo -e "${GREEN}[INFO]${NC} ✅ Sealed Secret REGCRED criado com sucesso!"
+                echo -e "${GREEN}[INFO]${NC} Sealed Secret REGCRED criado com sucesso!"
                 ;;
             2)
                 get_public_cert
-                create_mariadb_base_sealed_secret
-                echo -e "${GREEN}[INFO]${NC} ✅ Sealed Secret BASE do MariaDB criado com sucesso!"
+                create_mariadb_env_sealed_secret "staging" "uniselec-api-stg"
+                create_laravel_sealed_secret "staging" "uniselec-api-stg"
+                echo -e "${GREEN}[INFO]${NC} Sealed Secrets STAGING criados com sucesso!"
                 ;;
             3)
                 get_public_cert
-                create_mariadb_env_sealed_secret "staging" "uniselec-api-stg"
-                create_laravel_sealed_secret "staging" "uniselec-api-stg"
-                echo -e "${GREEN}[INFO]${NC} ✅ Sealed Secrets STAGING criados com sucesso!"
+                create_mariadb_env_sealed_secret "production" "uniselec-api"
+                create_laravel_sealed_secret "production" "uniselec-api"
+                echo -e "${GREEN}[INFO]${NC} Sealed Secrets PRODUCTION criados com sucesso!"
                 ;;
             4)
                 get_public_cert
-                create_mariadb_env_sealed_secret "production" "uniselec-api"
-                create_laravel_sealed_secret "production" "uniselec-api"
-                echo -e "${GREEN}[INFO]${NC} ✅ Sealed Secrets PRODUCTION criados com sucesso!"
-                ;;
-            5)
-                get_public_cert
                 create_regcred_sealed_secret
-                create_mariadb_base_sealed_secret
                 create_mariadb_env_sealed_secret "staging" "uniselec-api-stg"
                 create_laravel_sealed_secret "staging" "uniselec-api-stg"
                 create_mariadb_env_sealed_secret "production" "uniselec-api"
                 create_laravel_sealed_secret "production" "uniselec-api"
-                echo -e "${GREEN}[INFO]${NC} ✅ TODOS os Sealed Secrets criados com sucesso!"
+                echo -e "${GREEN}[INFO]${NC} TODOS os Sealed Secrets criados com sucesso!"
                 ;;
-            6)
+            5)
                 get_public_cert
                 ;;
             0)
