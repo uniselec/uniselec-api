@@ -26,7 +26,15 @@ class AppealDocumentController extends Controller
     {
         $request->validate([
             'file' => 'required|file|mimes:pdf|max:10240',
+        ],[
+            'file.required' => 'É obrigatório o envio de um arquivo PDF'
         ]);
+
+        if (in_array($appeal->status, ['accepted', 'rejected'])) {
+            return response()->json([
+                'message' => 'O recurso já foi analisado. Alterações não são mais permitidas'
+            ], 403);
+        }
 
         $file = $request->file('file');
 
@@ -54,7 +62,7 @@ class AppealDocumentController extends Controller
     {
         if ($appealDocument->appeal_id !== $appeal->id) {
             return response()->json([
-                'message' => 'Este documento não pertence ao recurso especificado.'
+                'message' => 'Este documento não pertence ao recurso informado'
             ], 403);
         }
 
@@ -70,11 +78,11 @@ class AppealDocumentController extends Controller
     public function download(Appeal $appeal, AppealDocument $appealDocument)
     {
         if ($appealDocument->appeal_id !== $appeal->id) {
-            return response()->json(['message' => 'Documento não pertence ao recurso.'], 403);
+            return response()->json(['message' => 'Este documento não pertence ao recurso informado'], 403);
         }
 
         if (!Storage::disk('local')->exists($appealDocument->path)) {
-            return response()->json(['message' => 'Arquivo não encontrado.'], 404);
+            return response()->json(['message' => 'O arquivo não foi encontrado'], 404);
         }
 
         return Storage::disk('local')->download(

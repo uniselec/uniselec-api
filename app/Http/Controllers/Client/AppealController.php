@@ -23,14 +23,17 @@ class AppealController extends BasicCrudController
     public function store(Request $request)
     {
         $request->validate([
-            'application_id' => 'required|exists:applications,id',
             'justification' => 'required|string',
+            'application_id' => 'required|exists:applications,id',
+        ],[
+            'justification.required' => 'A justificativa é obrigatória',
+            'application_id.required' => 'O ID da inscrição é obrigatório'
         ]);
 
         $application = Application::find($request->application_id);
         if (!$application) {
             return response()->json([
-                'message' => 'Não foi possível encontrar a Application.'
+                'message' => 'Não foi possível encontrar a inscrição'
             ], 403);
         }
 
@@ -50,7 +53,7 @@ class AppealController extends BasicCrudController
         // Check if it is within the allowed period
         if (!($now->greaterThanOrEqualTo($appeal_start_date) && $now->lessThanOrEqualTo($appeal_end_date))) {
             return response()->json([
-                'message' => 'O período para interpor recurso não está aberto.'
+                'message' => 'O período para interpor recurso não está disponível no momento'
             ], 403);
         }
 
@@ -70,9 +73,18 @@ class AppealController extends BasicCrudController
         $appeal = Appeal::findOrFail($id);
 
         $request->validate([
-            'application_id' => 'required|integer',
             'justification' => 'required|string',
+            'application_id' => 'required|exists:applications,id',
+        ],[
+            'justification.required' => 'A justificativa é obrigatória.',
+            'application_id.required' => 'O id da aplicação é obrigatório.'
         ]);
+
+        if (in_array($appeal->status, ['accepted', 'rejected'])) {
+            return response()->json([
+                'message' => 'O recurso já foi analisado. Alterações não são mais permitidas'
+            ], 403);
+        }
 
         $appeal->update($request->only(['application_id', 'justification']));
 
@@ -114,7 +126,7 @@ class AppealController extends BasicCrudController
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
-                'message' => 'Erro ao excluir o recurso.'
+                'message' => 'Ocorreu um erro ao excluir o recurso'
             ], 500);
         }
 

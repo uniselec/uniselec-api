@@ -36,6 +36,9 @@ class AppealController extends BasicCrudController
             'decision' => 'string|nullable',
             'reviewed_by' => 'required|string',
             'status' => 'required|string|in:accepted,rejected',
+        ],[
+            'status.required' => 'É necessário escolher um status para o recurso. Selecione entre "Aceitar" ou "Rejeitar"',
+            'status.in' => 'O status do recurso deve ser "Aceitar" ou "Rejeitar"',
         ]);
 
         $appeal->update($request->only(['decision', 'reviewed_by', 'status']));
