@@ -8,6 +8,7 @@ resources:
   - configmap-mariadb-galera.yaml   # configuração do Galera (custom.cnf)
   - service-mariadb.yaml
   - statefulset-mariadb.yaml
+  - backup-restore/ 
 
 # Variáveis de ambiente PÚBLICAS do MariaDB
 configMapGenerator:

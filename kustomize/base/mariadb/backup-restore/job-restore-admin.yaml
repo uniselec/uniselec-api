@@ -1,0 +1,55 @@
+# base/mariadb/backup-restore/job-restore-admin.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mariadb-restore-admin
+  labels:
+    app: mariadb
+    component: restore
+spec:
+  template:
+    spec:
+      serviceAccountName: mariadb-backup
+      containers:
+      - name: restore-admin
+        image: mariadb:10.6.24
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          echo "=== MODO RESTORE ADMIN ==="
+          echo "Para restaurar um backup, execute:"
+          echo "1. /scripts/list-backups.sh"
+          echo "2. /scripts/verify-backup.sh <timestamp>"
+          echo "3. /scripts/execute-restore-safe.sh <timestamp>"
+          echo ""
+          echo "Aguardando comandos..."
+          tail -f /dev/null
+        envFrom:
+        - secretRef:
+            name: mariadb-secret-env
+        volumeMounts:
+        - name: backup-storage
+          mountPath: /backup
+        - name: backup-scripts
+          mountPath: /scripts
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+        securityContext:
+          runAsUser: 0
+          privileged: true
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+      restartPolicy: Never
+      volumes:
+      - name: backup-storage
+        persistentVolumeClaim:
+          claimName: mariadb-backup-pvc
+      - name: backup-scripts
+        configMap:
+          name: mariadb-backup-scripts
+          defaultMode: 0755
+      - name: mysql-data
+        persistentVolumeClaim:
+          claimName: database-mariadb-0  # PVC específico do nó 0 para restore

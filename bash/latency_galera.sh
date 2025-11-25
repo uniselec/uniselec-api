@@ -1,10 +1,14 @@
-#!/usr/bin/env bash
+#!/bin/bash
+# ============================================================
+# Script paralelo de latência real de replicação Galera
+# ============================================================
+# Autor: erivandosena@gmail.com
+# Data: 2025-11-20
+# Versão: 1.0.0
+# ============================================================
+
 set -euo pipefail
 IFS=$'\n\t'
-
-# ======================================================
-# Script paralelo de latência real de replicação Galera
-# ======================================================
 
 NODES=("mariadb-0" "mariadb-1" "mariadb-2")
 NAMESPACE="uniselec-api-dev"

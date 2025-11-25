@@ -1,0 +1,33 @@
+# overlays/production/mariadb/backup-restore/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../../../../base/mariadb/backup-restore
+
+patches:
+- target:
+    kind: PersistentVolumeClaim
+    name: mariadb-backup-pvc
+  patch: |-
+    - op: replace
+      path: /spec/resources/requests/storage
+      value: 200Gi
+
+- target:
+    kind: CronJob
+    name: mariadb-backup-daily
+  patch: |-
+    - op: replace
+      path: /spec/schedule
+      value: "0 1 * * *"
+
+    - op: replace
+      path: /spec/jobTemplate/spec/template/spec/containers/0/resources
+      value:
+        requests:
+          memory: "2Gi"
+          cpu: "1"
+        limits:
+          memory: "4Gi"
+          cpu: "2"

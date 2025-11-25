@@ -1,7 +1,12 @@
 #!/bin/bash
-# diagnose-galera-complete.sh
-# Versão ampliada: mantém todo o comportamento original e adiciona testes de latência, flow control,
-# replicação detalhada, testes de carga de inserts/queries concorrentes e distribuição do service.
+# ============================================================
+# Script para testes de latência, flow control, replicação detalhada,
+# testes de carga de inserts/queries concorrentes e distribuição do service.
+# ============================================================
+# Autor: erivandosena@gmail.com
+# Data: 2025-11-20
+# Versão: 1.0.0
+# ============================================================
 
 set -o errexit
 set -o nounset
@@ -9,7 +14,7 @@ set -o pipefail
 
 NAMESPACE="uniselec-api-stg"
 PASSWORD="Password123"
-TEST_DB="uniselec_stag"
+TEST_DB="uniselec_diag_test"
 TEST_TABLE="galera_diag_test"
 LB_SERVICE="mariadb-app"
 PODS=(mariadb-0 mariadb-1 mariadb-2)
