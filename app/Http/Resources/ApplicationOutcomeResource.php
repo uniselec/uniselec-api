@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Application;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class ApplicationOutcomeResource extends JsonResource
@@ -16,6 +17,11 @@ class ApplicationOutcomeResource extends JsonResource
                 'selected_birthdate' => $this->getResolvedValue($data, 'birthdate'),
                 'selected_cpf'       => $this->getResolvedValue($data, 'cpf'),
             ];
+
+            $application = $this->application;
+            $data['application']['appeal'] = $application->appeal
+            ? new AppealResource($application->appeal->load('documents'))
+            : null;
         }
 
         return $data;

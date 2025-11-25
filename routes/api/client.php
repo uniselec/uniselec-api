@@ -27,6 +27,7 @@ Route::middleware(['auth:sanctum'])->prefix('client')->group(function () {
         ->name('appeal.documents.store');
         Route::delete('/appeal_documents/{appealDocument}', [AppealDocumentController::class, 'destroy'])
         ->name('appeal.documents.destroy');
+        Route::get('/appeal_documents/{appealDocument}/download', [AppealDocumentController::class, 'download']);
     });
 
 

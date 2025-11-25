@@ -16,7 +16,6 @@ class AppealDocumentResource extends JsonResource
             'id' => $this->id,
             'appeal_id' => $this->appeal_id,
             'path' => $this->path,
-            'url' => asset('storage/' . $this->path),
             'original_name' => $this->original_name,
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
         ];

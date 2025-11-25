@@ -33,7 +33,7 @@ class AppealController extends BasicCrudController
         $appeal = Appeal::findOrFail($id);
 
         $request->validate([
-            'decision' => 'required|string',
+            'decision' => 'string|nullable',
             'reviewed_by' => 'required|string',
             'status' => 'required|string|in:accepted,rejected',
         ]);
