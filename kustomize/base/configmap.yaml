@@ -98,10 +98,10 @@ data:
   # -------------------------------------------------
   # Swagger
   # -------------------------------------------------
-  L5_SWAGGER_CONST_HOST: https://uniselec-api-staging.unilab.edu.br/api
+  L5_SWAGGER_CONST_HOST: https://uniselec-api-development.unilab.edu.br/api
   L5_SWAGGER_GENERATE_ALWAYS: "true"
 
   # -------------------------------------------------
   # Custom
   # -------------------------------------------------
-  MESSAGE: Development
+  MESSAGE: Laravel Development Environment

@@ -12,15 +12,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-NAMESPACE="uniselec-api-stg"
+NAMESPACE="uniselec-api-dev"
 PASSWORD="Password123"
-TEST_DB="uniselec_diag_test"
-TEST_TABLE="galera_diag_test"
+TEST_DB="test_dev"
+TEST_TABLE="test_dev"
 LB_SERVICE="mariadb-app"
 PODS=(mariadb-0 mariadb-1 mariadb-2)
-LB_TEST_ROUNDS=100
+LB_TEST_ROUNDS=50
 CONCURRENT_INSERTS=50
-INSERT_ITERATIONS=100
+INSERT_ITERATIONS=50
 
 echo "╔════════════════════════════════════════════════════════════════╗"
 echo "║     Diagnóstico Completo - MariaDB Galera Cluster              ║"

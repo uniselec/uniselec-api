@@ -44,38 +44,16 @@ configMapGenerator:
     options:
       disableNameSuffixHash: true
     literals:
-
-      # -------------------------------------------------
-      # Application - Production
-      # -------------------------------------------------
       - APP_NAME=UniSelec Seleções
       - APP_ENV=production
       - APP_DEBUG=false
       - APP_URL=https://uniselec-api.unilab.edu.br
       - FRONTEND_URL=https://selecoes.unilab.edu.br
       - BACKOFFICE_URL=https://uniselec-admin.unilab.edu.br
-
-      # -------------------------------------------------
-      # Logging
-      # -------------------------------------------------
-      - LOG_LEVEL=error
-
-      # -------------------------------------------------
-      # Email
-      # -------------------------------------------------
       - MAIL_FROM_ADDRESS=noreply@selecoes.unilab.edu.br
       - MAIL_FROM_NAME=Seleções - UNILAB
-
-      # -------------------------------------------------
-      # Swagger
-      # -------------------------------------------------
-      - L5_SWAGGER_CONST_HOST=https://uniselec-api.unilab.edu.br/api
-      - L5_SWAGGER_GENERATE_ALWAYS=false
-
-      # -------------------------------------------------
-      # Custom
-      # -------------------------------------------------
       - WEB_APPLICATION_LINK=https://selecoes.unilab.edu.br
+      - LOG_LEVEL=error
       - MESSAGE=Production
 
   - name: mariadb-env
