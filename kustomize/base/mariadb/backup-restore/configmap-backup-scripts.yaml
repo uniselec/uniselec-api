@@ -1,0 +1,383 @@
+# base/mariadb/backup-restore/configmap-backup-scripts.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mariadb-backup-scripts
+  labels:
+    app: mariadb
+    component: backup
+data:
+  # ======================================================
+  # BACKUP GALERA
+  # ======================================================
+  backup-galera-optimized.sh: |
+    #!/bin/bash
+    set -eo pipefail
+
+    log() {
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a /backup/backup.log
+    }
+
+    error() {
+      echo "[ERROR][$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a /backup/backup.log
+      exit 1
+    }
+
+    HOSTNAME=$(hostname)
+    ORDINAL="${HOSTNAME##*-}"
+
+    # Backup apenas em nós secundários
+    if [ "$ORDINAL" = "0" ]; then
+      log "Skip: Backup deve executar em nós secundários (mariadb-1, mariadb-2)"
+      exit 0
+    fi
+
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    BACKUP_DIR="/backup/${TIMESTAMP}"
+    LOG_FILE="/backup/backup-${TIMESTAMP}.log"
+
+    mkdir -p "$BACKUP_DIR"
+
+    log "=== BACKUP GALERA OTIMIZADO (Nó Secundário) ==="
+    log "Executando em: $HOSTNAME"
+    log "Backup Directory: $BACKUP_DIR"
+
+    # Verificar se o MariaDB está respondendo
+    log "Verificando conexão com MariaDB..."
+    if ! mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}" --silent; then
+      error "MariaDB não está respondendo"
+    fi
+
+    # ======================================================
+    # 1. BACKUP FÍSICO (Mariabackup) - Para restore rápido
+    # ======================================================
+    log "Iniciando backup físico com mariabackup..."
+
+    if mariabackup --backup \
+      --user=root \
+      --password="${MYSQL_ROOT_PASSWORD}" \
+      --target-dir="${BACKUP_DIR}/physical" \
+      --compress \
+      --compress-threads=2 \
+      --parallel=2; then
+
+      log "Backup físico concluído com sucesso"
+
+      # Preparar backup para restore
+      mariabackup --prepare \
+        --target-dir="${BACKUP_DIR}/physical" \
+        --compress
+
+      log "Backup físico preparado para restore"
+    else
+      error "Falha no backup físico"
+    fi
+
+    # ======================================================
+    # 2. BACKUP LÓGICO (mysqldump) - Para migração/verificação
+    # ======================================================
+    log "Iniciando backup lógico completo..."
+
+    if mariadb-dump -u root -p"${MYSQL_ROOT_PASSWORD}" \
+      --all-databases \
+      --routines \
+      --events \
+      --triggers \
+      --single-transaction \
+      --master-data=1 \
+      --flush-logs \
+      --hex-blob \
+      --max-allowed-packet=1G \
+      > "${BACKUP_DIR}/logical-full-backup.sql"; then
+
+      log "Backup lógico concluído"
+
+      # Compactar backup lógico
+      gzip "${BACKUP_DIR}/logical-full-backup.sql"
+      log "Backup lógico compactado"
+    else
+      error "Falha no backup lógico"
+    fi
+
+    # ======================================================
+    # 3. BACKUP DE METADADOS DO GALERA
+    # ======================================================
+    log "Fazendo backup de metadados do Galera..."
+
+    # Backup do grastate.dat
+    cp /var/lib/mysql/grastate.dat "${BACKUP_DIR}/grastate.dat" 2>/dev/null || true
+
+    # Backup do galera.cache
+    cp /var/lib/mysql/galera.cache "${BACKUP_DIR}/galera.cache" 2>/dev/null || true
+
+    # Backup do status do cluster
+    mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" -e "
+      SHOW STATUS LIKE 'wsrep%';
+      SHOW GLOBAL STATUS LIKE 'wsrep%';
+    " > "${BACKUP_DIR}/galera-status.txt" 2>/dev/null || true
+
+    # ======================================================
+    # 4. VALIDAÇÃO E VERIFICAÇÃO
+    # ======================================================
+    log "Validando backups..."
+
+    # Verificar integridade do backup lógico
+    if gzip -t "${BACKUP_DIR}/logical-full-backup.sql.gz"; then
+      log "✓ Backup lógico válido"
+    else
+      error "✗ Backup lógico corrompido"
+    fi
+
+    # Verificar se backup físico é válido
+    if [ -f "${BACKUP_DIR}/physical/xtrabackup_checkpoints" ]; then
+      log "✓ Backup físico válido"
+    else
+      error "✗ Backup físico incompleto"
+    fi
+
+    # ======================================================
+    # 5. LIMPEZA DE BACKUPS ANTIGOS (> 7 dias)
+    # ======================================================
+    log "Limpando backups antigos..."
+    find /backup -name "202*" -type d -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
+    find /backup -name "backup-*.log" -mtime +7 -delete 2>/dev/null || true
+
+    # ======================================================
+    # 6. RELATÓRIO FINAL
+    # ======================================================
+    BACKUP_SIZE=$(du -sh "$BACKUP_DIR" | cut -f1)
+    log "=== BACKUP CONCLUÍDO COM SUCESSO ==="
+    log "Backup ID: $TIMESTAMP"
+    log "Tamanho: $BACKUP_SIZE"
+    log "Localização: $BACKUP_DIR"
+
+    echo "SUCCESS:$TIMESTAMP" > "/backup/last_backup_status"
+
+    log "Backup finalizado às $(date)"
+
+  # ======================================================
+  # SCRIPT DE RESTORE SEGURO
+  # ======================================================
+  restore-galera-safe.sh: |
+    #!/bin/bash
+    set -eo pipefail
+
+    log() {
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a /backup/restore.log
+    }
+
+    if [ -z "$1" ]; then
+      echo "Uso: $0 <backup-timestamp>"
+      echo "Exemplo: $0 20231201-020000"
+      exit 1
+    fi
+
+    BACKUP_TIMESTAMP="$1"
+
+    log "=== PROCEDIMENTO DE RESTORE SEGURO (Percona Validado) ==="
+
+    log "VERIFICAÇÕES PRÉ-RESTORE:"
+    log "1. Este backup foi testado em ambiente staging? [S/N]"
+    log "2. Há backup recente dos dados atuais? [S/N]"
+    log "3. A aplicação está em modo de manutenção? [S/N]"
+    log "4. Equipe está preparada para rollback? [S/N]"
+    log ""
+    log "Procedimento completo levará 15-30 minutos"
+    log ""
+
+    log "PROCEDIMENTO COMPLETO:"
+    log "1. kubectl scale deployment uniselec-api --replicas=0"
+    log "2. kubectl patch statefulset mariadb -p '{\"spec\":{\"replicas\":0}}'"
+    log "3. kubectl delete pod mariadb-0 --force --grace-period=0"
+    log "4. kubectl apply -f job-restore-admin.yaml"
+    log "5. kubectl exec job/mariadb-restore-admin -- /scripts/execute-restore-safe.sh $BACKUP_TIMESTAMP"
+    log "6. kubectl patch statefulset mariadb -p '{\"spec\":{\"replicas\":3}}'"
+    log "7. kubectl scale deployment uniselec-api --replicas=1"
+
+  # ======================================================
+  # SCRIPT DE EXECUÇÃO DE RESTORE
+  # ======================================================
+  execute-restore-safe.sh: |
+    #!/bin/bash
+    set -eo pipefail
+
+    if [ -z "$1" ]; then
+      echo "Uso: $0 <backup-timestamp>"
+      exit 1
+    fi
+
+    BACKUP_TIMESTAMP="$1"
+    BACKUP_DIR="/backup/${BACKUP_TIMESTAMP}"
+    RESTORE_DIR="/var/lib/mysql"
+
+    echo "=== EXECUTANDO RESTORE FÍSICO SEGURO ==="
+
+    # Validar backup antes de qualquer operação
+    if [ ! -d "$BACKUP_DIR" ]; then
+      echo "Backup não encontrado: $BACKUP_DIR"
+      exit 1
+    fi
+
+    if [ ! -d "${BACKUP_DIR}/physical" ]; then
+      echo "Backup físico não encontrado"
+      exit 1
+    fi
+
+    # Parar MariaDB completamente
+    echo "Parando MariaDB..."
+    pkill -f mariadbd || true
+    sleep 10
+
+    # Garantir que parou
+    pkill -9 -f mariadbd || true
+    sleep 5
+
+    # Backup dos dados atuais (rollback safety)
+    echo "Fazendo backup dos dados atuais..."
+    CURRENT_BACKUP="/backup/pre-restore-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$CURRENT_BACKUP"
+
+    if [ -d "$RESTORE_DIR" ] && [ "$(ls -A $RESTORE_DIR)" ]; then
+      cp -r "$RESTORE_DIR"/* "$CURRENT_BACKUP/" 2>/dev/null || true
+      echo "Backup de segurança criado: $CURRENT_BACKUP"
+    fi
+
+    echo "Limpando dados atuais..."
+    rm -rf "${RESTORE_DIR:?}"/*
+    rm -rf "${RESTORE_DIR:?}"/.* 2>/dev/null || true
+
+    echo "Restaurando backup físico..."
+
+    # Descompactar e restaurar
+    mariabackup --decompress \
+      --target-dir="${BACKUP_DIR}/physical" \
+      --parallel=2
+
+    mariabackup --copy-back \
+      --target-dir="${BACKUP_DIR}/physical" \
+      --datadir="$RESTORE_DIR"
+
+    echo "Backup físico restaurado"
+
+    # Garantir safe_to_bootstrap=1
+    echo "Configurando Galera para bootstrap seguro..."
+    cat > "$RESTORE_DIR/grastate.dat" << 'EOF'
+    # GALERA saved state - RESTORE POINT
+    version: 2.1
+    uuid: 00000000-0000-0000-0000-000000000000
+    seqno: -1
+    safe_to_bootstrap: 1
+    EOF
+
+    # Ajustar permissões
+    chown -R mysql:mysql "$RESTORE_DIR"
+    chmod 755 "$RESTORE_DIR"
+
+    echo "Verificando restore..."
+
+    if [ -f "$RESTORE_DIR/ibdata1" ] && [ -d "$RESTORE_DIR/mysql" ]; then
+      echo "Restore verificado com sucesso"
+    else
+      echo "Restore incompleto - arquivos essenciais faltando"
+      exit 1
+    fi
+
+    echo "RESTORE CONCLUÍDO! PRÓXIMOS PASSOS:"
+    echo "1. kubectl patch statefulset mariadb -p '{\"spec\":{\"replicas\":3}}'"
+    echo "2. Monitorar: kubectl logs mariadb-0 -f"
+    echo "3. Verificar cluster: kubectl exec mariadb-0 -- mariadb -u root -p\$MYSQL_ROOT_PASSWORD -e \"SHOW STATUS LIKE 'wsrep_cluster_size%'\""
+
+    echo "RESTORE_SUCCESS:$BACKUP_TIMESTAMP" > "/backup/last_restore_status"
+
+  # ======================================================
+  # SCRIPTS AUXILIARES
+  # ======================================================
+  list-backups.sh: |
+    #!/bin/bash
+
+    echo "=== BACKUPS DISPONÍVEIS ==="
+    echo ""
+
+    for backup_dir in /backup/20*; do
+      if [ -d "$backup_dir" ]; then
+        timestamp=$(basename "$backup_dir")
+        size=$(du -sh "$backup_dir" 2>/dev/null | cut -f1)
+        date=$(echo "$timestamp" | cut -d'-' -f1)
+        time=$(echo "$timestamp" | cut -d'-' -f2)
+
+        # Verificar integridade
+        if [ -f "$backup_dir/physical/xtrabackup_checkpoints" ] && [ -f "$backup_dir/logical-full-backup.sql.gz" ]; then
+          status="✓ COMPLETO"
+        elif [ -f "$backup_dir/physical/xtrabackup_checkpoints" ]; then
+          status="✓ FÍSICO"
+        elif [ -f "$backup_dir/logical-full-backup.sql.gz" ]; then
+          status="✓ LÓGICO"
+        else
+          status="✗ CORROMPIDO"
+        fi
+
+        printf "%-15s | %-6s | %-10s | %s\n" "$timestamp" "$size" "$status" "$date $time"
+      fi
+    done | sort -r
+
+    echo ""
+    echo "Total de backups: $(find /backup -name "20*" -type d 2>/dev/null | wc -l)"
+
+    # Status do último backup
+    if [ -f "/backup/last_backup_status" ]; then
+      echo ""
+      echo "Último backup: $(cat /backup/last_backup_status)"
+    fi
+
+  verify-backup.sh: |
+    #!/bin/bash
+
+    if [ -z "$1" ]; then
+      echo "Uso: $0 <backup-timestamp>"
+      echo "Exemplo: $0 20231201-020000"
+      exit 1
+    fi
+
+    BACKUP_DIR="/backup/$1"
+
+    echo "Verificando backup: $1"
+    echo "========================="
+
+    # Verificar se diretório existe
+    if [ ! -d "$BACKUP_DIR" ]; then
+      echo "Backup não encontrado"
+      exit 1
+    fi
+
+    # Verificar backup físico
+    echo -n "Backup físico: "
+    if [ -f "$BACKUP_DIR/physical/xtrabackup_checkpoints" ]; then
+      echo "OK"
+      echo "- Checkpoints: $(cat "$BACKUP_DIR/physical/xtrabackup_checkpoints" | grep -E '(backup_type|from_lsn|to_lsn)')"
+    else
+      echo "FALTANDO"
+    fi
+
+    # Verificar backup lógico
+    echo -n "Backup lógico: "
+    if [ -f "$BACKUP_DIR/logical-full-backup.sql.gz" ]; then
+      if gzip -t "$BACKUP_DIR/logical-full-backup.sql.gz"; then
+        echo "OK"
+        echo "  - Tamanho: $(du -h "$BACKUP_DIR/logical-full-backup.sql.gz" | cut -f1)"
+      else
+        echo "CORROMPIDO"
+      fi
+    else
+      echo "FALTANDO"
+    fi
+
+    # Verificar metadados
+    echo -n "Metadados Galera: "
+    if [ -f "$BACKUP_DIR/grastate.dat" ]; then
+      echo "OK"
+    else
+      echo "FALTANDO (será criado no restore)"
+    fi
+
+    echo "========================="
+    echo "Status geral: $( [ -f "$BACKUP_DIR/physical/xtrabackup_checkpoints" ] && [ -f "$BACKUP_DIR/logical-full-backup.sql.gz" ] && echo "PRONTO PARA RESTORE" || echo "INCOMPLETO" )"
