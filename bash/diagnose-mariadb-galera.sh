@@ -12,10 +12,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-NAMESPACE="uniselec-api-dev"
+NAMESPACE="uniselec-api-stg"
 PASSWORD="Password123"
-TEST_DB="test_dev"
-TEST_TABLE="test_dev"
+TEST_DB="test_diagnose"
+TEST_TABLE="diagnose_test"
 LB_SERVICE="mariadb-app"
 PODS=(mariadb-0 mariadb-1 mariadb-2)
 LB_TEST_ROUNDS=50
@@ -53,16 +53,23 @@ trap 'safe_rm_test_table || true' EXIT
 
 # Create test table if DB exists
 create_test_table_if_needed() {
-  # Check DB exists on first pod; if not, skip creating table.
   local p=${PODS[0]}
+  # Tenta criar o banco se não existir
+  if ! kubexec_sql "$p" "SHOW DATABASES;" | grep -q "^${TEST_DB}$"; then
+    echo "   📁 Criando banco ${TEST_DB} em ${p}..."
+    kubexec_sql "$p" "CREATE DATABASE IF NOT EXISTS ${TEST_DB};"
+  fi
+
+  # Agora cria a tabela se o banco existe
   if kubexec_sql "$p" "SHOW DATABASES;" | grep -q "^${TEST_DB}$"; then
     kubexec_sql "$p" "CREATE TABLE IF NOT EXISTS ${TEST_DB}.${TEST_TABLE} (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       created TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),
       payload VARCHAR(255)
     ) ENGINE=InnoDB;" >/dev/null
+    echo "   ✅ Tabela ${TEST_TABLE} criada/verificada no banco ${TEST_DB}."
   else
-    echo "   ⚠️  Banco ${TEST_DB} não encontrado em ${p} — pulando criação de tabela de teste."
+    echo "   ❌ Falha ao criar banco ${TEST_DB} — pulando criação de tabela de teste."
   fi
 }
 
