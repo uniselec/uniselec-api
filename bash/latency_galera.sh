@@ -11,8 +11,8 @@ set -euo pipefail
 IFS=$'\n\t'
 
 NODES=("mariadb-0" "mariadb-1" "mariadb-2")
-NAMESPACE="uniselec-api-dev"
-DB="tests"
+NAMESPACE="uniselec-api-stg"
+DB="test_latency"
 TABLE="latency_test"
 ITERATIONS=3
 
