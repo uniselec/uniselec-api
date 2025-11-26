@@ -23,6 +23,7 @@ use App\Http\Controllers\Admin\KnowledgeAreaController;
 use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
 use App\Http\Controllers\Admin\ProcessSelectionNotifyController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
@@ -35,6 +36,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::post('/resend-password-link', [AdminController::class, 'resendPasswordResetLink'])->name('admin.super_user.resend-password-link');
         Route::post('/resend-password-link-user', [UserController::class, 'resendPasswordResetLink'])->name('admin.super_user.resend-password-link-user');
 
+        Route::get('process_selections/{selection}/applications/export',[ReportController::class, 'exportApplications'])->name('admin.promoter.processSelection.applications.export');
 
 
         Route::apiResource('admins', AdminController::class)->names('admin.super_user.admins');
