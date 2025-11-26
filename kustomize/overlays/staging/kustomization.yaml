@@ -5,106 +5,68 @@ kind: Kustomization
 namespace: uniselec-api-stg
 
 resources:
-- ../../base
-- namespace.yaml
+  - ../../base
+  - namespace.yaml
+  - sealed-secret-mariadb-credentials.yaml
+  - sealed-secret-laravel-secrets.yaml
 
-# inicio - staging do MariaDB
+# Patches específicos de staging
 patches:
-- path: patch-deployment.yaml
-- path: patch-ingress.yaml
-- path: patch-hpa.yaml
-- path: mariadb/patch-statefulset.yaml
-  target:
-    kind: StatefulSet
-    name: mariadb
-# fim - MariaDB
+  - path: patch-deployment.yaml
+    target:
+      kind: Deployment
+      name: uniselec-api
 
+  - path: patch-ingress.yaml
+    target:
+      kind: Ingress
+      name: uniselec-api
 
+  - path: patch-hpa.yaml
+    target:
+      kind: HorizontalPodAutoscaler
+      name: uniselec-api
 
+  - path: mariadb/patch-statefulset.yaml
+    target:
+      kind: StatefulSet
+      name: mariadb
 
+  - path: mariadb/patch-service-loadbalancer.yaml
+    target:
+      kind: Service
+      name: mariadb-lb
 
-
-
-
-
-
-
-
-
-
-
-# inicio - Override de variáveis do MariaDB para staging
+# MERGE com valores específicos de STAGING
 configMapGenerator:
-- behavior: merge
-  literals:
-  - APP_NAME="UniSelec/Seleções - Staging"
-  - APP_ENV=staging
-  - APP_KEY=base64:K10kGMbwmuMCIciRc3hjsSr/dQDWSIN1mEFOQ0aVA2M=
-  - APP_DEBUG=true
-  - APP_URL='https://uniselec-api-staging.unilab.edu.br'
-  - FRONTEND_URL='https://selecoes-staging.unilab.edu.br'
-  - BACKOFFICE_URL='https://uniselec-admin-staging.unilab.edu.br'
-  - LOG_CHANNEL=stack
-  - LOG_DEPRECATIONS_CHANNEL=null
-  - LOG_LEVEL=debug
-  - DB_CONNECTION=mysql
-  - DB_HOST=mariadb-app.uniselec-api-stg.svc.cluster.local
-  - DB_PORT=3306
-  - DB_DATABASE=uniselec_stag
-  - DB_USERNAME=root
-  - DB_PASSWORD=Password123
-  - BROADCAST_DRIVER=log
-  - CACHE_DRIVER=file
-  - FILESYSTEM_DISK=local
-  - QUEUE_CONNECTION=sync
-  - SESSION_DRIVER=file
-  - SESSION_LIFETIME=120
-  - MEMCACHED_HOST=127.0.0.1
-  - REDIS_HOST=127.0.0.1
-  - REDIS_PASSWORD=null
-  - REDIS_PORT=6379
-  - MAIL_MAILER=smtp
-  - MAIL_HOST=smtp.noreply.unilab.edu.br
-  - MAIL_PORT=25
-  - MAIL_USERNAME=""
-  - MAIL_PASSWORD=""
-  - MAIL_ENCRYPTION=""
-  - MAIL_FROM_ADDRESS="noreply@selecoes-staging.unilab.edu.br"
-  - MAIL_FROM_NAME="[Treinamento] Seleções - UNILAB"
-  - AWS_ACCESS_KEY_ID=
-  - AWS_SECRET_ACCESS_KEY=
-  - AWS_DEFAULT_REGION=us-east-1
-  - AWS_BUCKET=
-  - AWS_USE_PATH_STYLE_ENDPOINT=false
-  - PUSHER_APP_ID=
-  - PUSHER_APP_KEY=
-  - PUSHER_APP_SECRET=
-  - PUSHER_HOST=
-  - PUSHER_PORT=443
-  - PUSHER_SCHEME=https
-  - PUSHER_APP_CLUSTER=mt1
-  - VITE_APP_NAME="${APP_NAME}"
-  - VITE_PUSHER_APP_KEY="${PUSHER_APP_KEY}"
-  - VITE_PUSHER_HOST="${PUSHER_HOST}"
-  - VITE_PUSHER_PORT="${PUSHER_PORT}"
-  - VITE_PUSHER_SCHEME="${PUSHER_SCHEME}"
-  - VITE_PUSHER_APP_CLUSTER="${PUSHER_APP_CLUSTER}"
-  - L5_SWAGGER_CONST_HOST=https://uniselec-api-staging.unilab.edu.br/api
-  - L5_SWAGGER_GENERATE_ALWAYS=true
-  - MESSAGE=Staging
-  name: uniselec-api-config
-  options:
-    disableNameSuffixHash: true
-- behavior: merge
-  literals:
-  - DB_DATABASE=uniselec_stag
-  - MYSQL_DATABASE=uniselec_stag
-  - MARIADB_CLUSTER_NAME=uniselec_stag_galera_cluster
-  name: mariadb-env
-  options:
-    disableNameSuffixHash: true
-# fim - Override de variáveis
+  - name: uniselec-api-config
+    behavior: merge
+    options:
+      disableNameSuffixHash: true
+    literals:
+      - APP_NAME=UniSelec/Seleções - Staging
+      - APP_ENV=staging
+      - APP_DEBUG=false
+      - APP_URL=https://uniselec-api-staging.unilab.edu.br
+      - FRONTEND_URL=https://selecoes-staging.unilab.edu.br
+      - BACKOFFICE_URL=https://uniselec-admin-staging.unilab.edu.br
+      - MAIL_FROM_ADDRESS=noreply@selecoes-staging.unilab.edu.br
+      - MAIL_FROM_NAME=[Treinamento] Seleções - UNILAB
+      - WEB_APPLICATION_LINK=https://selecoes-staging.unilab.edu.br
+      - LOG_LEVEL=info
+      - MESSAGE=Staging
+
+  - name: mariadb-env
+    behavior: merge
+    options:
+      disableNameSuffixHash: true
+    literals:
+      - DB_HOST=mariadb-app.uniselec-api-stg.svc.cluster.local
+      - DB_DATABASE=uniselec_stag
+      - MYSQL_DATABASE=uniselec_stag
+      - MYSQL_USER=uniselec_stag_user
+      - MARIADB_CLUSTER_NAME=uniselec_stag_galera_cluster
 
 images:
-- name: dti-registro.unilab.edu.br/unilab/uniselec-api
-  newTag: latest
+  - name: dti-registro.unilab.edu.br/unilab/uniselec-api
+    newTag: latest

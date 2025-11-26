@@ -31,8 +31,8 @@ spec:
 
       source:
         repoURL: '{{repoURL}}'
-        targetRevision: main  # Branch principal
-        path: '{{path}}'      # kustomize/overlays/staging ou production
+        targetRevision: ${GIT_BRANCH}
+        path: '{{path}}'
 
       destination:
         server: '{{cluster}}'
@@ -47,8 +47,8 @@ spec:
 
       syncPolicy:
         automated:
-          prune: true      # Remove recursos deletados do Git
-          selfHeal: true   # Corrige drift automaticamente
+          prune: true
+          selfHeal: true
         syncOptions:
           - CreateNamespace=true
           - PruneLast=true

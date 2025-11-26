@@ -3,8 +3,8 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: uniselec-api
 spec:
-  minReplicas: 2
-  maxReplicas: 15
+  minReplicas: 3
+  maxReplicas: 10
   metrics:
   - type: Resource
     resource:

@@ -19,6 +19,19 @@
 # ----------------------------------------------------------------------
 # Usage:      kubectl apply -f mariadb-statefulset.yaml
 # =====================================================================-
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mariadb-pdb
+  labels:
+    app: mariadb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: mariadb
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -38,15 +51,25 @@ spec:
         app: mariadb
         mariadb/replication-role: member
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: mariadb
+              topologyKey: kubernetes.io/hostname
+
       serviceAccountName: mariadb
+
       securityContext:
         runAsUser: 999
         runAsGroup: 999
         fsGroup: 999
         fsGroupChangePolicy: "OnRootMismatch"
+
       initContainers:
         - name: mariadb-bootstrap-check
-          image: mariadb:11.3.2
+          image: mariadb:10.6.24
           command:
             - /bin/bash
             - -c
@@ -55,7 +78,8 @@ spec:
               GR="/var/lib/mysql/grastate.dat"
               LOG="/var/lib/mysql/wsrep_bootstrap.log"
 
-              echo "[INFO] Starting bootstrap check..." > $LOG
+              echo "[INFO] Starting bootstrap... "
+              echo "[INFO] Bootstrap check" > $LOG
 
               echo "[INFO] Installing netcat" >> $LOG
               if ! apt-get update -qq >/dev/null 2>&1; then
@@ -85,7 +109,7 @@ spec:
                   echo "[INFO] safe_to_bootstrap=0 found" >> $LOG
                   ALL_DOWN=true
 
-                  NAMESPACE="${POD_NAMESPACE:-uniselec-api-stg}"
+                  NAMESPACE="${POD_NAMESPACE}"
 
                   for peer in "mariadb-0.mariadb.${NAMESPACE}.svc.cluster.local" \
                               "mariadb-1.mariadb.${NAMESPACE}.svc.cluster.local" \
@@ -119,6 +143,11 @@ spec:
               echo "[COMPLETE] Bootstrap check finished" >> $LOG
           securityContext:
             runAsUser: 0
+          env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
           envFrom:
             - configMapRef:
                 name: mariadb-env
@@ -130,7 +159,7 @@ spec:
 
       containers:
       - name: mariadb
-        image: mariadb:11.3.2
+        image: mariadb:10.6.24
         command:
         - bash
         - -c
@@ -171,7 +200,7 @@ spec:
 
           echo "[INFO] Pod: $HOSTNAME | Ordinal: $ordinal | ServerID: $SERVER_ID"
 
-          NAMESPACE="${POD_NAMESPACE:-uniselec-api-stg}"
+          NAMESPACE="${POD_NAMESPACE}"
 
           if [ "$ordinal" = "0" ]; then
             CLUSTER_ACTIVE=false
@@ -224,13 +253,18 @@ spec:
         resources:
           requests:
             cpu: "500m"
-            memory: "512Mi"
+            memory: "2Gi"
           limits:
             cpu: "2"
-            memory: "3Gi"
+            memory: "4Gi"
+
         securityContext:
           runAsUser: 0
           runAsGroup: 0
+          capabilities:
+            add:
+              - IPC_LOCK
+
         ports:
         - name: mysql
           containerPort: 3306
@@ -268,10 +302,10 @@ spec:
             - -c
             - |
               mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}"
-          initialDelaySeconds: 10
+          initialDelaySeconds: 30        # aguarde mais na primeira verificação
           periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 30  # 5min para iniciar
+          timeoutSeconds: 10             # mais tempo para a resposta do banco
+          failureThreshold: 60           # até 10min tolerância total de inicialização
 
         readinessProbe:
           exec:

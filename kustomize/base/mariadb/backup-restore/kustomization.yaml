@@ -1,0 +1,10 @@
+# base/mariadb/backup-restore/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - serviceaccount-backup.yaml
+  - pvc-backup-storage.yaml
+  - configmap-backup-scripts.yaml
+  - cronjob-backup-daily.yaml
+  - job-restore-admin.yaml

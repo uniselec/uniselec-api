@@ -1,0 +1,54 @@
+# base/mariadb/backup-restore/cronjob-backup-daily.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mariadb-backup-daily
+  labels:
+    app: mariadb
+    component: backup
+spec:
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: mariadb-backup
+          # Executar apenas em nós secundários
+          nodeSelector:
+            kubernetes.io/hostname: worker02-c1  # Ajustar para os workers secundários
+          containers:
+          - name: backup
+            image: mariadb:10.6.24
+            command: ["/bin/bash", "/scripts/backup-galera-optimized.sh"]
+            envFrom:
+            - secretRef:
+                name: mariadb-secret-env
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+            - name: backup-scripts
+              mountPath: /scripts
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+              readOnly: true
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "1"
+          restartPolicy: OnFailure
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: mariadb-backup-pvc
+          - name: backup-scripts
+            configMap:
+              name: mariadb-backup-scripts
+              defaultMode: 0755
+          - name: mysql-data
+            persistentVolumeClaim:
+              claimName: database-mariadb-1  # PVC específico do nó secundário

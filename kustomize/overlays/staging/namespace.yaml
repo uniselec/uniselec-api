@@ -3,5 +3,8 @@ kind: Namespace
 metadata:
   name: uniselec-api-stg
   labels:
-    environment: staging
+    name: uniselec-api-stg
     app: uniselec-api
+    environment: staging
+    managed-by: kustomize
+    project: uniselec

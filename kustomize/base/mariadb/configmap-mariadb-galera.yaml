@@ -61,7 +61,7 @@ data:
 
     # InnoDB
     innodb_flush_log_at_trx_commit = 1
-    innodb_buffer_pool_size = 512M
+    innodb_buffer_pool_size = 2Gi
     innodb_log_file_size = 128M
     innodb_flush_method = O_DIRECT
 
@@ -85,7 +85,8 @@ data:
     wsrep_sst_method = mariabackup
     wsrep_slave_threads = 4
     wsrep_retry_autocommit = 3
-    wsrep_provider_options = "gcache.size=512M;evs.suspect_timeout=PT10S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S"
+    # wsrep_provider_options = "gcache.size=512M;evs.suspect_timeout=PT10S;evs.inactive_timeout=PT30S;evs.install_timeout=PT15S"
+    wsrep_provider_options = "gcache.size=512M;evs.suspect_timeout=PT5S;evs.inactive_timeout=PT15S;evs.install_timeout=PT5S;evs.send_window=512;evs.user_send_window=256"
 
     [mariadb]
     transaction-isolation = READ-COMMITTED

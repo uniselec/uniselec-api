@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\KnowledgeAreaController;
 use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
 use App\Http\Controllers\Admin\ProcessSelectionNotifyController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
@@ -31,6 +32,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::post('/resend-password-link', [AdminController::class, 'resendPasswordResetLink'])->name('admin.promoter.resend-password-link');
         Route::post('/resend-password-link-user', [UserController::class, 'resendPasswordResetLink'])->name('admin.resend-password-link-user');
 
+        Route::get('process_selections/{selection}/applications/export',[ReportController::class, 'exportApplications'])->name('admin.promoter.processSelection.applications.export');
 
 
         Route::apiResource('admins', AdminController::class)->names('admin.promoter.admins');
@@ -46,11 +48,11 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
 
         Route::apiResource('applications', ApplicationController::class)->only(['index', 'show'])->names('admin.promoter.applications');
 
-      
+
         Route::apiResource('application_outcomes', ApplicationOutcomeController::class)->only(['index', 'show'])->names('admin.promoter.application_outcomes');
         Route::patch('applications/{application_id}/resolve-inconsistencies', [ApplicationController::class, 'resolveInconsistencies'])->name('admin.promoter.applications.resolve-inconsistencies');
 
-        
+
 
         Route::apiResource('users', UserController::class)->only(['index', 'show']);
         Route::apiResource('enem_scores', EnemScoreController::class)->only(['index', 'show'])->names('enem_scores.api');;
