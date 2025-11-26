@@ -69,12 +69,18 @@ class ApplicationController extends BasicCrudController
             ->where('status', 'active')
             ->firstOrFail();
         $processSelectionId = $processSelection->id;
-        $start = $processSelection->start_date;
-        $end = $processSelection->end_date;
-        $now = now();
+
+        $start = Carbon::parse($processSelection->start_date);
+        $end   = Carbon::parse($processSelection->end_date);
+        $now   = Carbon::now();
+
         if ($now->lt($start) || $now->gt($end)) {
             return response()->json([
-                'message' => 'Inscrições estão fechadas. O período de inscrição é de ' . $start->format('d/m/Y H:i') . ' até ' . $end->format('d/m/Y H:i') . '.',
+                'message' => 'Inscrições estão fechadas. O período de inscrição é de '
+                    . $start->format('d/m/Y H:i')
+                    . ' até '
+                    . $end->format('d/m/Y H:i')
+                    . '.',
             ], 403);
         }
 
@@ -153,13 +159,17 @@ class ApplicationController extends BasicCrudController
             return response()->json(['message' => 'Processo de seleção inativo ou inexistente.'], 403);
         }
 
-        $now  = now();
-        $from = $processSelection->start_date;
-        $to   = $processSelection->end_date;
+        $start = Carbon::parse($processSelection->start_date);
+        $end   = Carbon::parse($processSelection->end_date);
+        $now   = Carbon::now();
 
-        if ($now->lt($from) || $now->gt($to)) {
+        if ($now->lt($start) || $now->gt($end)) {
             return response()->json([
-                'message' => "Inscrições estão fechadas. O período de inscrição é de {$from->format('d/m/Y H:i')} até {$to->format('d/m/Y H:i')}.",
+                'message' => 'Inscrições estão fechadas. O período de inscrição é de '
+                    . $start->format('d/m/Y H:i')
+                    . ' até '
+                    . $end->format('d/m/Y H:i')
+                    . '.',
             ], 403);
         }
 
