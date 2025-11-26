@@ -18,7 +18,7 @@ kubectl scale deployment uniselec-api --replicas=0
 kubectl patch statefulset mariadb -p '{"spec":{"replicas":0}}'
 
 # 3. Aguardar pods pararem
-kubectl wait --for=delete pod/mariadb-0 --timeout=300s
+kubectl wait --for=delete pod/mariadb-0 --timeout=360s
 
 # 4. Executar restore
 kubectl apply -f job-restore-admin.yaml
