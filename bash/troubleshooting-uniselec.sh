@@ -35,7 +35,7 @@ SSH_USER="${SSH_USER:-ansible}"
 KUBECTL_CONTEXT="${KUBECTL_CONTEXT:-}"
 
 declare -A NS_MAP=( ["dev"]="uniselec-api-dev" ["stg"]="uniselec-api-stg" ["prd"]="uniselec-api-prd" )
-declare -A LB_MAP=( ["dev"]="10.130.0.159" ["stg"]="10.130.0.157" ["prd"]="10.130.0.158" )
+declare -A LB_MAP=( ["dev"]="10.130.0.159" ["stg"]="10.130.0.158" ["prd"]="10.130.0.157" )
 declare -A INGRESS_HOST=( ["dev"]="uniselec-api-development.unilab.edu.br" ["stg"]="uniselec-api-stg.unilab.edu.br" ["prd"]="uniselec-api.unilab.edu.br" )
 
 NAMESPACE="${NS_MAP[$ENV]}"
