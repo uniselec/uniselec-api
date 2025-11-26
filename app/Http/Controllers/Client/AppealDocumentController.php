@@ -25,9 +25,12 @@ class AppealDocumentController extends Controller
     public function store(Request $request, Appeal $appeal)
     {
         $request->validate([
-            'file' => 'required|file|mimes:pdf|max:10240',
+            'file' => 'required|file|mimes:pdf|max:2048',
         ],[
-            'file.required' => 'É obrigatório o envio de um arquivo PDF'
+            'file.required' => 'É obrigatório o envio de um arquivo PDF.',
+            'file.file'      => 'O arquivo enviado é inválido. Envie um arquivo PDF.',
+            'file.mimes'     => 'O arquivo deve ser um PDF.',
+            'file.max'       => 'O PDF deve ter tamanho máximo de 2MB.',
         ]);
 
         if (in_array($appeal->status, ['accepted', 'rejected'])) {

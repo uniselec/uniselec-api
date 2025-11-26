@@ -27,8 +27,7 @@ use App\Http\Controllers\Admin\ProcessSelectionNotifyController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
-
-
+use App\Http\Controllers\Client\AppealDocumentController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
@@ -53,6 +52,9 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::patch('applications/{id}/resolve-inconsistencies', [ApplicationController::class, 'resolveInconsistencies'])->name('admin.applications.resolve-inconsistencies');
         Route::apiResource('application_outcomes', ApplicationOutcomeController::class)->only(['index', 'show'])->names('admin.applications');
         Route::apiResource('appeals', AppealController::class)->names('admin.appeals');
+        Route::prefix('appeals/{appeal}')->group(function () {
+            Route::get('/appeal_documents/{appealDocument}/download', [AppealDocumentController::class, 'download']);
+        });
         Route::apiResource('users', UserController::class)->only(['index', 'show']);
         Route::apiResource('enem_scores', EnemScoreController::class)->only(['index', 'show'])->names('enem_scores.api');;
         Route::put('profile', [RegisterController::class, 'updateProfileAdmin'])->name('admin.super_user.profile.update');
