@@ -32,7 +32,6 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::post('/resend-password-link', [AdminController::class, 'resendPasswordResetLink'])->name('admin.promoter.resend-password-link');
         Route::post('/resend-password-link-user', [UserController::class, 'resendPasswordResetLink'])->name('admin.resend-password-link-user');
 
-
         Route::get('process_selections/{selection}/applications/export',[ReportController::class, 'exportApplications'])->name('admin.promoter.processSelection.applications.export');
 
 
