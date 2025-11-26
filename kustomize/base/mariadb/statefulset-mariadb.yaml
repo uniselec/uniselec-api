@@ -141,6 +141,8 @@ spec:
               fi
 
               echo "[COMPLETE] Bootstrap check finished" >> $LOG
+              cat $LOG
+
           securityContext:
             runAsUser: 0
           env:
@@ -178,15 +180,18 @@ spec:
           apt-get update -qq >/dev/null
           apt-get install -y -qq netcat-openbsd pv >/dev/null
 
+          echo "[STAGE] Preparando diretórios SST"
           mkdir -p /var/lib/mysql/.sst
           chown -Rf mysql:mysql /var/lib/mysql/.sst
           chmod 700 /var/lib/mysql/.sst
 
+          echo "[STAGE] Instalando mariadb-backup se necessário"
           export DEBIAN_FRONTEND=noninteractive
           command -v mariabackup >/dev/null || apt-get install -y -qq mariadb-backup >/dev/null
 
-          echo "[INFO] Iniciando configuração dinâmica do MariaDB Galera"
+          echo "[STAGE] Iniciando configuração dinâmica do MariaDB Galera"
 
+          echo "[CHECK] Variáveis essenciais"
           for v in MARIADB_CLUSTER_NAME SST_USER SST_PASSWORD; do
             if [ -z "${!v}" ]; then
               echo "[ERROR] Variável $v não definida"
@@ -203,12 +208,13 @@ spec:
           NAMESPACE="${POD_NAMESPACE}"
 
           if [ "$ordinal" = "0" ]; then
+            echo "[STAGE] Verificando cluster Galera ativo (peers)"
             CLUSTER_ACTIVE=false
 
             for peer in "mariadb-1.mariadb.${NAMESPACE}.svc.cluster.local" \
                         "mariadb-2.mariadb.${NAMESPACE}.svc.cluster.local"; do
               if nc -z -w2 "$peer" 4567 2>/dev/null; then
-                echo "[INFO] Cluster ativo: $peer"
+                echo "[INFO] Cluster ativo detectado em $peer"
                 CLUSTER_ACTIVE=true
                 CLUSTER_ADDRESS="gcomm://$peer:4567"
                 break
@@ -216,13 +222,14 @@ spec:
             done
 
             if [ "$CLUSTER_ACTIVE" = "false" ]; then
-              echo "[INFO] Bootstrap mode"
+              echo "[BOOTSTRAP] Nenhum peer ativo. Iniciando em modo bootstrap."
               CLUSTER_ADDRESS="gcomm://"
               BOOTSTRAP_FLAG="--wsrep-new-cluster"
             else
               BOOTSTRAP_FLAG=""
             fi
           else
+            echo "[STAGE] Inicializando nó adicional"
             CLUSTER_ADDRESS="gcomm://mariadb-0.mariadb.${NAMESPACE}.svc.cluster.local:4567"
             BOOTSTRAP_FLAG=""
           fi
@@ -230,6 +237,7 @@ spec:
           echo "[INFO] CLUSTER_ADDRESS: $CLUSTER_ADDRESS"
 
           CONFIG_FILE="/etc/mysql/mariadb.conf.d/99-custom.cnf"
+          echo "[STAGE] Renderizando arquivo de configuração customizada"
           sed -e "s/_SERVER_ID/$SERVER_ID/g" \
               -e "s|_MARIADB_CLUSTER_NAME|$MARIADB_CLUSTER_NAME|g" \
               -e "s|_MARIADB_CLUSTER_ADDRESS|$CLUSTER_ADDRESS|g" \
@@ -239,10 +247,12 @@ spec:
               /etc/mysql/config-template/custom.cnf > $CONFIG_FILE
 
           if [ "$ordinal" != "0" ]; then
+            echo "[CONFIG] Desativando GTID strict mode para non-bootstrap node"
             echo "gtid_strict_mode = OFF" >> "$CONFIG_FILE"
           fi
 
           if [ "$ordinal" = "0" ]; then
+            echo "[USERS] Executando ensure-users.sh"
             bash /etc/mysql/ensure-users.sh &
           fi
 
