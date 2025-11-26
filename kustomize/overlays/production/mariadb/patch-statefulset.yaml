@@ -17,7 +17,12 @@ spec:
   volumeClaimTemplates:
     - metadata:
         name: database
+        labels:
+          app: mariadb
       spec:
+        accessModes:             
+          - ReadWriteOnce
+        storageClassName: nfs-storage-k8s-v1
         resources:
           requests:
             storage: 50Gi
