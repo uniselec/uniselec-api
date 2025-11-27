@@ -1,6 +1,5 @@
 #!/bin/bash
 
-#!/bin/bash
 # ============================================================
 # Script para diagnóstico de performance entre aplicação e banco de dados
 # Diagnóstico de performance app <-> banco - MariaDB Galera (Kubernetes)
@@ -13,8 +12,8 @@
 NAMESPACE="uniselec-api-stg"
 MYSQL_USER="root"
 MYSQL_PASS="Password123"
-MYSQL_DB="test_diagnose"
-MYSQL_TABLE="diagnose_test"
+MYSQL_DB="uniselec_stag"
+MYSQL_TABLE="users"
 API_LABEL="app=uniselec-api"
 DB_LABEL="app=mariadb"
 PVC_PATH="/var/lib/mysql"
