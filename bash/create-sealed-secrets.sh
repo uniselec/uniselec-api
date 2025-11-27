@@ -341,8 +341,8 @@ main() {
                 ;;
             3)
                 get_public_cert
-                create_mariadb_env_sealed_secret "production" "uniselec-api"
-                create_laravel_sealed_secret "production" "uniselec-api"
+                create_mariadb_env_sealed_secret "production" "uniselec-api-prd"
+                create_laravel_sealed_secret "production" "uniselec-api-prd"
                 echo -e "${GREEN}[INFO]${NC} Sealed Secrets PRODUCTION criados com sucesso!"
                 ;;
             4)
@@ -350,8 +350,8 @@ main() {
                 create_regcred_sealed_secret
                 create_mariadb_env_sealed_secret "staging" "uniselec-api-stg"
                 create_laravel_sealed_secret "staging" "uniselec-api-stg"
-                create_mariadb_env_sealed_secret "production" "uniselec-api"
-                create_laravel_sealed_secret "production" "uniselec-api"
+                create_mariadb_env_sealed_secret "production" "uniselec-api-prd"
+                create_laravel_sealed_secret "production" "uniselec-api-prd"
                 echo -e "${GREEN}[INFO]${NC} TODOS os Sealed Secrets criados com sucesso!"
                 ;;
             5)
