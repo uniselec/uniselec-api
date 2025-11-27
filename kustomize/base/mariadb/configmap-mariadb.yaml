@@ -20,31 +20,41 @@ metadata:
   name: config-init-users
 data:
   init-users.sql: |
-    -- Criando banco e usuários
+    -- Criando banco e usuários COM atualização de senhas
 
     CREATE DATABASE IF NOT EXISTS `${DB_DATABASE}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
+    -- Usuário da aplicação
+    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%';
+    ALTER USER '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
     GRANT ALL PRIVILEGES ON `${DB_DATABASE}`.* TO '${MYSQL_USER}'@'%';
 
-    CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
+    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'localhost';
+    ALTER USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';
+    GRANT ALL PRIVILEGES ON `${DB_DATABASE}`.* TO '${MYSQL_USER}'@'localhost';
+
+    -- Usuário root
+    CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'%';
+    ALTER USER '${DB_USERNAME}'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
     GRANT ALL PRIVILEGES ON *.* TO '${DB_USERNAME}'@'%' WITH GRANT OPTION;
 
-    -- Configuração SST (Galera)
-    CREATE USER IF NOT EXISTS '${SST_USER}'@'%' IDENTIFIED BY '${SST_PASSWORD}';
-    GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'%';
-
-    -- SST precisa funcionar localmente também
-    CREATE USER IF NOT EXISTS '${SST_USER}'@'localhost' IDENTIFIED BY '${SST_PASSWORD}';
-    GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'localhost';
-
-    -- Para root funcionar dentro do pod
-    CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
+    CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'localhost';
+    ALTER USER '${DB_USERNAME}'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
     GRANT ALL PRIVILEGES ON *.* TO '${DB_USERNAME}'@'localhost' WITH GRANT OPTION;
 
-    -- Para usuário app funcionar de dentro do pod
-    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';
-    GRANT ALL PRIVILEGES ON `${DB_DATABASE}`.* TO '${MYSQL_USER}'@'localhost';
+    -- Usuário SST (CRÍTICO para Galera)
+    CREATE USER IF NOT EXISTS '${SST_USER}'@'%';
+    ALTER USER '${SST_USER}'@'%' IDENTIFIED BY '${SST_PASSWORD}';
+    GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'%';
+
+    CREATE USER IF NOT EXISTS '${SST_USER}'@'localhost';
+    ALTER USER '${SST_USER}'@'localhost' IDENTIFIED BY '${SST_PASSWORD}';
+    GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'localhost';
+
+    -- Usuário de replicação
+    CREATE USER IF NOT EXISTS 'replicator'@'%';
+    ALTER USER 'replicator'@'%' IDENTIFIED BY '${MARIADB_REPLICATION_PASSWORD}';
+    GRANT REPLICATION SLAVE ON *.* TO 'replicator'@'%';
 
     FLUSH PRIVILEGES;
 
@@ -65,7 +75,7 @@ data:
       exit 0
     fi
 
-    log "Aguardando MariaDB aceitar conexões..."
+    log "Aguardando MariaDB aceitar conexões."
     for i in {1..30}; do
       if mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" -h 127.0.0.1 -e "SELECT 1" >/dev/null 2>&1; then
         log "MariaDB pronto!"
@@ -74,29 +84,43 @@ data:
       sleep 3
     done
 
-    log "Executando comandos para garantir banco e usuários..."
+    log "Executando comandos para garantir banco e atualizar senhas de usuários."
     mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" -h 127.0.0.1 <<EOSQL
     CREATE DATABASE IF NOT EXISTS ${DB_DATABASE} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
+    -- Usuário da aplicação
+    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%';
+    ALTER USER '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
     GRANT ALL PRIVILEGES ON ${DB_DATABASE}.* TO '${MYSQL_USER}'@'%';
 
-    CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
+    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'localhost';
+    ALTER USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';
+    GRANT ALL PRIVILEGES ON ${DB_DATABASE}.* TO '${MYSQL_USER}'@'localhost';
+
+    -- Usuário root
+    CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'%';
+    ALTER USER '${DB_USERNAME}'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
     GRANT ALL PRIVILEGES ON *.* TO '${DB_USERNAME}'@'%' WITH GRANT OPTION;
 
-    CREATE USER IF NOT EXISTS '${SST_USER}'@'%' IDENTIFIED BY '${SST_PASSWORD}';
-    GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'%';
-
-    CREATE USER IF NOT EXISTS '${SST_USER}'@'localhost' IDENTIFIED BY '${SST_PASSWORD}';
-    GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'localhost';
-
-    CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
+    CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'localhost';
+    ALTER USER '${DB_USERNAME}'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
     GRANT ALL PRIVILEGES ON *.* TO '${DB_USERNAME}'@'localhost' WITH GRANT OPTION;
 
-    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';
-    GRANT ALL PRIVILEGES ON ${DB_DATABASE}.* TO '${MYSQL_USER}'@'localhost';
+    -- Usuário SST (CRÍTICO)
+    CREATE USER IF NOT EXISTS '${SST_USER}'@'%';
+    ALTER USER '${SST_USER}'@'%' IDENTIFIED BY '${SST_PASSWORD}';
+    GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'%';
+
+    CREATE USER IF NOT EXISTS '${SST_USER}'@'localhost';
+    ALTER USER '${SST_USER}'@'localhost' IDENTIFIED BY '${SST_PASSWORD}';
+    GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'localhost';
+
+    -- Usuário de replicação
+    CREATE USER IF NOT EXISTS 'replicator'@'%';
+    ALTER USER 'replicator'@'%' IDENTIFIED BY '${MARIADB_REPLICATION_PASSWORD}';
+    GRANT REPLICATION SLAVE ON *.* TO 'replicator'@'%';
 
     FLUSH PRIVILEGES;
     EOSQL
 
-    log "Usuários garantidos"
+    log "Usuários garantidos e credenciais atualizadas."
