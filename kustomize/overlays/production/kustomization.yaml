@@ -5,68 +5,68 @@ kind: Kustomization
 namespace: uniselec-api-prd
 
 resources:
-  - ../../base
-  - namespace.yaml
-  - sealed-secret-mariadb-credentials.yaml
-  - sealed-secret-laravel-secrets.yaml
+- ../../base
+- namespace.yaml
+- sealed-secret-mariadb-credentials.yaml
+- sealed-secret-laravel-secrets.yaml
 
 # Patches específicos de production
+
+
+
+
 patches:
-  - path: patch-deployment.yaml
-    target:
-      kind: Deployment
-      name: uniselec-api
-
-  - path: patch-ingress.yaml
-    target:
-      kind: Ingress
-      name: uniselec-api
-
-  - path: patch-hpa.yaml
-    target:
-      kind: HorizontalPodAutoscaler
-      name: uniselec-api
-
-  - path: mariadb/patch-statefulset.yaml
-    target:
-      kind: StatefulSet
-      name: mariadb
-
-  - path: mariadb/patch-service-loadbalancer.yaml
-    target:
-      kind: Service
-      name: mariadb-lb
+- path: patch-deployment.yaml
+  target:
+    kind: Deployment
+    name: uniselec-api
+- path: patch-ingress.yaml
+  target:
+    kind: Ingress
+    name: uniselec-api
+- path: patch-hpa.yaml
+  target:
+    kind: HorizontalPodAutoscaler
+    name: uniselec-api
+- path: mariadb/patch-statefulset.yaml
+  target:
+    kind: StatefulSet
+    name: mariadb
+- path: mariadb/patch-service-loadbalancer.yaml
+  target:
+    kind: Service
+    name: mariadb-lb
 
 # MERGE com valores específicos de PRODUCTION
-configMapGenerator:
-  - name: uniselec-api-config
-    behavior: merge
-    options:
-      disableNameSuffixHash: true
-    literals:
-      - APP_NAME=UniSelec Seleções
-      - APP_ENV=production
-      - APP_DEBUG=false
-      - APP_URL=https://uniselec-api.unilab.edu.br
-      - FRONTEND_URL=https://selecoes.unilab.edu.br
-      - BACKOFFICE_URL=https://uniselec-admin.unilab.edu.br
-      - MAIL_FROM_ADDRESS=noreply@selecoes.unilab.edu.br
-      - MAIL_FROM_NAME=Seleções - UNILAB
-      - WEB_APPLICATION_LINK=https://selecoes.unilab.edu.br
-      - LOG_LEVEL=error
-      - MESSAGE=Production
 
-  - name: mariadb-env
-    behavior: merge
-    options:
-      disableNameSuffixHash: true
-    literals:
-      - DB_HOST=mariadb-app.uniselec-api.svc.cluster.local
-      - DB_DATABASE=uniselec_prod
-      - MYSQL_DATABASE=uniselec_prod
-      - MYSQL_USER=uniselec_prod_user
-      - MARIADB_CLUSTER_NAME=uniselec_prod_galera_cluster
+configMapGenerator:
+- behavior: merge
+  literals:
+  - APP_NAME=UniSelec Seleções
+  - APP_ENV=production
+  - APP_DEBUG=false
+  - APP_URL=https://uniselec-api.unilab.edu.br
+  - FRONTEND_URL=https://selecoes.unilab.edu.br
+  - BACKOFFICE_URL=https://uniselec-admin.unilab.edu.br
+  - MAIL_FROM_ADDRESS=noreply@selecoes.unilab.edu.br
+  - MAIL_FROM_NAME=Seleções - UNILAB
+  - WEB_APPLICATION_LINK=https://selecoes.unilab.edu.br
+  - LOG_LEVEL=error
+  - MESSAGE=Production
+  name: uniselec-api-config
+  options:
+    disableNameSuffixHash: true
+- behavior: merge
+  literals:
+  - DB_HOST=mariadb-app.uniselec-api.svc.cluster.local
+  - DB_DATABASE=uniselec_prod
+  - MYSQL_DATABASE=uniselec_prod
+  - MYSQL_USER=uniselec_prod_user
+  - MARIADB_CLUSTER_NAME=uniselec_prod_galera_cluster
+  name: mariadb-env
+  options:
+    disableNameSuffixHash: true
 
 images:
-  - name: dti-registro.unilab.edu.br/unilab/uniselec-api
-    newTag: v1.0.0
+- name: dti-registro.unilab.edu.br/unilab/uniselec-api
+  newTag: v3.0.1
