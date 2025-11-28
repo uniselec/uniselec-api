@@ -14,6 +14,7 @@
 # ----------------------------------------------------------------------
 # Usage:      kubectl apply -f configmap-mariadb.yaml
 # =====================================================================-
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -84,43 +85,7 @@ data:
       sleep 3
     done
 
-    log "Executando comandos para garantir banco e atualizar senhas de usuários."
-    mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" -h 127.0.0.1 <<EOSQL
-    CREATE DATABASE IF NOT EXISTS ${DB_DATABASE} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-    -- Usuário da aplicação
-    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%';
-    ALTER USER '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
-    GRANT ALL PRIVILEGES ON ${DB_DATABASE}.* TO '${MYSQL_USER}'@'%';
-
-    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'localhost';
-    ALTER USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';
-    GRANT ALL PRIVILEGES ON ${DB_DATABASE}.* TO '${MYSQL_USER}'@'localhost';
-
-    -- Usuário root
-    CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'%';
-    ALTER USER '${DB_USERNAME}'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
-    GRANT ALL PRIVILEGES ON *.* TO '${DB_USERNAME}'@'%' WITH GRANT OPTION;
-
-    CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'localhost';
-    ALTER USER '${DB_USERNAME}'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
-    GRANT ALL PRIVILEGES ON *.* TO '${DB_USERNAME}'@'localhost' WITH GRANT OPTION;
-
-    -- Usuário SST (CRÍTICO)
-    CREATE USER IF NOT EXISTS '${SST_USER}'@'%';
-    ALTER USER '${SST_USER}'@'%' IDENTIFIED BY '${SST_PASSWORD}';
-    GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'%';
-
-    CREATE USER IF NOT EXISTS '${SST_USER}'@'localhost';
-    ALTER USER '${SST_USER}'@'localhost' IDENTIFIED BY '${SST_PASSWORD}';
-    GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'localhost';
-
-    -- Usuário de replicação
-    CREATE USER IF NOT EXISTS 'replicator'@'%';
-    ALTER USER 'replicator'@'%' IDENTIFIED BY '${MARIADB_REPLICATION_PASSWORD}';
-    GRANT REPLICATION SLAVE ON *.* TO 'replicator'@'%';
-
-    FLUSH PRIVILEGES;
-    EOSQL
+    log "Executando init-users.sql para garantir banco e atualizar senhas de usuários."
+    mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" -h 127.0.0.1 < /docker-entrypoint-initdb.d/init-users.sql
 
     log "Usuários garantidos e credenciais atualizadas."
