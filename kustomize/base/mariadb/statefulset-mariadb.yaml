@@ -242,8 +242,6 @@ spec:
               -e "s|_MARIADB_CLUSTER_NAME|$MARIADB_CLUSTER_NAME|g" \
               -e "s|_MARIADB_CLUSTER_ADDRESS|$CLUSTER_ADDRESS|g" \
               -e "s|_POD_IP|$POD_IP|g" \
-              -e "s|_SST_USER|$SST_USER|g" \
-              -e "s|_SST_PASSWORD|$SST_PASSWORD|g" \
               /etc/mysql/config-template/custom.cnf > $CONFIG_FILE
 
           if [ "$ordinal" != "0" ]; then
@@ -407,6 +405,6 @@ spec:
         - ReadWriteOnce
       resources:
         requests:
-          storage: 10Gi
+          storage: 50Gi
       storageClassName: nfs-storage-k8s-v1
       volumeMode: Filesystem
