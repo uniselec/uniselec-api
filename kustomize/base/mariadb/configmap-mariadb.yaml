@@ -42,7 +42,7 @@ data:
     ALTER USER '${DB_USERNAME}'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
     GRANT ALL PRIVILEGES ON *.* TO '${DB_USERNAME}'@'localhost' WITH GRANT OPTION;
 
-    -- Usuário SST (CRÍTICO para Galera)
+    -- Usuário SST (Galera)
     CREATE USER IF NOT EXISTS '${SST_USER}'@'%';
     ALTER USER '${SST_USER}'@'%' IDENTIFIED BY '${SST_PASSWORD}';
     GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT ON *.* TO '${SST_USER}'@'%';
@@ -71,11 +71,11 @@ data:
 
     ordinal="${HOSTNAME##*-}"
     if [[ "$ordinal" != "0" ]]; then
-      log "Skip: Só roda em mariadb-0 (atual: $HOSTNAME)"
+      log "Skip: só roda em mariadb-0 (atual: $HOSTNAME)"
       exit 0
     fi
 
-    log "Aguardando MariaDB aceitar conexões."
+    log "Aguardando MariaDB aceitar conexões..."
     for i in {1..30}; do
       if mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" -h 127.0.0.1 -e "SELECT 1" >/dev/null 2>&1; then
         log "MariaDB pronto!"
@@ -84,18 +84,18 @@ data:
       sleep 3
     done
 
-    log "Executando comandos para garantir banco e atualizar senhas de usuários."
+    log "Executando SQL para garantir usuários e atualizar credenciais..."
     mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" -h 127.0.0.1 <<EOSQL
-    CREATE DATABASE IF NOT EXISTS ${DB_DATABASE} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS \`${DB_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
     -- Usuário da aplicação
     CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%';
     ALTER USER '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
-    GRANT ALL PRIVILEGES ON ${DB_DATABASE}.* TO '${MYSQL_USER}'@'%';
+    GRANT ALL PRIVILEGES ON \`${DB_DATABASE}\`.* TO '${MYSQL_USER}'@'%';
 
     CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'localhost';
     ALTER USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';
-    GRANT ALL PRIVILEGES ON ${DB_DATABASE}.* TO '${MYSQL_USER}'@'localhost';
+    GRANT ALL PRIVILEGES ON \`${DB_DATABASE}\`.* TO '${MYSQL_USER}'@'localhost';
 
     -- Usuário root
     CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'%';
