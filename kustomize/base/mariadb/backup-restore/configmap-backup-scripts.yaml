@@ -61,7 +61,7 @@ data:
       --compress-threads=2 \
       --parallel=2; then
 
-      log "Backup físico concluído com sucesso"
+      log "Backup físico concluído"
 
       # Preparar backup para restore
       mariabackup --prepare \
@@ -146,7 +146,7 @@ data:
     # 6. RELATÓRIO FINAL
     # ======================================================
     BACKUP_SIZE=$(du -sh "$BACKUP_DIR" | cut -f1)
-    log "=== BACKUP CONCLUÍDO COM SUCESSO ==="
+    log "=== BACKUP CONCLUÍDO ==="
     log "Backup ID: $TIMESTAMP"
     log "Tamanho: $BACKUP_SIZE"
     log "Localização: $BACKUP_DIR"
@@ -276,7 +276,7 @@ data:
     echo "Verificando restore..."
 
     if [ -f "$RESTORE_DIR/ibdata1" ] && [ -d "$RESTORE_DIR/mysql" ]; then
-      echo "Restore verificado com sucesso"
+      echo "Restore verificado"
     else
       echo "Restore incompleto - arquivos essenciais faltando"
       exit 1
