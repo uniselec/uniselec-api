@@ -21,9 +21,9 @@ class DatabaseSeeder extends Seeder
             AdmissionCategorySeeder::class,
             BonusOptionSeeder::class,
             CourseSeeder::class,
-            ProcessSelectionSeeder::class,   // novo
+            // ProcessSelectionSeeder::class,   // novo
             AdminSeeder::class,
-            UsersTableSeeder::class,
+            // UsersTableSeeder::class,
             KnowledgeAreaSeeder::class,
         ]);
     }
