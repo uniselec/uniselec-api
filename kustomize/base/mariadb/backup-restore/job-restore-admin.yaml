@@ -1,4 +1,3 @@
-# base/mariadb/backup-restore/job-restore-admin.yaml
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -16,13 +15,28 @@ spec:
         command: ["/bin/bash", "-c"]
         args:
         - |
-          echo "=== MODO RESTORE ADMIN ==="
-          echo "Para restaurar um backup, execute:"
-          echo "1. /scripts/list-backups.sh"
-          echo "2. /scripts/verify-backup.sh <timestamp>"
-          echo "3. /scripts/execute-restore-safe.sh <timestamp>"
+          echo "================================================================"
+          echo "         MARIADB GALERA RESTORE ADMIN - AMBIENTE UNIFICADO      "
+          echo "================================================================"
           echo ""
-          echo "Aguardando comandos..."
+          echo "Este ambiente tem acesso a:"
+          echo "  - Backups AUTOMÁTICOS (CronJob): /backup/auto-*"
+          echo "  - Backups MANUAIS (Scripts): /backup/manual-*"
+          echo "  - PVC: backup-mariadb-1 (mesmo que backup manual usa)"
+          echo ""
+          echo "COMANDOS DISPONÍVEIS:"
+          echo "  /scripts/list-backups.sh           - Lista todos os backups"
+          echo "  /scripts/verify-backup.sh <id>     - Verifica integridade"
+          echo "  /scripts/execute-restore-safe.sh <id> - Executa restore"
+          echo ""
+          echo "EXEMPLO:"
+          echo "  /scripts/list-backups.sh"
+          echo "  /scripts/verify-backup.sh 20251130-124024"
+          echo "  /scripts/execute-restore-safe.sh 20251130-124024"
+          echo ""
+          echo "================================================================"
+          echo ""
+          echo "Aguardando comandos... (pod ficará ativo)"
           tail -f /dev/null
         envFrom:
         - secretRef:
@@ -41,15 +55,18 @@ spec:
           requests:
             memory: "1Gi"
             cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
       restartPolicy: Never
       volumes:
       - name: backup-storage
         persistentVolumeClaim:
-          claimName: mariadb-backup-pvc
+          claimName: backup-mariadb-1
       - name: backup-scripts
         configMap:
           name: mariadb-backup-scripts
           defaultMode: 0755
       - name: mysql-data
         persistentVolumeClaim:
-          claimName: database-mariadb-0  # PVC específico do nó 0 para restore
+          claimName: database-mariadb-0

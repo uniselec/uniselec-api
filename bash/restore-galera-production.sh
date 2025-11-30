@@ -186,15 +186,32 @@ if [ -z "$MYSQL_ROOT_PASSWORD" ]; then
 fi
 
 # Validar que backup existe
+# IMPORTANTE: Backup pode estar em mariadb-1 (onde foi feito) ou mariadb-0
 log_info "Validando backup em: $BACKUP_DIR"
-if ! kubectl exec -n "$NAMESPACE" "$PRIMARY_POD" -- test -d "$BACKUP_DIR" 2>/dev/null; then
+
+# Tentar encontrar backup em mariadb-1 primeiro (padrão de backup)
+BACKUP_SOURCE_POD=""
+if kubectl exec -n "$NAMESPACE" "$SECONDARY_POD" -- test -d "$BACKUP_DIR" 2>/dev/null; then
+    BACKUP_SOURCE_POD="$SECONDARY_POD"
+    log_info "Backup encontrado em: $SECONDARY_POD"
+elif kubectl exec -n "$NAMESPACE" "$PRIMARY_POD" -- test -d "$BACKUP_DIR" 2>/dev/null; then
+    BACKUP_SOURCE_POD="$PRIMARY_POD"
+    log_info "Backup encontrado em: $PRIMARY_POD"
+elif kubectl exec -n "$NAMESPACE" "$TERTIARY_POD" -- test -d "$BACKUP_DIR" 2>/dev/null; then
+    BACKUP_SOURCE_POD="$TERTIARY_POD"
+    log_info "Backup encontrado em: $TERTIARY_POD"
+else
     log_error "Diretório de backup não encontrado: $BACKUP_DIR"
+    log_error "Procurado em: mariadb-0, mariadb-1, mariadb-2"
+    echo ""
+    log_info "Para listar backups disponíveis:"
+    echo "  kubectl exec -n $NAMESPACE mariadb-1 -- ls -lh /backup"
     exit 1
 fi
 
 # Validar arquivos críticos do backup
 log_info "Verificando integridade do backup..."
-VALIDATION_ERRORS=$(kubectl exec -n "$NAMESPACE" "$PRIMARY_POD" -- bash -c "
+VALIDATION_ERRORS=$(kubectl exec -n "$NAMESPACE" "$BACKUP_SOURCE_POD" -- bash -c "
 cd $BACKUP_DIR
 
 required_files=(
@@ -224,8 +241,8 @@ log_success "Backup válido"
 
 # Mostrar informações do backup
 log_info "Informações do backup:"
-kubectl exec -n "$NAMESPACE" "$PRIMARY_POD" -- cat "$BACKUP_DIR/xtrabackup_checkpoints" || true
-kubectl exec -n "$NAMESPACE" "$PRIMARY_POD" -- cat "$BACKUP_DIR/cluster-info.txt" 2>/dev/null || true
+kubectl exec -n "$NAMESPACE" "$BACKUP_SOURCE_POD" -- cat "$BACKUP_DIR/xtrabackup_checkpoints" || true
+kubectl exec -n "$NAMESPACE" "$BACKUP_SOURCE_POD" -- cat "$BACKUP_DIR/cluster-info.txt" 2>/dev/null || true
 
 # ============================================================
 # AVISO DE DOWNTIME E CONFIRMAÇÃO
@@ -234,7 +251,7 @@ kubectl exec -n "$NAMESPACE" "$PRIMARY_POD" -- cat "$BACKUP_DIR/cluster-info.txt
 section "⚠️  AVISO CRÍTICO DE DOWNTIME ⚠️"
 
 echo ""
-log_error "VOCÊ ESTÁ PRESTES A EXECUTAR UM RESTORE EM PRODUÇÃO"
+log_warning "VOCÊ ESTÁ PRESTES A EXECUTAR UM RESTORE EM PRODUÇÃO"
 echo ""
 echo "  ⚠️  DOWNTIME TOTAL: 15-30 minutos estimados"
 echo "  ⚠️  APLICAÇÃO SERÁ PARADA: $LARAVEL_DEPLOYMENT"
@@ -256,7 +273,7 @@ echo "  7. Iniciar mariadb-1 e mariadb-2 (SST)"
 echo "  8. Validar cluster"
 echo "  9. Reiniciar aplicação"
 echo ""
-log_error "Este processo é IRREVERSÍVEL sem um backup"
+log_warning "Este processo é IRREVERSÍVEL sem um backup"
 echo ""
 
 read -p "Você tem certeza ABSOLUTA? Digite 'RESTORE PRODUCTION' para continuar: " -r
@@ -443,7 +460,9 @@ spec:
           claimName: database-mariadb-0
       - name: backup-storage
         persistentVolumeClaim:
-          claimName: backup-mariadb-0
+          # Usar PVC onde o backup está localizado
+          # Detectado automaticamente em BACKUP_SOURCE_POD
+          claimName: backup-$BACKUP_SOURCE_POD
 EOF
 
 log_info "Aguardando conclusão do restore (timeout: ${SST_TIMEOUT}s)..."

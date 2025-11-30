@@ -1,19 +1,8 @@
 ---
-# =====================================================================-
-# API Version: v1
-# Kind:       ConfigMap
-# Metadata:
-#   Name:     mariadb-config
-# ----------------------------------------------------------------------
-# Author:     erivandosena@gmail.com
-# Created:    2025-04-02
-# Version:    1.0.0
 # ----------------------------------------------------------------------
 # Description: Configurações gerais do MariaDB, incluindo parâmetros de
 #              inicialização e variáveis de ambiente.
 # ----------------------------------------------------------------------
-# Usage:      kubectl apply -f configmap-mariadb.yaml
-# =====================================================================-
 apiVersion: v1
 kind: ConfigMap
 metadata:
