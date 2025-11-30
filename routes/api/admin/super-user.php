@@ -42,7 +42,9 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::apiResource('admins', AdminController::class)->names('admin.super_user.admins');
         Route::apiResource('academic_units', AcademicUnitController::class)->names('admin.super_user.academic_units');
         Route::apiResource('courses', CourseController::class)->names('admin.super_user.courses');
-        Route::apiResource('process_selections', ProcessSelectionController::class)->names('admin.super_user.processSelection');
+        Route::apiResource('process_selections', ProcessSelectionController::class)
+        ->only(['index', 'show', 'store', 'update'])
+        ->names('admin.super_user.processSelection');
         Route::apiResource('admission_categories', AdmissionCategoryController::class)->names('admin.super_user.admission_categories');
         Route::apiResource('bonus_options', BonusOptionController::class)->names('admin.super_user.bonus_options');
         Route::apiResource('documents', DocumentController::class)->names('docum.super_userents.api');
