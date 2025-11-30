@@ -25,7 +25,7 @@ data:
   # Database
   # -------------------------------------------------
   DB_CONNECTION: mysql
-  DB_HOST: mariadb-app.uniselec-api-stg.svc.cluster.local
+  DB_HOST: mariadb-app.uniselec-api-dev.svc.cluster.local
   DB_PORT: "3306"
   DB_DATABASE:
   DB_USERNAME:

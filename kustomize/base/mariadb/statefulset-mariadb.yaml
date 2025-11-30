@@ -69,7 +69,7 @@ spec:
 
       initContainers:
         - name: mariadb-bootstrap-check
-          image: mariadb:10.6.24
+          image: mariadb:10.11.15-jammy
           command:
             - /bin/bash
             - -c
@@ -161,7 +161,7 @@ spec:
 
       containers:
       - name: mariadb
-        image: mariadb:10.6.24
+        image: mariadb:10.11.15-jammy
         command:
         - bash
         - -c
@@ -242,6 +242,8 @@ spec:
               -e "s|_MARIADB_CLUSTER_NAME|$MARIADB_CLUSTER_NAME|g" \
               -e "s|_MARIADB_CLUSTER_ADDRESS|$CLUSTER_ADDRESS|g" \
               -e "s|_POD_IP|$POD_IP|g" \
+              -e "s/_SST_USER/$SST_USER/g" \
+              -e "s/_SST_PASSWORD/$SST_PASSWORD/g" \
               /etc/mysql/config-template/custom.cnf > $CONFIG_FILE
 
           if [ "$ordinal" != "0" ]; then
@@ -272,7 +274,7 @@ spec:
           capabilities:
             add:
               - IPC_LOCK
-
+              - SYS_RESOURCE
         ports:
         - name: mysql
           containerPort: 3306
@@ -383,6 +385,9 @@ spec:
         - name: ensure-users
           mountPath: /etc/mysql/ensure-users.sh
           subPath: ensure-users.sh
+        - name: backup
+          mountPath: /backup
+
       volumes:
       - name: mariadb-config
         configMap:
@@ -406,5 +411,19 @@ spec:
       resources:
         requests:
           storage: 50Gi
+      storageClassName: nfs-storage-k8s-v1
+      volumeMode: Filesystem
+
+  - metadata:
+      name: backup
+      labels:
+        app: mariadb
+        purpose: backup
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Gi
       storageClassName: nfs-storage-k8s-v1
       volumeMode: Filesystem

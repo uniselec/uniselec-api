@@ -150,7 +150,7 @@ mapfile -t pods < <(kubectl_cmd get pods -n "$NAMESPACE" -l app=mariadb -o name)
 set -e
 
 # Usar MariaDB 10.6.24 LTS como cliente compatível com o servidor
-MYSQL_IMAGE="mariadb:10.6.24"
+MYSQL_IMAGE="mariadb:10.11.15-jammy"
 
 echolog "4.1 wsrep status"
 for p in "${pods[@]}"; do
