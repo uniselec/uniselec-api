@@ -362,7 +362,7 @@ spec:
           echo "Corrigindo permissoes..."
           chown -R 999:999 /var/lib/mysql
 
-          echo "SUCCESS: Restore completado com sucesso!"
+          echo "SUCCESS: Restore completado!"
           ls -lh /var/lib/mysql/
           exit 0
         env:
@@ -392,7 +392,7 @@ EOF
 log_info "Aguardando conclusao do restore (timeout: 900s)..."
 
 if kubectl wait --for=condition=complete --timeout=900s -n "$NAMESPACE" job/$RESTORE_JOB_NAME; then
-    log_success "Restore job completado com sucesso!"
+    log_success "Restore job completado!"
     kubectl logs -n "$NAMESPACE" job/$RESTORE_JOB_NAME
 else
     log_error "Restore job falhou!"
@@ -442,7 +442,7 @@ spec:
           GRASTATE
           echo "Conteudo de grastate.dat:"
           cat /data/grastate.dat
-          echo "Bootstrap preparado com sucesso!"
+          echo "Bootstrap preparado!"
         volumeMounts:
         - name: data
           mountPath: /data
@@ -455,7 +455,7 @@ EOF
 
 log_info "Aguardando conclusao do bootstrap fix..."
 if kubectl wait --for=condition=complete job/$BOOTSTRAP_JOB -n "$NAMESPACE" --timeout=60s; then
-    log_success "Bootstrap preparado com sucesso!"
+    log_success "Bootstrap preparado!"
     kubectl logs -n "$NAMESPACE" job/$BOOTSTRAP_JOB
     kubectl delete job $BOOTSTRAP_JOB -n "$NAMESPACE"
 else
@@ -624,7 +624,7 @@ echo "  - Tertiary (SST):      $TERTIARY_POD"
 echo ""
 
 if [ "$restored_count" = "$TEST_ROWS" ] && [ "$RESTORED_CHECKSUM" = "$ORIGINAL_CHECKSUM" ]; then
-    echo -e "${GREEN}SUCCESS: TESTE PASSOU COM SUCESSO!${NC}"
+    echo -e "${GREEN}SUCCESS: TESTE PASSOU!${NC}"
     echo -e "${GREEN}SUCCESS: Backup e Restore estao funcionando corretamente!${NC}"
     echo -e "${GREEN}SUCCESS: Integridade dos dados: 100% preservada${NC}"
     echo -e "${GREEN}SUCCESS: Cluster Galera sincronizado em todos os 3 nos${NC}"

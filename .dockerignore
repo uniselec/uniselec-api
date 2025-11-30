@@ -14,3 +14,4 @@ passwords-laravel-*.txt
 passwords-mariadb-*.txt
 passwords-regcred.txt
 public-key-cert.pem
+*.info
