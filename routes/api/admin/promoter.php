@@ -38,7 +38,9 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::apiResource('admins', AdminController::class)->names('admin.promoter.admins');
         Route::apiResource('academic_units', AcademicUnitController::class)->names('admin.promoter.academic_units');
         Route::apiResource('courses', CourseController::class)->names('admin.promoter.courses');
-        Route::apiResource('process_selections', ProcessSelectionController::class)->names('admin.promoter.processSelection');
+        Route::apiResource('process_selections', ProcessSelectionController::class)
+        ->only(['index', 'show', 'store', 'update'])
+        ->names('admin.promoter.processSelection');
         Route::apiResource('admission_categories', AdmissionCategoryController::class)->names('admin.promoter.admission_categories');
         Route::apiResource('bonus_options', BonusOptionController::class)->names('admin.promoter.bonus_options');
         Route::apiResource('documents', DocumentController::class)->names('documents.api');
