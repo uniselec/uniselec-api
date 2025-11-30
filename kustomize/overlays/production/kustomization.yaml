@@ -58,7 +58,7 @@ configMapGenerator:
     disableNameSuffixHash: true
 - behavior: merge
   literals:
-  - DB_HOST=mariadb-app.uniselec-api.svc.cluster.local
+  - DB_HOST=mariadb-app.uniselec-api-prd.svc.cluster.local
   - DB_DATABASE=uniselec_prod
   - MYSQL_DATABASE=uniselec_prod
   - MYSQL_USER=uniselec_prod_user

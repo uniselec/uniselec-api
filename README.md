@@ -161,6 +161,11 @@ kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/downloa
 kubeseal -f regcred-secret.yaml -w base/sealed-secret-regcred.yaml --scope cluster-wide
 kubeseal --validate < base/sealed-secret-regcred.yaml
 ```
+
+### Pausar ArgoCD
+argocd login argocd.unilab.edu.br --username admin --password "pass" --grpc-web
+argocd app set uniselec-api-prd --sync-policy none
+
 ### Desprovisionar Deploy
 ```sh
 argocd login argocd.unilab.edu.br --username admin --password "pass" --grpc-web

@@ -41,6 +41,7 @@ data:
     # --print-defaults to see which it would actually understand and use.
     #
     # If you are new to MariaDB, check out https://mariadb.com/kb/en/basic-mariadb-articles/
+
     [mysqld]
     skip-name-resolve
     skip-slave-start
@@ -92,9 +93,16 @@ data:
     wsrep_slave_threads = 4
     wsrep_retry_autocommit = 3
     wsrep_provider_options = "gcache.size=512M;evs.suspect_timeout=PT5S;evs.inactive_timeout=PT15S;evs.install_timeout=PT5S;evs.send_window=512;evs.user_send_window=256"
-    # wsrep_sst_auth = _SST_USER:_SST_PASSWORD
+    # wsrep_sst_auth não é definido - autenticação automática via seção [xtrabackup]
 
     [mariadb]
     transaction-isolation = READ-COMMITTED
     default_storage_engine = InnoDB
     innodb_autoinc_lock_mode = 2
+
+    # O script wsrep_sst_mariabackup lê exatamente esta seção para obter as
+    # credenciais necessárias para autenticação durante o processo de SST
+    # (State Snapshot Transfer) no Galera Cluster, utilizando my_print_defaults.
+    [xtrabackup]
+    user = _SST_USER
+    password = "_SST_PASSWORD"
