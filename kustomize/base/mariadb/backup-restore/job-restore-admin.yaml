@@ -12,7 +12,7 @@ spec:
       serviceAccountName: mariadb-backup
       containers:
       - name: restore-admin
-        image: mariadb:10.6.24
+        image: mariadb:10.11.15-jammy
         command: ["/bin/bash", "-c"]
         args:
         - |

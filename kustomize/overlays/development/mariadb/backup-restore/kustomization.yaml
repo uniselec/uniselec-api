@@ -1,4 +1,3 @@
-# overlays/development/mariadb/backup-restore/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -12,9 +11,4 @@ patches:
   patch: |-
     - op: replace
       path: /spec/schedule
-      value: "0 4 * * *"  # 4 AM em development
-
-    - op: replace
-      path: /spec/jobTemplate/spec/template/spec/nodeSelector
-      value:
-        kubernetes.io/hostname: worker07-ct  # Worker específico para dev
+      value: "0 4 * * *"

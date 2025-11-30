@@ -9,20 +9,8 @@ spec:
         - name: mariadb
           resources:
             requests:
-              cpu: 200m
-              memory: 512Mi
+              cpu: "300m"
+              memory: "512Mi"
             limits:
-              cpu: 1000m
-              memory: 2Gi
-  volumeClaimTemplates:
-    - metadata:
-        name: database
-        labels:
-          app: mariadb
-      spec:
-        accessModes:   
-          - ReadWriteOnce
-        storageClassName: nfs-storage-k8s-v1
-        resources:
-          requests:
-            storage: 25Gi
+              cpu: "2000m"
+              memory: "2Gi"

@@ -23,6 +23,8 @@ RUN apt-get update \
        libjpeg62-turbo-dev \
        libpng-dev \
        default-mysql-client \
+       iputils-ping \
+       netcat-openbsd \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 

@@ -62,7 +62,7 @@ DNS_ITERATIONS="${DNS_ITERATIONS:-30}"
 PHP_ITERATIONS="${PHP_ITERATIONS:-50}"
 MYSQL_ITERATIONS="${MYSQL_ITERATIONS:-10}"
 
-MYSQL_IMAGE="${MYSQL_IMAGE:-mariadb:10.6.24}"
+MYSQL_IMAGE="${MYSQL_IMAGE:-mariadb:10.11.15-jammy}"
 
 echolog() { printf "\n===== %s =====\n" "$1"; }
 

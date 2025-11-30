@@ -222,7 +222,7 @@ done
 
 for i in $(seq 1 $LB_TEST_ROUNDS); do
   # obtém o hostname onde a conexão foi atendida
-  POD_NAME=$(kubectl run mysql-test-$RANDOM --rm -i --restart=Never --image=mariadb:10.6.24 -n "$NAMESPACE" -- \
+  POD_NAME=$(kubectl run mysql-test-$RANDOM --rm -i --restart=Never --image=mariadb:10.11.15-jammy -n "$NAMESPACE" -- \
     mariadb -h "$LB_SERVICE" -u root -p"$PASSWORD" -N -e "SELECT @@hostname;" 2>/dev/null || echo "UNREACHABLE")
   echo "   Tentativa $i: Conectado em $POD_NAME"
   if [[ " ${PODS[*]} " =~ " ${POD_NAME} " ]]; then
@@ -262,7 +262,7 @@ total_ms=0
 successes=0
 for i in $(seq 1 $INSERT_ITERATIONS); do
   START=$(ms_now)
-  kubectl run mysql-ins-$RANDOM --rm -i --restart=Never --image=mariadb:10.6.24 -n "$NAMESPACE" -- \
+  kubectl run mysql-ins-$RANDOM --rm -i --restart=Never --image=mariadb:10.11.15-jammy -n "$NAMESPACE" -- \
     mariadb -h "$LB_SERVICE" -u root -p"$PASSWORD" -N -e "INSERT INTO ${TEST_DB}.${TEST_TABLE} (payload) VALUES (UUID());" >/dev/null 2>&1 && OK=1 || OK=0
   END=$(ms_now)
   if [ "$OK" -eq 1 ]; then
@@ -287,7 +287,7 @@ total_sel_ms=0
 sel_success=0
 for i in $(seq 1 $SEL_ROUNDS); do
   START=$(ms_now)
-  kubectl run mysql-sel-$RANDOM --rm -i --restart=Never --image=mariadb:10.6.24 -n "$NAMESPACE" -- \
+  kubectl run mysql-sel-$RANDOM --rm -i --restart=Never --image=mariadb:10.11.15-jammy -n "$NAMESPACE" -- \
     mariadb -h "$LB_SERVICE" -u root -p"$PASSWORD" -N -e "SELECT id,payload FROM ${TEST_DB}.${TEST_TABLE} ORDER BY id DESC LIMIT 10;" >/dev/null 2>&1 && OK=1 || OK=0
   END=$(ms_now)
   if [ "$OK" -eq 1 ]; then
@@ -312,7 +312,7 @@ start_total=$(ms_now)
 for w in $(seq 1 $CONCURRENT_INSERTS); do
   (
     for j in $(seq 1 $(awk -v a="$INSERT_ITERATIONS" -v b="$CONCURRENT_INSERTS" 'BEGIN{printf("%d", a/b)}')); do
-      kubectl run mysql-par-$RANDOM --rm -i --restart=Never --image=mariadb:10.6.24 -n "$NAMESPACE" -- \
+      kubectl run mysql-par-$RANDOM --rm -i --restart=Never --image=mariadb:10.11.15-jammy -n "$NAMESPACE" -- \
         mariadb -h "$LB_SERVICE" -u root -p"$PASSWORD" -N -e "INSERT INTO ${TEST_DB}.${TEST_TABLE} (payload) VALUES (UUID());" >/dev/null 2>&1 || true
     done
   ) &
@@ -344,7 +344,7 @@ echo "📊 RESUMO DO CLUSTER"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-kubectl run mysql-summary --rm -i --restart=Never --image=mariadb:10.6.24 -n "$NAMESPACE" -- \
+kubectl run mysql-summary --rm -i --restart=Never --image=mariadb:10.11.15-jammy -n "$NAMESPACE" -- \
   mariadb -h "$LB_SERVICE" -u root -p"$PASSWORD" -e "
     SELECT
       '=== CLUSTER STATUS ===' as '';
