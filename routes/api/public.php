@@ -10,7 +10,8 @@ use App\Http\Controllers\HealthController;
 Route::get('/', function () {
     return response()->json([
         'status' => 'ok',
-        'message' => 'API is working'
+        'message' => 'API is working',
+        'version-info' => 'v4.0.0',
     ]);
 });
 Route::get('health/ready', [HealthController::class, 'ready']);
