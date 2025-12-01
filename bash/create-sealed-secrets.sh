@@ -331,19 +331,19 @@ main() {
             1)
                 get_public_cert
                 create_regcred_sealed_secret
-                echo -e "${GREEN}[INFO]${NC} Sealed Secret REGCRED criado com sucesso!"
+                echo -e "${GREEN}[INFO]${NC} Sealed Secret REGCRED criado!"
                 ;;
             2)
                 get_public_cert
                 create_mariadb_env_sealed_secret "staging" "uniselec-api-stg"
                 create_laravel_sealed_secret "staging" "uniselec-api-stg"
-                echo -e "${GREEN}[INFO]${NC} Sealed Secrets STAGING criados com sucesso!"
+                echo -e "${GREEN}[INFO]${NC} Sealed Secrets STAGING criados!"
                 ;;
             3)
                 get_public_cert
                 create_mariadb_env_sealed_secret "production" "uniselec-api-prd"
                 create_laravel_sealed_secret "production" "uniselec-api-prd"
-                echo -e "${GREEN}[INFO]${NC} Sealed Secrets PRODUCTION criados com sucesso!"
+                echo -e "${GREEN}[INFO]${NC} Sealed Secrets PRODUCTION criados!"
                 ;;
             4)
                 get_public_cert
@@ -352,7 +352,7 @@ main() {
                 create_laravel_sealed_secret "staging" "uniselec-api-stg"
                 create_mariadb_env_sealed_secret "production" "uniselec-api-prd"
                 create_laravel_sealed_secret "production" "uniselec-api-prd"
-                echo -e "${GREEN}[INFO]${NC} TODOS os Sealed Secrets criados com sucesso!"
+                echo -e "${GREEN}[INFO]${NC} TODOS os Sealed Secrets criados!"
                 ;;
             5)
                 get_public_cert

@@ -1,25 +1,3 @@
----
-# =====================================================================-
-# API Version: apps/v1
-# Kind:       StatefulSet
-# Metadata:
-#   Name:     mariadb
-# ----------------------------------------------------------------------
-# Author:     erivandosena@gmail.com
-# Created:    2025-04-14
-# Version:    1.0.0
-# ----------------------------------------------------------------------
-# Description: StatefulSet configuration for MariaDB Galera Cluster with:
-#              - 3-node replication topology
-#              - Automatic bootstrap safety checks
-#              - pt_BR locale configuration
-#              - SST/IST replication settings
-#              - Persistent NFS storage
-#              - Custom resource limits and probes
-# ----------------------------------------------------------------------
-# Usage:      kubectl apply -f mariadb-statefulset.yaml
-# =====================================================================-
-
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
