@@ -49,6 +49,7 @@ spec:
         server: '{{cluster}}'
         namespace: '{{namespace}}'
       # IGNORE DIFFERENCES: Recursos gerenciados externamente
+      # Documentação: https://argo-cd.readthedocs.io/en/stable/user-guide/diffing/
       ignoreDifferences:
       # HPA: Status e métricas são gerenciados pelo Kubernetes
       - group: autoscaling
@@ -56,7 +57,25 @@ spec:
         jsonPointers:
         - /status
         - /metadata/annotations/autoscaling.alpha.kubernetes.io~1metrics
-      # ConfigMap: Hash do Kustomize
+      # StatefulSet: volumeClaimTemplates é IMUTÁVEL (Kubernetes limitation)
+      - group: apps
+        kind: StatefulSet
+        jsonPointers:
+        - /status
+        - /spec/replicas
+        - /spec/volumeClaimTemplates
+      # PVC: Campos adicionados automaticamente pelo StatefulSet controller
+      - group: ""
+        kind: PersistentVolumeClaim
+        jsonPointers:
+        - /status
+        - /metadata/annotations
+        - /metadata/labels
+        - /spec/volumeMode
+        - /spec/storageClassName
+        jqPathExpressions:
+        - .metadata.ownerReferences[]?.controller
+      # ConfigMap: Annotation do kubectl apply (last-applied-configuration)
       - group: ""
         kind: ConfigMap
         jqPathExpressions:
@@ -98,14 +117,14 @@ spec:
         # RETRY: Política de Retry (Resilience)
         retry:
           # Número máximo de tentativas
-          limit: 10
+          limit: 20
           # Backoff exponencial
           backoff:
             # Duração inicial
-            duration: 10s
+            duration: 30s
             # Fator de multiplicação
             factor: 2
             # Duração máxima entre tentativas
-            maxDuration: 5m
+            maxDuration: 10m
       # REVISION HISTORY: Retenção de histórico
       revisionHistoryLimit: 10
