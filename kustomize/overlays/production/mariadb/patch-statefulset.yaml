@@ -9,8 +9,8 @@ spec:
         - name: mariadb
           resources:
             requests:
-              cpu: "1500m"
-              memory: "2Gi"
+              cpu: 200m
+              memory: 512Mi
             limits:
               cpu: "3000m"
-              memory: "4Gi"
+              memory: "5Gi"

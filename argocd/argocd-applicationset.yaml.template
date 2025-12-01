@@ -4,10 +4,15 @@ metadata:
   name: ${APP_NAME}-${DEPLOY_ENV}-as
   namespace: argocd
   labels:
+    app.kubernetes.io/name: ${APP_NAME}
+    app.kubernetes.io/instance: ${APP_NAME}-${DEPLOY_ENV}
+    app.kubernetes.io/component: argocd-applicationset
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/managed-by: argocd
     environment: ${DEPLOY_ENV}
     app: ${APP_NAME}-${DEPLOY_ENV}
-
 spec:
+  # GENERATOR: Lista de aplicações
   generators:
     - list:
         elements:
@@ -16,50 +21,91 @@ spec:
             path: ${KUSTOMIZE_PATH}
             cluster: https://${CLUSTER_REMOTE1_DOMAIN}:6443
             namespace: ${APP_NAMESPACE}
-
+  # TEMPLATE: Definição da Application
   template:
     metadata:
       name: '{{name}}'
       labels:
+        app.kubernetes.io/name: ${APP_NAME}
+        app.kubernetes.io/instance: ${APP_NAME}-${DEPLOY_ENV}
+        app.kubernetes.io/managed-by: argocd
         environment: ${DEPLOY_ENV}
         app: ${APP_NAME}
       annotations:
+        # Sync wave para ordenação de deploys
         argocd.argoproj.io/sync-wave: "0"
-
+        # Notificações (opcional)
+        notifications.argoproj.io/subscribe.on-sync-succeeded.slack: gitops-deployments
     spec:
+      # PROJECT: Isolamento RBAC
       project: ${APP_NAME}-${DEPLOY_ENV}-ap
-
+      # SOURCE: Repositório Git (Fonte Única da Verdade)
       source:
         repoURL: '{{repoURL}}'
         targetRevision: ${GIT_BRANCH}
         path: '{{path}}'
-
+      # DESTINATION: Cluster e Namespace de destino
       destination:
         server: '{{cluster}}'
         namespace: '{{namespace}}'
-
+      # IGNORE DIFFERENCES: Recursos gerenciados externamente
       ignoreDifferences:
+      # HPA: Status e métricas são gerenciados pelo Kubernetes
       - group: autoscaling
         kind: HorizontalPodAutoscaler
         jsonPointers:
         - /status
         - /metadata/annotations/autoscaling.alpha.kubernetes.io~1metrics
-
+      # ConfigMap: Hash do Kustomize
+      - group: ""
+        kind: ConfigMap
+        jqPathExpressions:
+        - .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"]
+      # SYNC POLICY: Estratégia de Sincronização GitOps
       syncPolicy:
+        # AUTOMATED: Sincronização Automática (Core do GitOps)
         automated:
+          # PRUNE: Remove recursos deletados do Git
           prune: true
-          selfHeal: true
+          # SELF-HEAL: Reverte mudanças manuais no cluster
+          # RECOMENDAÇÃO GitOps: true (força Git como fonte única)
+          # Porém, se quer permitir mudanças manuais temporárias, use false
+          selfHeal: false
+          # ALLOW EMPTY: Permite sync mesmo se Git tiver 0 recursos
+          allowEmpty: false
+        # SYNC OPTIONS: Comportamento do Sync
         syncOptions:
+          # Cria namespace automaticamente se não existir
           - CreateNamespace=true
+          # Remove recursos "orphaned" por último (evita downtime)
           - PruneLast=true
-          - ApplyOutOfSyncOnly=true
+          # Impede detecção de mudanças em imagens Docker se True
+          # Sync completo sempre que Git mudar se mantendo false
+          - ApplyOutOfSyncOnly=false
+          # Valida recursos antes de aplicar
+          - Validate=true
+          # Pula dry-run se recurso não existir
           - SkipDryRunOnMissingResource=true
+          # Respeita ignoreDifferences
           - RespectIgnoreDifferences=true
-          - ServerSideApply=false
+          # Server-Side Apply (SSA) - Recomendado para K8s 1.22+
+          # BENEFIT: Melhor handling de conflitos e field managers
+          - ServerSideApply=true
+          # Replace: false (usa patch em vez de replace completo)
           - Replace=false
+          # Falha se qualquer hook falhar
+          - FailOnSharedResource=false
+        # RETRY: Política de Retry (Resilience)
         retry:
+          # Número máximo de tentativas
           limit: 10
+          # Backoff exponencial
           backoff:
+            # Duração inicial
             duration: 10s
+            # Fator de multiplicação
             factor: 2
+            # Duração máxima entre tentativas
             maxDuration: 5m
+      # REVISION HISTORY: Retenção de histórico
+      revisionHistoryLimit: 10
