@@ -404,7 +404,7 @@ data:
     # Validar restore
     echo "Validando restore..."
     if [ -f /var/lib/mysql/ibdata1 ] && [ -d /var/lib/mysql/mysql ]; then
-      echo "✓ Restore validado com sucesso"
+      echo "✓ Restore validado"
       ls -lh /var/lib/mysql/ | head -20
     else
       echo "✗ Restore incompleto!"

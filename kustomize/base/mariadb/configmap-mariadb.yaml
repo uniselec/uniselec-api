@@ -1,8 +1,3 @@
----
-# ----------------------------------------------------------------------
-# Description: Configurações gerais do MariaDB, incluindo parâmetros de
-#              inicialização e variáveis de ambiente.
-# ----------------------------------------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:

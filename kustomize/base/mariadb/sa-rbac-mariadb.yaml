@@ -1,8 +1,3 @@
----
-# ----------------------------------------------------------------------
-# Description: Conta de serviço e configurações de RBAC para o MariaDB,
-#              garantindo permissões adequadas no cluster Kubernetes.
-# ----------------------------------------------------------------------
 apiVersion: v1
 kind: ServiceAccount
 metadata:

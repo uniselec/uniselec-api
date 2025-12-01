@@ -1,13 +1,3 @@
----
-# ----------------------------------------------------------------------
-# Description: StatefulSet configuration for MariaDB Galera Cluster with:
-#              - 3-node replication topology
-#              - Automatic bootstrap safety checks
-#              - pt_BR locale configuration
-#              - SST/IST replication settings
-#              - Persistent NFS storage
-#              - Custom resource limits and probes
-# ----------------------------------------------------------------------
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:

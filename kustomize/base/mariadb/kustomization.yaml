@@ -4,11 +4,11 @@ kind: Kustomization
 # Recursos específicos do MariaDB
 resources:
   - sa-rbac-mariadb.yaml
-  - configmap-mariadb.yaml          # scripts SQL e shell
-  - configmap-mariadb-galera.yaml   # configuração do Galera (custom.cnf)
+  - configmap-mariadb.yaml
+  - configmap-mariadb-galera.yaml
   - service-mariadb.yaml
   - statefulset-mariadb.yaml
-  - backup-restore/ 
+  - backup-restore/
 
 # Variáveis de ambiente PÚBLICAS do MariaDB
 configMapGenerator:
