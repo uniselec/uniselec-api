@@ -11,7 +11,7 @@ metadata:
     haproxy.org/websocket: "true"
 spec:
   rules:
-  - host: dti-app-test-c1.unilab.edu.br
+  - host: dti-app-test-c1.unilab.edu.br # não necessita alteração --- IGNORE ---
     http:
       paths:
       - path: /
