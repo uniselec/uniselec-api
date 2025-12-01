@@ -347,12 +347,16 @@ build:docker:
     - |
       echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Tag da imagem docker"
       if [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
-        DOCKER_TAGS="--tag ${DOCKER_IMAGE}:dev"
+        IMAGE_TAG="dev-${CI_COMMIT_SHORT_SHA}"
+        DOCKER_TAGS="--tag ${DOCKER_IMAGE}:${IMAGE_TAG} --tag ${DOCKER_IMAGE}:dev"
       elif [[ -n "${CI_COMMIT_TAG}" ]]; then
-        DOCKER_TAGS="--tag ${DOCKER_IMAGE}:${CI_COMMIT_TAG}"
+        IMAGE_TAG="${CI_COMMIT_TAG}"
+        DOCKER_TAGS="--tag ${DOCKER_IMAGE}:${IMAGE_TAG}"
       else
-        DOCKER_TAGS="--tag ${DOCKER_IMAGE}:latest"
+        IMAGE_TAG="stg-${CI_COMMIT_SHORT_SHA}"
+        DOCKER_TAGS="--tag ${DOCKER_IMAGE}:${IMAGE_TAG} --tag ${DOCKER_IMAGE}:latest"
       fi
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] IMAGE_TAG=${IMAGE_TAG}"
 
     - |
       echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Build da imagem docker"
@@ -376,11 +380,11 @@ build:docker:
 
     - |
       echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Push para Harbor registry"
+      docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
+
       if [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
         docker push ${DOCKER_IMAGE}:dev
-      elif [[ -n "${CI_COMMIT_TAG}" ]]; then
-        docker push ${DOCKER_IMAGE}:${CI_COMMIT_TAG}
-      else
+      elif [[ "$CI_COMMIT_BRANCH" == "main" ]]; then
         docker push ${DOCKER_IMAGE}:latest
       fi
 
@@ -463,7 +467,9 @@ development:deploy:
   script:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 1 - Atualizar Image Tag dev no Git"
     - cd ${CI_PROJECT_DIR}/${KUSTOMIZE_PATH}
-    - kustomize edit set image ${DOCKER_IMAGE}:dev
+    - IMAGE_TAG="dev-${CI_COMMIT_SHORT_SHA}"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Setting image to ${DOCKER_IMAGE}:${IMAGE_TAG}"
+    - kustomize edit set image ${DOCKER_IMAGE}:${IMAGE_TAG}
     - |
       if git diff --quiet kustomization.yaml; then
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Nenhuma mudança em kustomization.yaml"
@@ -695,9 +701,11 @@ staging:deploy:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] GitOps Staging Deploy - ArgoCD"
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Branch ${CI_COMMIT_BRANCH} | Commit ${CI_COMMIT_SHORT_SHA}"
   script:
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 1 - Atualizar Image Tag latest no Git"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 1 - Atualizar Image Tag stg no Git"
     - cd ${CI_PROJECT_DIR}/${KUSTOMIZE_PATH}
-    - kustomize edit set image ${DOCKER_IMAGE}:latest
+    - IMAGE_TAG="stg-${CI_COMMIT_SHORT_SHA}"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Setting image to ${DOCKER_IMAGE}:${IMAGE_TAG}"
+    - kustomize edit set image ${DOCKER_IMAGE}:${IMAGE_TAG}
     - |
       if git diff --quiet kustomization.yaml; then
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Nenhuma mudança em kustomization.yaml"
