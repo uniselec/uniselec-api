@@ -87,11 +87,11 @@ secretGenerator:
 
 images:
 - name: dti-registro.unilab.edu.br/unilab/uniselec-api
-  newTag: dev
+  newTag: dev-0a3dcfcd
 
 labels:
 - pairs:
     environment: development
 
 commonAnnotations:
-  description: "Ambiente de desenvolvimento - UNISELEC Api"
+  description: Ambiente de desenvolvimento - UNISELEC Api
