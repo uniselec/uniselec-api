@@ -5,6 +5,13 @@ metadata:
   labels:
     app: mariadb
     component: restore
+  annotations:
+    # Hook: Sync = executa durante sync normal
+    argocd.argoproj.io/hook: Sync
+    # Delete Policy: Never = mantém job/pod após sync
+    argocd.argoproj.io/hook-delete-policy: Never
+    # Sync Options: Pula dry-run se recurso não existir
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   template:
     spec:
@@ -36,7 +43,7 @@ spec:
           echo ""
           echo "================================================================"
           echo ""
-          echo "Aguardando comandos... (pod ficará ativo)"
+          echo "Aguardando comandos..."
           tail -f /dev/null
         envFrom:
         - secretRef:

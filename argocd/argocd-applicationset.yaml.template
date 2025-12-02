@@ -48,16 +48,22 @@ spec:
       destination:
         server: '{{cluster}}'
         namespace: '{{namespace}}'
-      # IGNORE DIFFERENCES: Recursos gerenciados externamente
-      # Documentação: https://argo-cd.readthedocs.io/en/stable/user-guide/diffing/
+      # IGNORE DIFFERENCES: Campos gerenciados externamente pelo Kubernetes
+      # Documentação:
+      # https://argo-cd.readthedocs.io/en/stable/user-guide/diffing/
+      # https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#limitations
+      # https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#stable-storage
+      # https://argo-cd.readthedocs.io/en/stable/faq/#why-is-my-app-out-of-sync-even-after-syncing
       ignoreDifferences:
-      # HPA: Status e métricas são gerenciados pelo Kubernetes
+      # HPA: Status e métricas são gerenciados pelo Kubernetes Metrics Server
+      # Razão: Metrics Server atualiza constantemente estas annotations
       - group: autoscaling
         kind: HorizontalPodAutoscaler
         jsonPointers:
         - /status
         - /metadata/annotations/autoscaling.alpha.kubernetes.io~1metrics
-      # StatefulSet: volumeClaimTemplates é IMUTÁVEL (Kubernetes limitation)
+      # StatefulSet: volumeClaimTemplates imutável, k8s limitation
+      # Razão: volumeClaimTemplates não pode ser modificado após criação do StatefulSet
       - group: apps
         kind: StatefulSet
         jsonPointers:
@@ -65,6 +71,7 @@ spec:
         - /spec/replicas
         - /spec/volumeClaimTemplates
       # PVC: Campos adicionados automaticamente pelo StatefulSet controller
+      # Razão: Controller adiciona ownerReferences, labels, e annotations automaticamente
       - group: ""
         kind: PersistentVolumeClaim
         jsonPointers:
@@ -75,20 +82,31 @@ spec:
         - /spec/storageClassName
         jqPathExpressions:
         - .metadata.ownerReferences[]?.controller
-      # ConfigMap: Annotation do kubectl apply (last-applied-configuration)
+      # ConfigMap: Annotation do kubectl apply, last-applied-configuration
+      # Razão: kubectl adiciona esta annotation automaticamente
       - group: ""
         kind: ConfigMap
         jqPathExpressions:
         - .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"]
+      # Job: Status e labels ephemeral (Jobs run-to-completion)
+      # Razões: Jobs mudam status durante execução. Pending,Running,Succeeded/Failed
+      - group: batch
+        kind: Job
+        jsonPointers:
+        - /status
+        - /spec/selector
+        - /spec/template/metadata/labels
+        jqPathExpressions:
+        - .spec.template.metadata.labels
+        - .status.conditions
       # SYNC POLICY: Estratégia de Sincronização GitOps
       syncPolicy:
         # AUTOMATED: Sincronização Automática (Core do GitOps)
         automated:
           # PRUNE: Remove recursos deletados do Git
           prune: true
-          # SELF-HEAL: Reverte mudanças manuais no cluster
-          # RECOMENDAÇÃO GitOps: true (força Git como fonte única)
-          # Porém, se quer permitir mudanças manuais temporárias, use false
+          # se true Git é fonte única da verdade
+          # Porém, se deseja permitir mudanças manuais temporárias, use false
           selfHeal: false
           # ALLOW EMPTY: Permite sync mesmo se Git tiver 0 recursos
           allowEmpty: false
