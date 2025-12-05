@@ -7,14 +7,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProcessSelectionApplicationCsvService
 {
-    /**
-     * Exporta as inscrições de um processo seletivo.
-     *
-     * @param  ProcessSelection $selection
-     * @param  int|null         $enemYear        Ano do ENEM para filtro (form_data.enem_year)
-     * @param  bool             $onlyEnemNumbers Se true, exporta apenas numeração ENEM em ZIP paginado
-     * @return StreamedResponse
-     */
+
     public function export(
         ProcessSelection $selection,
         ?int $enemYear = null,
@@ -124,16 +117,12 @@ class ProcessSelectionApplicationCsvService
         ]);
     }
 
-    /**
-     * Modo "só ENEM": gera um ZIP com vários CSVs, sem cabeçalho,
-     * no máximo 1000 linhas por arquivo. Cada linha é apenas o número
-     * de inscrição do ENEM (form_data.enem).
-     */
+
     protected function exportOnlyEnemNumbersZip(
         ProcessSelection $selection,
         ?int $enemYear = null
     ): StreamedResponse {
-        $zipFileName = "enem_numbers_process_{$selection->id}.zip";
+        $zipFileName = "notas-enem-{$enemYear}-processo-{$selection->id}.zip";
 
         return response()->streamDownload(function () use ($selection, $enemYear) {
 
@@ -152,7 +141,6 @@ class ProcessSelectionApplicationCsvService
                 $baseQuery->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(form_data, '$.enem_year')) = ?", [$enemYear]);
             }
 
-            // Conta total de aplicações para calcular páginas
             $totalApplications = (clone $baseQuery)->count();
 
             if ($totalApplications === 0) {
@@ -166,13 +154,13 @@ class ProcessSelectionApplicationCsvService
             $totalPages = (int) ceil($totalApplications / $perPage);
             $currentPage = 1;
 
-            $baseQuery->chunk($perPage, function ($apps) use (&$currentPage, $totalPages, $zip) {
+            $baseQuery->chunk($perPage, function ($apps) use (&$currentPage, $enemYear, $totalPages, $zip) {
 
-                // Nome do arquivo interno no zip: inscricoes-page-1-de-10.txt
                 $innerFileName = sprintf(
-                    "inscricoes-page-%d-de-%d.txt",
+                    "inscricoes-page-%d-de-%d-%d.txt",
                     $currentPage,
-                    $totalPages
+                    $totalPages,
+                    $enemYear
                 );
 
                 // Monta o conteúdo do txt
