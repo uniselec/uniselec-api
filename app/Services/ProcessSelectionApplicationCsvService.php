@@ -122,7 +122,9 @@ class ProcessSelectionApplicationCsvService
         ProcessSelection $selection,
         ?int $enemYear = null
     ): StreamedResponse {
-        $zipFileName = "notas-enem-{$enemYear}-processo-{$selection->id}.zip";
+        $zipFileName = $enemYear
+            ? "notas-enem-{$enemYear}.zip"
+            : "notas-enem.zip";
 
         return response()->streamDownload(function () use ($selection, $enemYear) {
 
@@ -150,7 +152,7 @@ class ProcessSelectionApplicationCsvService
                 return;
             }
 
-            $perPage = 1000;
+            $perPage = 999;
             $totalPages = (int) ceil($totalApplications / $perPage);
             $currentPage = 1;
 
