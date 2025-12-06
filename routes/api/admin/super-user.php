@@ -19,6 +19,7 @@ use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\EnemScoreController;
 use App\Http\Controllers\Admin\EnemScoreImportController;
+use App\Http\Controllers\Admin\EnemScoreSummaryController;
 use App\Http\Controllers\Admin\KnowledgeAreaController;
 use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
@@ -42,9 +43,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::apiResource('admins', AdminController::class)->names('admin.super_user.admins');
         Route::apiResource('academic_units', AcademicUnitController::class)->names('admin.super_user.academic_units');
         Route::apiResource('courses', CourseController::class)->names('admin.super_user.courses');
-        Route::apiResource('process_selections', ProcessSelectionController::class)
-        ->only(['index', 'show', 'store', 'update'])
-        ->names('admin.super_user.processSelection');
+        Route::apiResource('process_selections', ProcessSelectionController::class)->only(['index', 'show', 'store', 'update'])->names('admin.super_user.processSelection');
         Route::apiResource('admission_categories', AdmissionCategoryController::class)->names('admin.super_user.admission_categories');
         Route::apiResource('bonus_options', BonusOptionController::class)->names('admin.super_user.bonus_options');
         Route::apiResource('documents', DocumentController::class)->names('docum.super_userents.api');
@@ -93,6 +92,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::get('/process_selections/{selection}/notify-status', [ProcessSelectionNotifyController::class, 'notifyByStatus']);
 
         Route::post('enem_scores/import', EnemScoreImportController::class)->name('admin.super_user.enem_scores.import');
+        Route::get('enem_scores/summary/{process_selection}', EnemScoreSummaryController::class);
         Route::post('/logout', [AuthController::class, 'logout'])->name('admin.super_user.logout');
         Route::get('/me', [AuthController::class, 'me'])->name('admin.super_user.user.profile');
         Route::post('/register', [RegisterController::class, 'registerAdmin'])->name('admin.super_user.register');
