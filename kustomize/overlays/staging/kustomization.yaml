@@ -69,12 +69,11 @@ configMapGenerator:
 
 images:
 - name: dti-registro.unilab.edu.br/unilab/uniselec-api
-  newTag: latest
+  newTag: stg-cf028423
 
 labels:
 - pairs:
     environment: staging
 
 commonAnnotations:
-  description: "Ambiente de homologação - UNISELEC Api"
-
+  description: Ambiente de homologação - UNISELEC Api
