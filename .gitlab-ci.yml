@@ -40,7 +40,10 @@ variables:
   ARGOCD_SERVER: "argocd.unilab.edu.br"
   CLUSTER_REMOTE1_DOMAIN: "10.130.0.45"
   KUBECONFIG: "/tmp/kubeconfig-${CI_PIPELINE_ID}"
-  ARGOCD_TIMEOUT: "690"
+  ARGOCD_TIMEOUT_DEV: "560"  # 9min 20s
+  ARGOCD_TIMEOUT_STG: "630"  # 10min 30s
+  ARGOCD_TIMEOUT_PRD: "730"  # 12min 10s
+
   # Notificação
   MAIL_PRD: "jefponte@unilab.edu.br"
 
@@ -459,6 +462,7 @@ development:deploy:
     APP_NAMESPACE: "${APP_NAME}-dev"
     KUSTOMIZE_PATH: kustomize/overlays/development
     GIT_BRANCH: develop
+    ARGOCD_TIMEOUT: "${ARGOCD_TIMEOUT_DEV}"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
   before_script:
@@ -695,6 +699,7 @@ staging:deploy:
     DEPLOY_ENV: stg
     APP_NAMESPACE: "${APP_NAME}-stg"
     KUSTOMIZE_PATH: kustomize/overlays/staging
+    ARGOCD_TIMEOUT: "${ARGOCD_TIMEOUT_STG}"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
   before_script:
@@ -997,6 +1002,7 @@ production:deploy:
     DEPLOY_ENV: prd
     APP_NAMESPACE: "${APP_NAME}-prd"
     KUSTOMIZE_PATH: kustomize/overlays/production
+    ARGOCD_TIMEOUT: "${ARGOCD_TIMEOUT_PRD}"
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   needs:
