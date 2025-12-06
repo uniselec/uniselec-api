@@ -65,3 +65,13 @@ configMapGenerator:
       - VITE_PUSHER_PORT=${PUSHER_PORT}
       - VITE_PUSHER_SCHEME=${PUSHER_SCHEME}
       - VITE_PUSHER_APP_CLUSTER=${PUSHER_APP_CLUSTER}
+
+labels:
+- pairs:
+    app.kubernetes.io/name: uniselec-api
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/managed-by: kustomize
+    organization: uniselec
+
+commonAnnotations:
+  maintainer: erivando
