@@ -5,7 +5,7 @@ resources:
   - serviceaccount-backup.yaml
   - configmap-backup-scripts.yaml
   - cronjob-backup-daily.yaml
-  - job-restore-admin.yaml
+  - deployment-restore-admin.yaml
 
 # Configurações comuns
 labels:
