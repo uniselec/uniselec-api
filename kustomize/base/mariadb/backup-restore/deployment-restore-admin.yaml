@@ -1,0 +1,235 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb-restore-admin
+  labels:
+    app: mariadb
+    component: restore-admin
+    app.kubernetes.io/name: mariadb-restore-admin
+    app.kubernetes.io/component: backup-restore
+    app.kubernetes.io/part-of: mariadb
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mariadb
+      component: restore-admin
+  template:
+    metadata:
+      labels:
+        app: mariadb
+        component: restore-admin
+      annotations:
+        checksum/scripts: "{{ .Values.configMapChecksum }}"
+    spec:
+      serviceAccountName: mariadb-backup
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: "OnRootMismatch"
+      containers:
+      - name: restore-admin
+        image: mariadb:10.11.15-jammy
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -e
+
+          # Cores para output
+          RED='\033[0;31m'
+          GREEN='\033[0;32m'
+          YELLOW='\033[1;33m'
+          BLUE='\033[0;34m'
+          NC='\033[0m' # No Color
+
+          echo -e "${BLUE}================================================================${NC}"
+          echo -e "${GREEN}     MARIADB GALERA RESTORE ADMIN - POD ADMINISTRATIVO${NC}"
+          echo -e "${BLUE}================================================================${NC}"
+          echo ""
+          echo -e "${YELLOW}Pod iniciado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}"
+          echo -e "${YELLOW}Namespace: ${POD_NAMESPACE}${NC}"
+          echo -e "${YELLOW}Hostname: $(hostname)${NC}"
+          echo ""
+          echo -e "${BLUE}ACESSO AOS BACKUPS:${NC}"
+          echo "  • Backups AUTOMÁTICOS (CronJob): /backup/auto-*"
+          echo "  • Backups MANUAIS (Scripts):     /backup/manual-*"
+          echo "  • PVC em uso:                    backup-mariadb-1"
+          echo ""
+          echo -e "${BLUE}COMO CONECTAR A ESTE POD:${NC}"
+          echo "  kubectl exec -it deployment/mariadb-restore-admin -n ${POD_NAMESPACE} -- bash"
+          echo ""
+          echo -e "${BLUE}SCRIPTS DISPONÍVEIS EM /scripts/:${NC}"
+          echo "  ${GREEN}list-backups.sh${NC}               - Lista todos os backups disponíveis"
+          echo "  ${GREEN}verify-backup.sh <id>${NC}         - Verifica integridade de um backup"
+          echo "  ${GREEN}execute-restore-safe.sh <id>${NC} - Executa restore com validações"
+          echo ""
+          echo -e "${BLUE}EXEMPLO DE USO:${NC}"
+          echo "  # 1. Listar backups disponíveis"
+          echo "  /scripts/list-backups.sh"
+          echo ""
+          echo "  # 2. Verificar integridade do backup"
+          echo "  /scripts/verify-backup.sh 20251206-120000"
+          echo ""
+          echo "  # 3. Executar restore (se verificação OK)"
+          echo "  /scripts/execute-restore-safe.sh 20251206-120000"
+          echo ""
+          echo -e "${BLUE}ATALHOS ÚTEIS:${NC}"
+          echo "  alias lb='bash /scripts/list-backups.sh'"
+          echo "  alias vb='bash /scripts/verify-backup.sh'"
+          echo "  alias restore='bash /scripts/execute-restore-safe.sh'"
+          echo ""
+          echo -e "${BLUE}VARIÁVEIS DE AMBIENTE:${NC}"
+          echo "  MARIADB_ROOT_PASSWORD: [CONFIGURADO]"
+          echo "  MARIADB_REPLICATION_USER: [CONFIGURADO]"
+          echo ""
+          echo -e "${BLUE}================================================================${NC}"
+          echo -e "${GREEN}✓ Pod administrativo pronto e aguardando comandos...${NC}"
+          echo -e "${BLUE}================================================================${NC}"
+          echo ""
+
+          # Criar arquivo de atalhos no home
+          cat > /root/.bashrc_custom <<'EOF'
+          # Atalhos para backup/restore
+          alias lb='bash /scripts/list-backups.sh'
+          alias vb='bash /scripts/verify-backup.sh'
+          alias restore='bash /scripts/execute-restore-safe.sh'
+          alias logs='tail -f /var/log/restore.log'
+
+          # Cores no prompt
+          export PS1='\[\033[1;36m\][\u@restore-admin \W]\$\[\033[0m\] '
+
+          echo "Atalhos disponíveis: lb, vb, restore, logs"
+          EOF
+
+          # Source no bashrc principal
+          echo "source /root/.bashrc_custom" >> /root/.bashrc
+
+          # Criar diretório de logs se não existir
+          mkdir -p /var/log
+          touch /var/log/restore.log
+
+          # Healthcheck interno - verifica se volumes estão montados
+          check_health() {
+            if [ ! -d "/backup" ]; then
+              echo -e "${RED}ERRO: Volume /backup não montado!${NC}"
+              return 1
+            fi
+            if [ ! -d "/scripts" ]; then
+              echo -e "${RED}ERRO: Volume /scripts não montado!${NC}"
+              return 1
+            fi
+            if [ ! -d "/var/lib/mysql" ]; then
+              echo -e "${RED}ERRO: Volume /var/lib/mysql não montado!${NC}"
+              return 1
+            fi
+            return 0
+          }
+
+          # Verificar saúde inicial
+          if ! check_health; then
+            echo -e "${RED}Pod com problemas nos volumes montados!${NC}"
+            exit 1
+          fi
+
+          # Loop infinito com healthcheck periódico
+          echo -e "${GREEN}Iniciando monitoramento (healthcheck a cada 5 minutos)...${NC}"
+
+          while true; do
+            # Healthcheck a cada 5 minutos
+            sleep 300
+
+            if ! check_health; then
+              echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARN: Problema detectado nos volumes" | tee -a /var/log/restore.log
+            fi
+          done
+        envFrom:
+        - secretRef:
+            name: mariadb-secret-env
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: TZ
+          value: "America/Fortaleza"
+        volumeMounts:
+        - name: backup-storage
+          mountPath: /backup
+        - name: backup-scripts
+          mountPath: /scripts
+          readOnly: true
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+        - name: tmp
+          mountPath: /tmp
+        securityContext:
+          runAsUser: 0
+          runAsNonRoot: false
+          privileged: true
+          allowPrivilegeEscalation: true
+          capabilities:
+            add:
+            - SYS_ADMIN
+            - DAC_OVERRIDE
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              # Verifica se processo principal está rodando
+              pgrep -f "tail -f /dev/null" > /dev/null || pgrep -f "sleep" > /dev/null
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /bin/bash
+            - -c
+            - |
+              # Verifica se todos os volumes estão montados
+              [ -d /backup ] && [ -d /scripts ] && [ -d /var/lib/mysql ]
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+      restartPolicy: Always
+      volumes:
+      - name: backup-storage
+        persistentVolumeClaim:
+          claimName: backup-mariadb-1
+      - name: backup-scripts
+        configMap:
+          name: mariadb-backup-scripts
+          defaultMode: 0755
+      - name: mysql-data
+        persistentVolumeClaim:
+          claimName: database-mariadb-0
+      - name: tmp
+        emptyDir:
+          sizeLimit: 1Gi
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30

@@ -21,8 +21,7 @@ kubectl patch statefulset mariadb -p '{"spec":{"replicas":0}}'
 kubectl wait --for=delete pod/mariadb-0 --timeout=360s
 
 # 4. Executar restore
-kubectl apply -f job-restore-admin.yaml
-kubectl exec job/mariadb-restore-admin -- /scripts/execute-restore-safe.sh $BACKUP_TIMESTAMP
+kubectl exec deployment/mariadb-restore-admin -- /scripts/execute-restore-safe.sh $BACKUP_TIMESTAMP
 
 # 5. Reiniciar cluster
 kubectl patch statefulset mariadb -p '{"spec":{"replicas":3}}'
