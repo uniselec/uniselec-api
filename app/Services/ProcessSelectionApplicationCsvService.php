@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\ProcessSelection;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use ZipArchive;
 
 class ProcessSelectionApplicationCsvService
 {
@@ -131,10 +133,10 @@ class ProcessSelectionApplicationCsvService
             // Caminho temporário do ZIP
             $tmpZip = tempnam(sys_get_temp_dir(), 'zip_');
 
-            $zip = new \ZipArchive();
+            $zip = new ZipArchive();
 
-            if ($zip->open($tmpZip, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
-                throw new \RuntimeException('Erro ao criar pacote ZIP.');
+            if ($zip->open($tmpZip, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+                throw new RuntimeException('Erro ao criar pacote ZIP.');
             }
 
             $baseQuery = $selection->applications()->orderBy('id');
