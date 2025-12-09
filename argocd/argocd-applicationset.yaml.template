@@ -57,10 +57,10 @@ spec:
         kind: PersistentVolumeClaim
         jsonPointers:
         - /status
-        - /metadata/annotations
-        - /metadata/labels
-        - /spec/volumeMode
-        - /spec/storageClassName
+        - /metadata/annotations/pv.kubernetes.io~1bind-completed
+        - /metadata/annotations/pv.kubernetes.io~1bound-by-controller
+        - /metadata/annotations/volume.beta.kubernetes.io~1storage-provisioner
+        - /metadata/annotations/volume.kubernetes.io~1storage-provisioner
         jqPathExpressions:
         - .metadata.ownerReferences[]?.controller
       - group: ""

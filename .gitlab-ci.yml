@@ -752,6 +752,20 @@ staging:deploy:
       fi
 
     - cd ${CI_PROJECT_DIR}
+
+    - |
+      echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 1.5 - Gerar e Exibir Changelog"
+      if command -v node &>/dev/null && command -v npm &>/dev/null; then
+        npx --yes standard-version --no-git-tag-version --skip.commit --skip.bump || echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Falha ao gerar changelog."
+        if [ -f CHANGELOG.md ]; then
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ======== CHANGELOG.md ========="
+          cat CHANGELOG.md
+          echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ===== Fim do CHANGELOG.md ====="
+        fi
+      else
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Node/npm não disponível para geração de changelog"
+      fi
+
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 2 - Verificar ArgoCD Server (K8S Main)"
     - |
       if ! curl -s --max-time 10 https://${ARGOCD_SERVER}/healthz | grep -q "ok"; then
