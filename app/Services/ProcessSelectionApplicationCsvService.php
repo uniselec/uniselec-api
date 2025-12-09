@@ -145,6 +145,10 @@ class ProcessSelectionApplicationCsvService
                     [$enemYear]
                 );
             }
+            $baseQuery->whereRaw(
+                "CHAR_LENGTH(JSON_UNQUOTE(JSON_EXTRACT(form_data, '$.enem'))) = ?",
+                [12]
+            );
 
             $totalApplications = (clone $baseQuery)->count();
             if ($totalApplications === 0) {
