@@ -21,6 +21,9 @@ spec:
       tolerations:
       - effect: NoSchedule
         operator: Exists
+      securityContext:
+        fsGroup: 999
+
       containers:
       - name: restore-admin
         image: mariadb:10.11.15-jammy
@@ -92,10 +95,10 @@ spec:
           limits:
             cpu: 1000m
             memory: 1Gi
+
         securityContext:
           runAsUser: 999
           runAsGroup: 999
-          fsGroup: 999
           capabilities:
             add:
             - SYS_NICE
