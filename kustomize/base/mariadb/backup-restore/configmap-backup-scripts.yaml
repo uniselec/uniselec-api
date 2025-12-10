@@ -6,7 +6,6 @@ metadata:
     app: mariadb
     component: backup
 data:
-  # BACKUP GALERA AUTOMÁTICO (CronJob)
   backup-galera-automated.sh: |
     #!/bin/bash
     set -euo pipefail
@@ -20,100 +19,103 @@ data:
       exit 1
     }
 
+    # VALIDAÇÃO: Este script DEVE rodar no mariadb-1
     HOSTNAME=$(hostname)
-    ORDINAL="${HOSTNAME##*-}"
+    EXPECTED_POD="mariadb-1"
 
-    # Backup apenas em nós secundários (mariadb-1)
-    if [ "$ORDINAL" != "1" ]; then
-      log "Skip: Backup automático executa apenas em mariadb-1"
+    if [ "$HOSTNAME" != "$EXPECTED_POD" ]; then
+      log "Skip: Este script deve ser executado no pod $EXPECTED_POD"
+      log "Pod atual: $HOSTNAME"
       exit 0
     fi
 
-    # MESMO FORMATO QUE BACKUP MANUAL
+    # INICIAR BACKUP
     TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-    BACKUP_DIR="/backup/auto-${TIMESTAMP}"  # Prefixo 'auto-' para CronJob
+    BACKUP_DIR="/backup/auto-${TIMESTAMP}"
 
     mkdir -p "$BACKUP_DIR"
 
     log "=== BACKUP AUTOMÁTICO GALERA ==="
     log "Pod: $HOSTNAME"
     log "Dir: $BACKUP_DIR"
+    log "Timestamp: $TIMESTAMP"
 
-    # Verificar MariaDB
-    if ! mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}" --silent; then
+    # Verificar MariaDB está respondendo
+    if ! mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}" --silent 2>/dev/null; then
       error "MariaDB não responde"
     fi
 
-    # ======================================================
+    log "MariaDB OK"
+
     # BACKUP FÍSICO - MESMO MÉTODO DO SCRIPT MANUAL
-    # ======================================================
     log "Executando mariadb-backup (streaming)..."
 
-    mariadb-backup \
+    if ! mariadb-backup \
       --backup \
       --user=root \
       --password="${MYSQL_ROOT_PASSWORD}" \
-      --target-dir=$BACKUP_DIR \
+      --target-dir="$BACKUP_DIR" \
       --stream=mbstream \
-      --parallel=2 > $BACKUP_DIR/backup.mbstream
-
-    if [ $? -ne 0 ]; then
-      error "Backup falhou"
+      --parallel=2 > "$BACKUP_DIR/backup.mbstream" 2>&1; then
+      error "mariadb-backup --backup falhou"
     fi
 
     log "Backup stream completo"
 
     # Checksum (compatível com script manual)
-    md5sum $BACKUP_DIR/backup.mbstream > $BACKUP_DIR/backup.mbstream.md5
-    ls -lh $BACKUP_DIR/backup.mbstream | awk '{print $5}' > $BACKUP_DIR/backup.size
+    md5sum "$BACKUP_DIR/backup.mbstream" > "$BACKUP_DIR/backup.mbstream.md5"
+    ls -lh "$BACKUP_DIR/backup.mbstream" | awk '{print $5}' > "$BACKUP_DIR/backup.size"
 
-    # ======================================================
+    log "Checksum calculado"
+
     # PREPARAÇÃO DO BACKUP
-    # ======================================================
     log "Preparando backup..."
 
-    cd $BACKUP_DIR
-    mbstream -x < backup.mbstream
+    cd "$BACKUP_DIR"
 
-    mariadb-backup \
-      --prepare \
-      --target-dir=$BACKUP_DIR
-
-    if [ $? -ne 0 ]; then
-      error "Preparação falhou"
+    if ! mbstream -x < backup.mbstream 2>&1; then
+      error "mbstream -x falhou"
     fi
+
+    log "Backup extraído"
+
+    if ! mariadb-backup \
+      --prepare \
+      --target-dir="$BACKUP_DIR" 2>&1; then
+      error "mariadb-backup --prepare falhou"
+    fi
+
+    log "Backup preparado"
 
     # Validar xtrabackup_checkpoints
     if [ ! -f "$BACKUP_DIR/xtrabackup_checkpoints" ]; then
       error "xtrabackup_checkpoints não encontrado"
     fi
 
-    log "Backup preparado"
-
-    # ======================================================
     # METADADOS DO CLUSTER
-    # ======================================================
-    cat > $BACKUP_DIR/cluster-info.txt <<CLUSTERINFO
+    cat > "$BACKUP_DIR/cluster-info.txt" <<CLUSTERINFO
     Backup Type: AUTOMATED (CronJob)
     Timestamp: $TIMESTAMP
     Pod: $HOSTNAME
     Namespace: ${POD_NAMESPACE:-uniselec-api-prd}
+    Created: $(date)
 
     === CLUSTER STATUS ===
     CLUSTERINFO
 
     mariadb -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "
       SELECT NOW() as backup_time;
-      SHOW STATUS LIKE 'wsrep%';
-    " >> $BACKUP_DIR/cluster-info.txt 2>/dev/null || true
+      SHOW STATUS LIKE 'wsrep_cluster_size';
+      SHOW STATUS LIKE 'wsrep_local_state_comment';
+    " >> "$BACKUP_DIR/cluster-info.txt" 2>/dev/null || true
 
-    # ======================================================
+    log "Metadados salvos"
+
     # VALIDAÇÃO
-    # ======================================================
     log "Validando backup..."
 
     # Checksum
-    cd $BACKUP_DIR
+    cd "$BACKUP_DIR"
     if ! md5sum -c backup.mbstream.md5 2>/dev/null; then
       error "Checksum inválido"
     fi
@@ -133,69 +135,76 @@ data:
 
     log "Backup validado"
 
-    # ======================================================
     # LIMPEZA DE BACKUPS ANTIGOS
-    # ======================================================
     log "Limpando backups > 7 dias..."
     find /backup -maxdepth 1 -name "auto-*" -type d -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
     find /backup -maxdepth 1 -name "manual-*" -type d -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
     find /backup -name "backup-*.log" -mtime +7 -delete 2>/dev/null || true
 
-    # ======================================================
+    log "Limpeza concluída"
+
     # RELATÓRIO FINAL
-    # ======================================================
-    BACKUP_SIZE=$(du -sh "$BACKUP_DIR" | cut -f1)
+    BACKUP_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1 || echo "Unknown")
+
     log "=== BACKUP COMPLETO ==="
     log "ID: $TIMESTAMP"
     log "Tamanho: $BACKUP_SIZE"
     log "Local: $BACKUP_DIR"
 
-    echo "SUCCESS:$TIMESTAMP:automated" > "/backup/last_backup_status"
+    # Salvar status para monitoramento
+    echo "SUCCESS:$TIMESTAMP:automated:$BACKUP_SIZE" > "/backup/last_backup_status"
 
-    log "Backup finalizado"
+    log "Backup finalizado com sucesso"
 
-  # LISTAR BACKUPS (AUTOMÁTICOS E MANUAIS)
   list-backups.sh: |
     #!/bin/bash
+    set -euo pipefail
 
     echo "=== BACKUPS DISPONÍVEIS ==="
     echo ""
     echo "Formato: TIMESTAMP | TAMANHO | TIPO | STATUS"
     echo "-----------------------------------------------------"
 
+    # Contador
+    total_backups=0
+
     # Listar TODOS os backups (auto-* e manual-*)
-    for backup_dir in /backup/auto-* /backup/manual-*; do
-      if [ -d "$backup_dir" ]; then
-        basename_dir=$(basename "$backup_dir")
-
-        # Extrair tipo e timestamp
-        if [[ $basename_dir =~ ^auto-(.*)$ ]]; then
-          tipo="AUTO"
-          timestamp="${BASH_REMATCH[1]}"
-        elif [[ $basename_dir =~ ^manual-(.*)$ ]]; then
-          tipo="MANUAL"
-          timestamp="${BASH_REMATCH[1]}"
-        else
-          continue
-        fi
-
-        size=$(du -sh "$backup_dir" 2>/dev/null | cut -f1)
-
-        # Verificar integridade
-        if [ -f "$backup_dir/xtrabackup_checkpoints" ] && \
-           [ -f "$backup_dir/ibdata1" ] && \
-           [ -f "$backup_dir/backup.mbstream.md5" ]; then
-          status="✓ PRONTO"
-        else
-          status="✗ INCOMPLETO"
-        fi
-
-        printf "%-17s | %-8s | %-6s | %s\n" "$timestamp" "$size" "$tipo" "$status"
+    for backup_dir in /backup/auto-* /backup/manual-* 2>/dev/null; do
+      # Verificar se o path existe (glob pode retornar string literal)
+      if [ ! -d "$backup_dir" ]; then
+        continue
       fi
+
+      total_backups=$((total_backups + 1))
+      basename_dir=$(basename "$backup_dir")
+
+      # Extrair tipo e timestamp
+      if [[ $basename_dir =~ ^auto-(.*)$ ]]; then
+        tipo="AUTO"
+        timestamp="${BASH_REMATCH[1]}"
+      elif [[ $basename_dir =~ ^manual-(.*)$ ]]; then
+        tipo="MANUAL"
+        timestamp="${BASH_REMATCH[1]}"
+      else
+        continue
+      fi
+
+      size=$(du -sh "$backup_dir" 2>/dev/null | cut -f1 || echo "N/A")
+
+      # Verificar integridade
+      if [ -f "$backup_dir/xtrabackup_checkpoints" ] && \
+         [ -f "$backup_dir/ibdata1" ] && \
+         [ -f "$backup_dir/backup.mbstream.md5" ]; then
+        status="✓ PRONTO"
+      else
+        status="✗ INCOMPLETO"
+      fi
+
+      printf "%-17s | %-8s | %-6s | %s\n" "$timestamp" "$size" "$tipo" "$status"
     done | sort -r
 
     echo ""
-    echo "Total de backups: $(find /backup -maxdepth 1 \( -name "auto-*" -o -name "manual-*" \) -type d 2>/dev/null | wc -l)"
+    echo "Total de backups: $total_backups"
 
     # Status do último backup
     if [ -f "/backup/last_backup_status" ]; then
@@ -203,107 +212,27 @@ data:
       echo "Último backup: $(cat /backup/last_backup_status)"
     fi
 
+    # Status do último restore
+    if [ -f "/backup/last_restore_status" ]; then
+      echo "Último restore: $(cat /backup/last_restore_status)"
+    fi
+
     echo ""
-    echo "Para restaurar um backup:"
-    echo "  /scripts/execute-restore-safe.sh <timestamp>"
-    echo "  Exemplo: /scripts/execute-restore-safe.sh 20251130-124024"
+    echo "Comandos úteis:"
+    echo "  Verificar backup:  /scripts/verify-backup.sh <timestamp>"
+    echo "  Executar restore:  /scripts/execute-restore-safe.sh <timestamp>"
+    echo ""
+    echo "Exemplo:"
+    echo "  /scripts/verify-backup.sh 20251210-020000"
 
-  # VERIFICAR BACKUP (AUTOMÁTICO OU MANUAL)
   verify-backup.sh: |
-    #!/bin/bash
-
-    if [ -z "$1" ]; then
-      echo "Uso: $0 <timestamp>"
-      echo "Exemplo: $0 20251130-124024"
-      exit 1
-    fi
-
-    TIMESTAMP="$1"
-
-    # Procurar backup (auto ou manual)
-    BACKUP_DIR=""
-    if [ -d "/backup/auto-${TIMESTAMP}" ]; then
-      BACKUP_DIR="/backup/auto-${TIMESTAMP}"
-      TIPO="AUTOMÁTICO"
-    elif [ -d "/backup/manual-${TIMESTAMP}" ]; then
-      BACKUP_DIR="/backup/manual-${TIMESTAMP}"
-      TIPO="MANUAL"
-    else
-      echo "Backup não encontrado: $TIMESTAMP"
-      echo "Use /scripts/list-backups.sh para ver backups disponíveis"
-      exit 1
-    fi
-
-    echo "Verificando backup: $TIMESTAMP"
-    echo "Tipo: $TIPO"
-    echo "Local: $BACKUP_DIR"
-    echo "========================="
-
-    # Verificar checksum
-    echo -n "Checksum MD5: "
-    if [ -f "$BACKUP_DIR/backup.mbstream.md5" ]; then
-      cd "$BACKUP_DIR"
-      if md5sum -c backup.mbstream.md5 2>/dev/null; then
-        echo "OK"
-      else
-        echo "FALHOU"
-      fi
-    else
-      echo "NÃO ENCONTRADO"
-    fi
-
-    # Verificar xtrabackup_checkpoints
-    echo -n "xtrabackup_checkpoints: "
-    if [ -f "$BACKUP_DIR/xtrabackup_checkpoints" ]; then
-      echo "OK"
-      echo "  $(cat "$BACKUP_DIR/xtrabackup_checkpoints" | grep backup_type)"
-      echo "  $(cat "$BACKUP_DIR/xtrabackup_checkpoints" | grep to_lsn)"
-    else
-      echo "NÃO ENCONTRADO"
-    fi
-
-    # Verificar arquivos críticos
-    echo -n "Arquivos críticos: "
-    required_files=('xtrabackup_info' 'ibdata1')
-    missing=0
-    for file in "${required_files[@]}"; do
-      if [ ! -f "$BACKUP_DIR/$file" ]; then
-        echo "FALTANDO: $file"
-        missing=1
-      fi
-    done
-    if [ $missing -eq 0 ]; then
-      echo "OK"
-    fi
-
-    # Verificar cluster-info
-    if [ -f "$BACKUP_DIR/cluster-info.txt" ]; then
-      echo ""
-      echo "=== INFORMAÇÕES DO CLUSTER ==="
-      head -20 "$BACKUP_DIR/cluster-info.txt"
-    fi
-
-    echo "========================="
-
-    # Status final
-    if [ $missing -eq 0 ] && [ -f "$BACKUP_DIR/xtrabackup_checkpoints" ]; then
-      echo "Status: ✓ PRONTO PARA RESTORE"
-      echo ""
-      echo "Comando de restore:"
-      echo "  /scripts/execute-restore-safe.sh $TIMESTAMP"
-      exit 0
-    else
-      echo "Status: ✗ BACKUP INCOMPLETO"
-      exit 1
-    fi
-
-  # EXECUTAR RESTORE (AUTOMÁTICO OU MANUAL)
-  execute-restore-safe.sh: |
     #!/bin/bash
     set -euo pipefail
 
-    if [ -z "$1" ]; then
+    if [ -z "${1:-}" ]; then
       echo "Uso: $0 <timestamp>"
+      echo ""
+      echo "Exemplo: $0 20251210-020000"
       echo ""
       echo "Para listar backups disponíveis:"
       echo "  /scripts/list-backups.sh"
@@ -314,6 +243,138 @@ data:
 
     # Procurar backup (auto ou manual)
     BACKUP_DIR=""
+    TIPO=""
+
+    if [ -d "/backup/auto-${TIMESTAMP}" ]; then
+      BACKUP_DIR="/backup/auto-${TIMESTAMP}"
+      TIPO="AUTOMÁTICO"
+    elif [ -d "/backup/manual-${TIMESTAMP}" ]; then
+      BACKUP_DIR="/backup/manual-${TIMESTAMP}"
+      TIPO="MANUAL"
+    else
+      echo "Backup não encontrado: $TIMESTAMP"
+      echo ""
+      echo "Backups disponíveis:"
+      /scripts/list-backups.sh
+      exit 1
+    fi
+
+    echo "Verificando backup: $TIMESTAMP"
+    echo "Tipo: $TIPO"
+    echo "Local: $BACKUP_DIR"
+    echo "========================="
+
+    # Inicializar contador de erros
+    errors=0
+
+    # Verificar checksum
+    echo -n "Checksum MD5: "
+    if [ -f "$BACKUP_DIR/backup.mbstream.md5" ]; then
+      cd "$BACKUP_DIR"
+      if md5sum -c backup.mbstream.md5 &>/dev/null; then
+        echo "✓ OK"
+      else
+        echo "✗ FALHOU"
+        errors=$((errors + 1))
+      fi
+    else
+      echo "✗ NÃO ENCONTRADO"
+      errors=$((errors + 1))
+    fi
+
+    # Verificar xtrabackup_checkpoints
+    echo -n "xtrabackup_checkpoints: "
+    if [ -f "$BACKUP_DIR/xtrabackup_checkpoints" ]; then
+      echo "✓ OK"
+      backup_type=$(grep backup_type "$BACKUP_DIR/xtrabackup_checkpoints" 2>/dev/null || echo "unknown")
+      to_lsn=$(grep to_lsn "$BACKUP_DIR/xtrabackup_checkpoints" 2>/dev/null || echo "unknown")
+      echo "  $backup_type"
+      echo "  $to_lsn"
+    else
+      echo "✗ NÃO ENCONTRADO"
+      errors=$((errors + 1))
+    fi
+
+    # Verificar arquivos críticos
+    echo -n "Arquivos críticos: "
+    required_files=('xtrabackup_info' 'ibdata1')
+    missing_files=()
+
+    for file in "${required_files[@]}"; do
+      if [ ! -f "$BACKUP_DIR/$file" ]; then
+        missing_files+=("$file")
+        errors=$((errors + 1))
+      fi
+    done
+
+    if [ ${#missing_files[@]} -eq 0 ]; then
+      echo "✓ OK"
+    else
+      echo "✗ FALTANDO: ${missing_files[*]}"
+    fi
+
+    # Verificar tamanho do backup
+    echo -n "Tamanho: "
+    backup_size=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1 || echo "Unknown")
+    echo "$backup_size"
+
+    # Verificar cluster-info
+    if [ -f "$BACKUP_DIR/cluster-info.txt" ]; then
+      echo ""
+      echo "=== INFORMAÇÕES DO CLUSTER ==="
+      head -20 "$BACKUP_DIR/cluster-info.txt"
+    fi
+
+    echo ""
+    echo "========================="
+
+    # Status final
+    if [ $errors -eq 0 ]; then
+      echo "Status: ✓ PRONTO PARA RESTORE"
+      echo ""
+      echo "Comando de restore:"
+      echo "  /scripts/execute-restore-safe.sh $TIMESTAMP"
+      exit 0
+    else
+      echo "Status: ✗ BACKUP INCOMPLETO ($errors erros)"
+      exit 1
+    fi
+
+  execute-restore-safe.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    if [ -z "${1:-}" ]; then
+      echo "Uso: $0 <timestamp>"
+      echo ""
+      echo "Para listar backups disponíveis:"
+      echo "  /scripts/list-backups.sh"
+      echo ""
+      echo "Exemplo:"
+      echo "  /scripts/execute-restore-safe.sh 20251210-020000"
+      exit 1
+    fi
+
+    TIMESTAMP="$1"
+
+    # ============================================================
+    # VALIDAÇÃO: Este script DEVE rodar no mariadb-0
+    # ============================================================
+    HOSTNAME=$(hostname)
+    EXPECTED_POD="mariadb-0"
+
+    if [ "$HOSTNAME" != "$EXPECTED_POD" ]; then
+      echo "ERRO: Este script deve ser executado no pod $EXPECTED_POD"
+      echo "Pod atual: $HOSTNAME"
+      exit 1
+    fi
+
+    # ============================================================
+    # PROCURAR BACKUP
+    # ============================================================
+    BACKUP_DIR=""
+    TIPO=""
+
     if [ -d "/backup/auto-${TIMESTAMP}" ]; then
       BACKUP_DIR="/backup/auto-${TIMESTAMP}"
       TIPO="AUTOMÁTICO"
@@ -333,30 +394,55 @@ data:
     echo "Tipo: $TIPO"
     echo "Source: $BACKUP_DIR"
     echo "Target: /var/lib/mysql"
+    echo "Pod: $HOSTNAME"
     echo ""
 
-    # Validar backup
+    # ============================================================
+    # VALIDAR BACKUP
+    # ============================================================
+    echo "[1/6] Validando backup..."
+
     if [ ! -f "$BACKUP_DIR/xtrabackup_checkpoints" ]; then
-      echo "ERRO: Backup inválido - xtrabackup_checkpoints não encontrado"
+      echo "ERRO: xtrabackup_checkpoints não encontrado"
       exit 1
     fi
 
     if [ ! -f "$BACKUP_DIR/ibdata1" ]; then
-      echo "ERRO: Backup inválido - ibdata1 não encontrado"
+      echo "ERRO: ibdata1 não encontrado"
       exit 1
     fi
 
-    echo "Backup validado"
+    echo "✓ Backup validado"
 
-    # Parar MariaDB (se rodando)
-    echo "Parando MariaDB..."
-    pkill -f mariadbd || true
+    # ============================================================
+    # PARAR MARIADB
+    # ============================================================
+    echo ""
+    echo "[2/6] Parando MariaDB..."
+
+    # Graceful shutdown primeiro
+    pkill -TERM -f mariadbd 2>/dev/null || true
     sleep 10
-    pkill -9 -f mariadbd || true
+
+    # Force kill se ainda estiver rodando
+    pkill -KILL -f mariadbd 2>/dev/null || true
     sleep 5
 
-    # Backup de segurança dos dados atuais
-    echo "Criando backup de segurança..."
+    # Verificar se parou
+    if pgrep -f mariadbd > /dev/null; then
+      echo "AVISO: MariaDB ainda está rodando, forçando parada..."
+      killall -9 mariadbd 2>/dev/null || true
+      sleep 5
+    fi
+
+    echo "✓ MariaDB parado"
+
+    # ============================================================
+    # BACKUP DE SEGURANÇA
+    # ============================================================
+    echo ""
+    echo "[3/6] Criando backup de segurança..."
+
     SAFETY_BACKUP="/backup/pre-restore-safety-$(date +%Y%m%d-%H%M%S)"
     mkdir -p "$SAFETY_BACKUP"
 
@@ -366,26 +452,49 @@ data:
       cp /var/lib/mysql/ibdata1 "$SAFETY_BACKUP/" 2>/dev/null || true
       cp /var/lib/mysql/xtrabackup_* "$SAFETY_BACKUP/" 2>/dev/null || true
 
-      echo "Backup de segurança: $SAFETY_BACKUP"
+      echo "✓ Backup de segurança: $SAFETY_BACKUP"
+    else
+      echo "✓ Datadir vazio, sem necessidade de backup"
     fi
 
-    # Limpar datadir
-    echo "Limpando datadir..."
-    find /var/lib/mysql -mindepth 1 -delete
+    # ============================================================
+    # LIMPAR DATADIR
+    # ============================================================
+    echo ""
+    echo "[4/6] Limpando datadir..."
 
-    # Executar restore
-    echo "Executando mariadb-backup --copy-back..."
-    mariadb-backup \
+    if [ -d "/var/lib/mysql" ]; then
+      find /var/lib/mysql -mindepth 1 -delete 2>/dev/null || {
+        echo "AVISO: Erro ao limpar datadir, tentando novamente..."
+        rm -rf /var/lib/mysql/* 2>/dev/null || true
+      }
+    fi
+
+    echo "✓ Datadir limpo"
+
+    # ============================================================
+    # EXECUTAR RESTORE
+    # ============================================================
+    echo ""
+    echo "[5/6] Executando mariadb-backup --copy-back..."
+
+    if ! mariadb-backup \
       --copy-back \
-      --target-dir=$BACKUP_DIR \
-      --datadir=/var/lib/mysql
-
-    if [ $? -ne 0 ]; then
+      --target-dir="$BACKUP_DIR" \
+      --datadir=/var/lib/mysql 2>&1; then
       echo "ERRO: mariadb-backup --copy-back falhou!"
+      echo ""
+      echo "Backup de segurança disponível em: $SAFETY_BACKUP"
       exit 1
     fi
 
-    echo "Restore completado"
+    echo "✓ Restore completado"
+
+    # ============================================================
+    # CORRIGIR PERMISSÕES E CONFIGURAR BOOTSTRAP
+    # ============================================================
+    echo ""
+    echo "[6/6] Finalizando..."
 
     # Corrigir permissões
     echo "Corrigindo permissões..."
@@ -401,25 +510,53 @@ data:
     safe_to_bootstrap: 1
     GRASTATE
 
-    # Validar restore
+    echo "✓ Permissões e bootstrap configurados"
+
+    # ============================================================
+    # VALIDAR RESTORE
+    # ============================================================
+    echo ""
     echo "Validando restore..."
-    if [ -f /var/lib/mysql/ibdata1 ] && [ -d /var/lib/mysql/mysql ]; then
+
+    validation_errors=0
+
+    if [ ! -f /var/lib/mysql/ibdata1 ]; then
+      echo "✗ ibdata1 não encontrado"
+      validation_errors=$((validation_errors + 1))
+    fi
+
+    if [ ! -d /var/lib/mysql/mysql ]; then
+      echo "✗ Database mysql/ não encontrada"
+      validation_errors=$((validation_errors + 1))
+    fi
+
+    if [ ! -f /var/lib/mysql/grastate.dat ]; then
+      echo "✗ grastate.dat não encontrado"
+      validation_errors=$((validation_errors + 1))
+    fi
+
+    if [ $validation_errors -eq 0 ]; then
       echo "✓ Restore validado"
-      ls -lh /var/lib/mysql/ | head -20
     else
-      echo "✗ Restore incompleto!"
+      echo "✗ Restore incompleto! ($validation_errors erros)"
       exit 1
     fi
 
     echo ""
-    echo "=== RESTORE CONCLUÍDO ==="
+    echo "================================================================"
+    echo "✓ RESTORE CONCLUÍDO"
+    echo "================================================================"
+    echo ""
+    echo "Arquivos restaurados:"
+    ls -lh /var/lib/mysql/ | head -20
     echo ""
     echo "PRÓXIMOS PASSOS:"
-    echo "1. Sair do pod restore-admin"
-    echo "2. Iniciar cluster:"
-    echo "   kubectl scale statefulset mariadb -n uniselec-api-prd --replicas=1"
-    echo "   # Aguardar mariadb-0 ficar Synced"
-    echo "   kubectl scale statefulset mariadb -n uniselec-api-prd --replicas=3"
+    echo "1. Este pod (mariadb-0) será reiniciado automaticamente"
+    echo "2. Aguarde o pod ficar Ready e Synced"
+    echo "3. Os outros pods (mariadb-1, mariadb-2) farão SST automático"
     echo ""
 
-    echo "RESTORE_SUCCESS:$TIMESTAMP:$TIPO" > "/backup/last_restore_status"
+    # Salvar status para monitoramento
+    echo "RESTORE_SUCCESS:$TIMESTAMP:$TIPO:$(date +%Y%m%d-%H%M%S)" > "/backup/last_restore_status"
+
+    echo "✓ Restore finalizado"
