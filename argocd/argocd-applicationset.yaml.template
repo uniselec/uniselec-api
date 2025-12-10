@@ -42,40 +42,101 @@ spec:
         server: '{{cluster}}'
         namespace: '{{namespace}}'
       ignoreDifferences:
-      - group: autoscaling
-        kind: HorizontalPodAutoscaler
-        jsonPointers:
-        - /status
-        - /metadata/annotations/autoscaling.alpha.kubernetes.io~1metrics
-      - group: apps
-        kind: StatefulSet
-        jsonPointers:
-        - /status
-        - /spec/replicas
-        - /spec/volumeClaimTemplates
-      - group: ""
-        kind: PersistentVolumeClaim
-        jsonPointers:
-        - /status
-        - /metadata/annotations/pv.kubernetes.io~1bind-completed
-        - /metadata/annotations/pv.kubernetes.io~1bound-by-controller
-        - /metadata/annotations/volume.beta.kubernetes.io~1storage-provisioner
-        - /metadata/annotations/volume.kubernetes.io~1storage-provisioner
-        jqPathExpressions:
-        - .metadata.ownerReferences[]?.controller
-      - group: ""
-        kind: ConfigMap
-        jqPathExpressions:
-        - .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"]
-      - group: batch
-        kind: Job
-        jsonPointers:
-        - /status
-        - /spec/selector
-        - /spec/template/metadata/labels
-        jqPathExpressions:
-        - .spec.template.metadata.labels
-        - .status.conditions
+
+        - group: autoscaling
+          kind: HorizontalPodAutoscaler
+          jsonPointers:
+            - /status
+            - /spec/behavior
+            - /metadata/annotations/autoscaling.alpha.kubernetes.io~1current-metrics
+            - /metadata/annotations/autoscaling.alpha.kubernetes.io~1metrics
+
+        - group: apps
+          kind: StatefulSet
+          jsonPointers:
+            - /status
+            - /spec/replicas
+            - /spec/volumeClaimTemplates
+          managedFieldsManagers:
+            - kube-controller-manager
+
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /status
+            - /metadata/annotations/deployment.kubernetes.io~1revision
+
+        - group: ""
+          kind: PersistentVolumeClaim
+          jsonPointers:
+            - /status
+            - /spec/volumeName
+            - /metadata/annotations/pv.kubernetes.io~1bind-completed
+            - /metadata/annotations/pv.kubernetes.io~1bound-by-controller
+            - /metadata/annotations/volume.beta.kubernetes.io~1storage-provisioner
+            - /metadata/annotations/volume.kubernetes.io~1storage-provisioner
+          jqPathExpressions:
+            - .metadata.ownerReferences[]?.controller
+
+        - group: ""
+          kind: Service
+          jsonPointers:
+            - /spec/clusterIP
+            - /spec/clusterIPs
+            - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+
+        - group: ""
+          kind: ConfigMap
+          jsonPointers:
+            - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+
+        - group: batch
+          kind: Job
+          jsonPointers:
+            - /status
+            - /spec/selector
+            - /spec/template/metadata/labels/controller-uid
+            - /spec/template/metadata/labels/job-name
+            - /spec/template/metadata/labels/batch.kubernetes.io~1controller-uid
+            - /spec/template/metadata/labels/batch.kubernetes.io~1job-name
+          jqPathExpressions:
+            - .spec.template.metadata.labels
+            - .status.conditions
+
+        - group: batch
+          kind: CronJob
+          jsonPointers:
+            - /status
+            - /spec/jobTemplate/spec/selector
+            - /spec/jobTemplate/spec/template/metadata/labels/controller-uid
+            - /spec/jobTemplate/spec/template/metadata/labels/job-name
+            - /spec/jobTemplate/spec/template/metadata/labels/batch.kubernetes.io~1controller-uid
+            - /spec/jobTemplate/spec/template/metadata/labels/batch.kubernetes.io~1job-name
+          jqPathExpressions:
+            - .spec.jobTemplate.spec.template.metadata.labels
+            - .status.conditions
+            - .status.lastScheduleTime
+            - .status.lastSuccessfulTime
+
+        - group: networking.k8s.io
+          kind: Ingress
+          jsonPointers:
+            - /status
+
+        - group: policy
+          kind: PodDisruptionBudget
+          jsonPointers:
+            - /status
+            - /status/currentHealthy
+            - /status/desiredHealthy
+            - /status/disruptionsAllowed
+            - /status/expectedPods
+
+        - group: ""
+          kind: ServiceAccount
+          jqPathExpressions:
+            - .secrets
+
       syncPolicy:
         automated:
           prune: true

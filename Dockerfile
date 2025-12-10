@@ -22,6 +22,7 @@ RUN apt-get update \
        libfreetype6-dev \
        libjpeg62-turbo-dev \
        libpng-dev \
+       libzip-dev \
        default-mysql-client \
        iputils-ping \
        netcat-openbsd \
@@ -36,13 +37,14 @@ WORKDIR /var/www/html
 RUN docker-php-ext-install pdo_mysql mysqli \
   && docker-php-ext-configure opcache --enable-opcache \
   \
-  # ===== configurar e instalar GD =====
   && docker-php-ext-configure gd \
        --with-freetype=/usr/include/ \
        --with-jpeg=/usr/include/ \
   && docker-php-ext-install gd \
   \
-  # permissões do public
+  && docker-php-ext-configure zip \
+  && docker-php-ext-install zip \
+  \
   && chown -Rf www-data:www-data /var/www/html/public \
   && chmod -Rf 755 /var/www/html/public
 

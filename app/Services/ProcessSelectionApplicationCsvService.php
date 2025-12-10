@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\ProcessSelection;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use ZipArchive;
 
 class ProcessSelectionApplicationCsvService
 {
@@ -39,6 +41,7 @@ class ProcessSelectionApplicationCsvService
                 'application_id',
                 'user_id',
                 'nome',
+                'Nome Social',
                 'email',
                 'cpf',
                 'birthdate',
@@ -89,7 +92,8 @@ class ProcessSelectionApplicationCsvService
                         fputcsv($handle, [
                             $app->id,
                             $app->user_id,
-                            $user->name,
+                            $app->form_data['name'] ?? '',
+                            $app->form_data['social_name'] ?? '',
                             $user->email,
                             $user->cpf,
                             $data['birthdate'] ?? '',
@@ -122,29 +126,33 @@ class ProcessSelectionApplicationCsvService
         ProcessSelection $selection,
         ?int $enemYear = null
     ): StreamedResponse {
-        $zipFileName = $enemYear
-            ? "notas-enem-{$enemYear}.zip"
-            : "notas-enem.zip";
+        $yearLabel = $enemYear ? $enemYear : 'all';
 
-        return response()->streamDownload(function () use ($selection, $enemYear) {
+        $zipFileName = "notas-enem-{$yearLabel}.zip";
 
-            // Caminho temporário do ZIP
+        return response()->streamDownload(function () use ($selection, $enemYear, $yearLabel) {
+
             $tmpZip = tempnam(sys_get_temp_dir(), 'zip_');
+            $zip = new ZipArchive();
 
-            $zip = new \ZipArchive();
-
-            if ($zip->open($tmpZip, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
-                throw new \RuntimeException('Erro ao criar pacote ZIP.');
+            if ($zip->open($tmpZip, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+                throw new RuntimeException('Erro ao criar pacote ZIP.');
             }
 
             $baseQuery = $selection->applications()->orderBy('id');
 
             if (!is_null($enemYear)) {
-                $baseQuery->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(form_data, '$.enem_year')) = ?", [$enemYear]);
+                $baseQuery->whereRaw(
+                    "JSON_UNQUOTE(JSON_EXTRACT(form_data, '$.enem_year')) = ?",
+                    [$enemYear]
+                );
             }
+            $baseQuery->whereRaw(
+                "CHAR_LENGTH(JSON_UNQUOTE(JSON_EXTRACT(form_data, '$.enem'))) = ?",
+                [12]
+            );
 
             $totalApplications = (clone $baseQuery)->count();
-
             if ($totalApplications === 0) {
                 $zip->close();
                 readfile($tmpZip);
@@ -156,22 +164,18 @@ class ProcessSelectionApplicationCsvService
             $totalPages = (int) ceil($totalApplications / $perPage);
             $currentPage = 1;
 
-            $baseQuery->chunk($perPage, function ($apps) use (&$currentPage, $enemYear, $totalPages, $zip) {
-
+            $baseQuery->chunk($perPage, function ($apps) use (&$currentPage, $yearLabel, $totalPages, $zip) {
                 $innerFileName = sprintf(
-                    "inscricoes-page-%d-de-%d-%d.txt",
+                    "notas-enem-%s-%d-de-%d.txt",
+                    $yearLabel,
                     $currentPage,
-                    $totalPages,
-                    $enemYear
+                    $totalPages
                 );
 
-                // Monta o conteúdo do txt
                 $stream = fopen('php://temp', 'r+');
 
                 foreach ($apps as $app) {
-                    $data = $app->form_data ?? [];
-                    $enemNumber = $data['enem'] ?? '';
-
+                    $enemNumber = $app->form_data['enem'] ?? '';
                     if ($enemNumber !== '') {
                         fwrite($stream, $enemNumber . PHP_EOL);
                     }
@@ -181,15 +185,12 @@ class ProcessSelectionApplicationCsvService
                 $content = stream_get_contents($stream);
                 fclose($stream);
 
-                // Adiciona ao ZIP
                 $zip->addFromString($innerFileName, $content);
 
                 $currentPage++;
             });
 
             $zip->close();
-
-            // envia ZIP para saída
             readfile($tmpZip);
             unlink($tmpZip);
         }, $zipFileName, [

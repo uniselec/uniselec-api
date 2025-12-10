@@ -69,11 +69,11 @@ configMapGenerator:
 
 images:
 - name: dti-registro.unilab.edu.br/unilab/uniselec-api
-  newTag: v3.0.5
+  newTag: v4.1.0
 
 labels:
 - pairs:
     environment: production
 
 commonAnnotations:
-  description: "Ambiente de produção - UNISELEC Api"
+  description: Ambiente de produção - UNISELEC Api
