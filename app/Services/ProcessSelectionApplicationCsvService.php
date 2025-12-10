@@ -41,6 +41,7 @@ class ProcessSelectionApplicationCsvService
                 'application_id',
                 'user_id',
                 'nome',
+                'Nome Social',
                 'email',
                 'cpf',
                 'birthdate',
@@ -91,7 +92,8 @@ class ProcessSelectionApplicationCsvService
                         fputcsv($handle, [
                             $app->id,
                             $app->user_id,
-                            $user->name,
+                            $app->form_data['name'] ?? '',
+                            $app->form_data['social_name'] ?? '',
                             $user->email,
                             $user->cpf,
                             $data['birthdate'] ?? '',
