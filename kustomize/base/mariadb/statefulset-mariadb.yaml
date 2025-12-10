@@ -365,6 +365,9 @@ spec:
           subPath: ensure-users.sh
         - name: backup
           mountPath: /backup
+        - name: backup-scripts
+          mountPath: /scripts
+          readOnly: true
 
       volumes:
       - name: mariadb-config
@@ -376,6 +379,10 @@ spec:
       - name: ensure-users
         configMap:
           name: config-ensure-users
+          defaultMode: 0755
+      - name: backup-scripts
+        configMap:
+          name: mariadb-backup-scripts
           defaultMode: 0755
 
   volumeClaimTemplates:
