@@ -17,7 +17,9 @@ use App\Http\Controllers\Admin\ConvocationListSeatGenerationController;
 use App\Http\Controllers\Admin\ConvocationListSeatRedistributionController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DocumentController;
+use App\Http\Controllers\Admin\EnemOutcomeExportController;
 use App\Http\Controllers\Admin\EnemScoreController;
+use App\Http\Controllers\Admin\EnemScoreExportController;
 use App\Http\Controllers\Admin\EnemScoreImportController;
 use App\Http\Controllers\Admin\EnemScoreSummaryController;
 use App\Http\Controllers\Admin\KnowledgeAreaController;
@@ -37,7 +39,9 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::post('/resend-password-link', [AdminController::class, 'resendPasswordResetLink'])->name('admin.super_user.resend-password-link');
         Route::post('/resend-password-link-user', [UserController::class, 'resendPasswordResetLink'])->name('admin.super_user.resend-password-link-user');
 
-        Route::get('process_selections/{selection}/applications/export',[ReportController::class, 'exportApplications'])->name('admin.super_user.processSelection.applications.export');
+        Route::get('process_selections/{selection}/applications/export', [ReportController::class, 'exportApplications'])->name('admin.super_user.processSelection.applications.export');
+        Route::get('process-selections/{selection}/export-enem-csv',[EnemScoreExportController::class, 'export'])->name('admin.selections.export_enem_csv');
+        Route::get('process-selections/{selection}/export-enem-outcomes',[EnemOutcomeExportController::class, 'export'])->name('admin.super_user.processSelection.export_enem_outcomes');
 
 
         Route::apiResource('admins', AdminController::class)->names('admin.super_user.admins');
