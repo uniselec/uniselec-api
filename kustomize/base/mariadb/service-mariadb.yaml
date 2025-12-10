@@ -82,7 +82,7 @@ metadata:
     metallb.universe.tf/address-pool: int-pool
 spec:
   type: LoadBalancer
-  externalTrafficPolicy: Local
+  externalTrafficPolicy: Cluster
   selector:
     app: mariadb
   ports:
