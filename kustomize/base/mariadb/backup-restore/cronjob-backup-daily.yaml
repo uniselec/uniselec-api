@@ -5,8 +5,6 @@ metadata:
   labels:
     app: mariadb
     component: backup
-  annotations:
-    argocd.argoproj.io/sync-options: Replace=true
 spec:
   schedule: "0 2 * * *"
   timeZone: "America/Fortaleza"

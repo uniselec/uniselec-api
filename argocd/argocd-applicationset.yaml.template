@@ -41,60 +41,130 @@ spec:
       destination:
         server: '{{cluster}}'
         namespace: '{{namespace}}'
+
+      # Ignorar diferenças em campos gerenciados pelo Kubernetes
       ignoreDifferences:
-      - group: autoscaling
-        kind: HorizontalPodAutoscaler
-        jsonPointers:
-        - /status
-        - /metadata/annotations/autoscaling.alpha.kubernetes.io~1metrics
-      - group: apps
-        kind: StatefulSet
-        jsonPointers:
-        - /status
-        - /spec/replicas
-        - /spec/volumeClaimTemplates
-      - group: ""
-        kind: PersistentVolumeClaim
-        jsonPointers:
-        - /status
-        - /metadata/annotations/pv.kubernetes.io~1bind-completed
-        - /metadata/annotations/pv.kubernetes.io~1bound-by-controller
-        - /metadata/annotations/volume.beta.kubernetes.io~1storage-provisioner
-        - /metadata/annotations/volume.kubernetes.io~1storage-provisioner
-        jqPathExpressions:
-        - .metadata.ownerReferences[]?.controller
-      - group: ""
-        kind: ConfigMap
-        jqPathExpressions:
-        - .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"]
-      - group: batch
-        kind: Job
-        jsonPointers:
-        - /status
-        - /spec/selector
-        - /spec/template/metadata/labels
-        jqPathExpressions:
-        - .spec.template.metadata.labels
-        - .status.conditions
+        # HorizontalPodAutoscaler - campos gerenciados pelo controller
+        - group: autoscaling
+          kind: HorizontalPodAutoscaler
+          jsonPointers:
+            - /status
+            - /spec/behavior
+            - /metadata/annotations/autoscaling.alpha.kubernetes.io~1current-metrics
+            - /metadata/annotations/autoscaling.alpha.kubernetes.io~1metrics
+
+        # StatefulSet - campos gerenciados pelo controller
+        - group: apps
+          kind: StatefulSet
+          jsonPointers:
+            - /status
+            - /spec/volumeClaimTemplates
+          managedFieldsManagers:
+            - kube-controller-manager
+
+        # Deployment - status gerenciado
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /status
+
+        # PersistentVolumeClaim - campos gerenciados pelo provisioner
+        - group: ""
+          kind: PersistentVolumeClaim
+          jsonPointers:
+            - /status
+            - /spec/volumeName
+            - /metadata/annotations/pv.kubernetes.io~1bind-completed
+            - /metadata/annotations/pv.kubernetes.io~1bound-by-controller
+            - /metadata/annotations/volume.beta.kubernetes.io~1storage-provisioner
+            - /metadata/annotations/volume.kubernetes.io~1storage-provisioner
+          jqPathExpressions:
+            - .metadata.ownerReferences[]?.controller
+
+        # Service - campos auto-atribuídos
+        - group: ""
+          kind: Service
+          jsonPointers:
+            - /spec/clusterIP
+            - /spec/clusterIPs
+            - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+
+        # ConfigMap - metadados kubectl
+        - group: ""
+          kind: ConfigMap
+          jqPathExpressions:
+            - .metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"]
+
+        # Job - campos gerenciados automaticamente
+        - group: batch
+          kind: Job
+          jsonPointers:
+            - /status
+            - /spec/selector
+            - /spec/template/metadata/labels
+          jqPathExpressions:
+            - .spec.template.metadata.labels
+            - .status.conditions
+
+        # CronJob - campos gerenciados pelo controller
+        - group: batch
+          kind: CronJob
+          jsonPointers:
+            - /status
+            - /spec/jobTemplate/spec/selector
+            - /spec/jobTemplate/spec/template/metadata/labels
+
+        # Ingress - status do load balancer
+        - group: networking.k8s.io
+          kind: Ingress
+          jsonPointers:
+            - /status
+
+        # PodDisruptionBudget - status
+        - group: policy
+          kind: PodDisruptionBudget
+          jsonPointers:
+            - /status
+
+      # Política de sincronização otimizada para CI/CD
       syncPolicy:
         automated:
-          prune: true
-          selfHeal: true
-          allowEmpty: false
+          prune: true        # Remove recursos deletados do Git
+          selfHeal: true     # Reverte mudanças manuais no cluster
+          allowEmpty: false  # Não permite aplicações vazias
+
         syncOptions:
+          # Namespace management
           - CreateNamespace=true
+
+          # Sync optimization - CRÍTICO para 31+ recursos
+          - ApplyOutOfSyncOnly=true
+
+          # Prune strategy - ESSENCIAL para StatefulSets e DBs
           - PruneLast=true
-          - ApplyOutOfSyncOnly=false
+          - PrunePropagationPolicy=foreground
+
+          # Validation
           - Validate=true
           - SkipDryRunOnMissingResource=true
+
+          # Diff strategy
           - RespectIgnoreDifferences=true
-          - ServerSideApply=true
+
+          # Apply strategy - false para evitar issues com StatefulSets
+          - ServerSideApply=false
           - Replace=false
+
+          # Resource handling
           - FailOnSharedResource=false
+
+        # Retry com backoff exponencial
         retry:
           limit: 20
           backoff:
             duration: 30s
             factor: 2
             maxDuration: 10m
+
+      # Histórico de revisões
       revisionHistoryLimit: 10
