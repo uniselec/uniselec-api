@@ -5,9 +5,10 @@ metadata:
   labels:
     app: mariadb
     component: backup
+  annotations:
+    description: "Backup diário às 02:00"
 spec:
   schedule: "0 2 * * *"
-  timeZone: "America/Fortaleza"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
   concurrencyPolicy: Forbid
@@ -38,7 +39,8 @@ spec:
               echo "================================================================"
               echo "BACKUP AUTOMÁTICO - MariaDB Galera"
               echo "================================================================"
-              echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
+              echo "Timestamp: $(TZ=America/Fortaleza date '+%Y-%m-%d %H:%M:%S %Z')"
+              echo "Schedule: 05:00 UTC = 02:00 Fortaleza (BRT)"
               echo "Namespace: ${NAMESPACE}"
               echo "Pod: ${BACKUP_POD}"
               echo ""
