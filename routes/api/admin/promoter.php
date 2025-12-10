@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\ConvocationListSeatRedistributionController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DocumentController;
 use App\Http\Controllers\Admin\EnemOutcomeExportController;
+use App\Http\Controllers\Admin\EnemOutcomePdfController;
 use App\Http\Controllers\Admin\EnemScoreController;
 use App\Http\Controllers\Admin\EnemScoreExportController;
 use App\Http\Controllers\Admin\EnemScoreImportController;
@@ -38,7 +39,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::get('process_selections/{selection}/applications/export', [ReportController::class, 'exportApplications'])->name('admin.promoter.processSelection.applications.export');
         Route::get('process-selections/{selection}/export-enem-csv',[EnemScoreExportController::class, 'export'])->name('admin.promoter.selections.export_enem_csv');
         Route::get('process-selections/{selection}/export-enem-outcomes',[EnemOutcomeExportController::class, 'export'])->name('admin.promoter.processSelection.export_enem_outcomes');
-
+        Route::get('process-selections/{selection}/export-enem-outcomes-pdf',EnemOutcomePdfController::class)->name('admin.promoter.processSelection.export_enem_outcomes_pdf');
 
         Route::apiResource('admins', AdminController::class)->names('admin.promoter.admins');
         Route::apiResource('academic_units', AcademicUnitController::class)->names('admin.promoter.academic_units');
