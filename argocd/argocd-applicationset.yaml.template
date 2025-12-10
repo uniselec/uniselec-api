@@ -42,6 +42,7 @@ spec:
         server: '{{cluster}}'
         namespace: '{{namespace}}'
       ignoreDifferences:
+
         - group: autoscaling
           kind: HorizontalPodAutoscaler
           jsonPointers:
@@ -49,18 +50,22 @@ spec:
             - /spec/behavior
             - /metadata/annotations/autoscaling.alpha.kubernetes.io~1current-metrics
             - /metadata/annotations/autoscaling.alpha.kubernetes.io~1metrics
+
         - group: apps
           kind: StatefulSet
           jsonPointers:
             - /status
+            - /spec/replicas
             - /spec/volumeClaimTemplates
           managedFieldsManagers:
             - kube-controller-manager
+
         - group: apps
           kind: Deployment
           jsonPointers:
             - /status
             - /metadata/annotations/deployment.kubernetes.io~1revision
+
         - group: ""
           kind: PersistentVolumeClaim
           jsonPointers:
@@ -72,16 +77,19 @@ spec:
             - /metadata/annotations/volume.kubernetes.io~1storage-provisioner
           jqPathExpressions:
             - .metadata.ownerReferences[]?.controller
+
         - group: ""
           kind: Service
           jsonPointers:
             - /spec/clusterIP
             - /spec/clusterIPs
             - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+
         - group: ""
           kind: ConfigMap
           jsonPointers:
             - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+
         - group: batch
           kind: Job
           jsonPointers:
@@ -94,6 +102,7 @@ spec:
           jqPathExpressions:
             - .spec.template.metadata.labels
             - .status.conditions
+
         - group: batch
           kind: CronJob
           jsonPointers:
@@ -108,10 +117,12 @@ spec:
             - .status.conditions
             - .status.lastScheduleTime
             - .status.lastSuccessfulTime
+
         - group: networking.k8s.io
           kind: Ingress
           jsonPointers:
             - /status
+
         - group: policy
           kind: PodDisruptionBudget
           jsonPointers:
@@ -120,10 +131,12 @@ spec:
             - /status/desiredHealthy
             - /status/disruptionsAllowed
             - /status/expectedPods
+
         - group: ""
           kind: ServiceAccount
           jqPathExpressions:
             - .secrets
+
       syncPolicy:
         automated:
           prune: true
@@ -132,10 +145,13 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - PruneLast=true
-          - PrunePropagationPolicy=foreground
+          - ApplyOutOfSyncOnly=false
           - Validate=true
+          - SkipDryRunOnMissingResource=true
           - RespectIgnoreDifferences=true
           - ServerSideApply=true
+          - Replace=false
+          - FailOnSharedResource=false
         retry:
           limit: 20
           backoff:
