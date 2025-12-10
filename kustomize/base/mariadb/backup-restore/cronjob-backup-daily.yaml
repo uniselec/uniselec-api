@@ -6,57 +6,155 @@ metadata:
     app: mariadb
     component: backup
 spec:
-  schedule: "0 2 * * *"  # 02:00 AM diariamente
+  schedule: "0 2 * * *"
+  timeZone: "America/Fortaleza"
   successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
   jobTemplate:
     spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 3600
       template:
+        metadata:
+          labels:
+            app: mariadb
+            component: backup
         spec:
           serviceAccountName: mariadb-backup
-          affinity:
-            podAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-              - labelSelector:
-                  matchLabels:
-                    statefulset.kubernetes.io/pod-name: mariadb-1
-                topologyKey: kubernetes.io/hostname
+          restartPolicy: Never
           containers:
-          - name: backup
-            image: mariadb:10.11.15-jammy
-            command: ["/bin/bash", "/scripts/backup-galera-automated.sh"]
-            envFrom:
-            - secretRef:
-                name: mariadb-secret-env
+          - name: backup-executor
+            image: bitnami/kubectl:1.31
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              NAMESPACE="${NAMESPACE}"
+              BACKUP_POD="mariadb-1"
+
+              echo "================================================================"
+              echo "BACKUP AUTOMÁTICO - MariaDB Galera"
+              echo "================================================================"
+              echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
+              echo "Namespace: ${NAMESPACE}"
+              echo "Pod: ${BACKUP_POD}"
+              echo ""
+
+              # Verificar pod está Ready
+              echo "[1/3] Verificando pod ${BACKUP_POD}..."
+              kubectl wait --for=condition=ready pod/${BACKUP_POD} -n ${NAMESPACE} --timeout=300s || {
+                echo "Pod não está Ready"
+                exit 1
+              }
+              echo "Pod está Ready"
+
+              # Verificar script existe (montado do ConfigMap)
+              echo ""
+              echo "[2/3] Verificando script do ConfigMap..."
+              if ! kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- test -f /scripts/backup-galera-automated.sh; then
+                echo "Script /scripts/backup-galera-automated.sh não encontrado!"
+                echo ""
+                echo "Scripts disponíveis:"
+                kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- ls -lh /scripts/ || true
+                exit 1
+              fi
+              echo "Script encontrado: /scripts/backup-galera-automated.sh"
+
+              # ============================================================
+              # EXECUTAR SCRIPT DO CONFIGMAP (backup-galera-automated.sh)
+              # Este script já contém TODA a lógica do backup manual!
+              # ============================================================
+              echo ""
+              echo "[3/3] Executando /scripts/backup-galera-automated.sh..."
+              echo "================================================================"
+              echo ""
+
+              kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- \
+                /bin/bash /scripts/backup-galera-automated.sh
+
+              EXIT_CODE=$?
+
+              echo ""
+              echo "================================================================"
+
+              if [ $EXIT_CODE -eq 0 ]; then
+                echo "BACKUP COMPLETADO"
+                echo "================================================================"
+                echo ""
+
+                # Mostrar último backup criado
+                echo "Último backup:"
+                kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- \
+                  bash -c 'ls -lhtd /backup/auto-* 2>/dev/null | head -1' || echo "Nenhum backup encontrado"
+
+                echo ""
+                echo "Status:"
+                kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- \
+                  cat /backup/last_backup_status 2>/dev/null || echo "N/A"
+
+                echo ""
+                echo "Espaço em /backup:"
+                kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- \
+                  df -h /backup | tail -1
+
+                echo ""
+                echo "Listar todos os backups:"
+                echo "  kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- /scripts/list-backups.sh"
+
+                exit 0
+              else
+                echo "BACKUP FALHOU (exit code: $EXIT_CODE)"
+                echo "================================================================"
+                echo ""
+
+                # Mostrar log de erro
+                echo "Log de erro:"
+                kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- \
+                  tail -30 /backup/backup.log 2>/dev/null || echo "Log não disponível"
+
+                exit 1
+              fi
             env:
-            - name: POD_NAMESPACE
+            - name: NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-            volumeMounts:
-            - name: backup-storage
-              mountPath: /backup
-            - name: backup-scripts
-              mountPath: /scripts
-            - name: mysql-data
-              mountPath: /var/lib/mysql
-              readOnly: true
             resources:
               requests:
-                memory: "1Gi"
-                cpu: "500m"
+                cpu: 100m
+                memory: 128Mi
               limits:
-                memory: "2Gi"
-                cpu: "1"
-          restartPolicy: OnFailure
-          volumes:
-          - name: backup-storage
-            persistentVolumeClaim:
-              claimName: backup-mariadb-1
-          - name: backup-scripts
-            configMap:
-              name: mariadb-backup-scripts
-              defaultMode: 0755
-          - name: mysql-data
-            persistentVolumeClaim:
-              claimName: database-mariadb-1
+                cpu: 500m
+                memory: 512Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mariadb-backup
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mariadb-backup
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/exec"]
+  verbs: ["get", "list", "create"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mariadb-backup
+subjects:
+- kind: ServiceAccount
+  name: mariadb-backup
+roleRef:
+  kind: Role
+  name: mariadb-backup
+  apiGroup: rbac.authorization.k8s.io
