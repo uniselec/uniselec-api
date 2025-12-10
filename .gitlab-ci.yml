@@ -40,9 +40,9 @@ variables:
   ARGOCD_SERVER: "argocd.unilab.edu.br"
   CLUSTER_REMOTE1_DOMAIN: "10.130.0.45"
   KUBECONFIG: "/tmp/kubeconfig-${CI_PIPELINE_ID}"
-  ARGOCD_TIMEOUT_DEV: "560"  # 9min 20s
-  ARGOCD_TIMEOUT_STG: "630"  # 10min 30s
-  ARGOCD_TIMEOUT_PRD: "730"  # 12min 10s
+  ARGOCD_TIMEOUT_DEV: "600"   # 10 minutos
+  ARGOCD_TIMEOUT_STG: "900"   # 15 minutos
+  ARGOCD_TIMEOUT_PRD: "1200"  # 20 minutos
 
   # Notificação
   MAIL_PRD: "jefponte@unilab.edu.br"
