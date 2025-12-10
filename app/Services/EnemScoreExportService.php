@@ -43,6 +43,7 @@ class EnemScoreExportService
                 'Categoria de Ingresso',
                 'Bônus',
                 'Data da Inscrição',
+                'Nota do Enem Original',
             ]);
 
             $query = $selection->applications()
@@ -95,6 +96,7 @@ class EnemScoreExportService
                             $cat['name'] ?? '',
                             $bonus,
                             $app->created_at?->toDateTimeString(),
+                            $app->enemScore?->original_scores ?? "",
                         ]);
                     }
                 }

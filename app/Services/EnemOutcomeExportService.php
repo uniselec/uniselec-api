@@ -41,20 +41,17 @@ class EnemOutcomeExportService
                 'Linguagens',
                 'Matemática',
                 'Redação',
-                'Status',
                 'Média',
                 'Nota Final',
-                'Motivo',
+                'Situação',
+                'Motivo da Decisão',
                 'Curso',
                 'Campus',
                 'Categoria de Ingresso',
                 'Bônus',
                 'Data de Inscrição',
+                'Nota do Enem Original',
             ]);
-
-
-
-
 
 
 
@@ -113,15 +110,17 @@ class EnemOutcomeExportService
                             $score['math_score']       ?? 0,
                             $score['writing_score']    ?? 0,
                             // status traduzido
-                            $statusLabel,
+
                             $outcome->average_score ?? '',
                             $outcome->final_score   ?? '',
+                            $statusLabel,
                             $outcome->reason        ?? '',
                             $courseName,
                             $campus,
                             $cat['name'] ?? '',
                             $bonus,
                             $app->created_at?->toDateTimeString(),
+                            $app->enemScore?->original_scores ?? "",
                         ]);
                     }
                 }
