@@ -6,7 +6,7 @@ metadata:
     app: mariadb
     component: restore-admin
 spec:
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app: mariadb
