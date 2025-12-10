@@ -128,7 +128,7 @@ class ProcessSelectionApplicationCsvService
     ): StreamedResponse {
         $yearLabel = $enemYear ? $enemYear : 'all';
 
-        $zipFileName = "notas-enem-{$yearLabel}.zip";
+        $zipFileName = "inscricoes-enem-{$yearLabel}.zip";
 
         return response()->streamDownload(function () use ($selection, $enemYear, $yearLabel) {
 
@@ -160,13 +160,13 @@ class ProcessSelectionApplicationCsvService
                 return;
             }
 
-            $perPage = 999;
+            $perPage = 500;
             $totalPages = (int) ceil($totalApplications / $perPage);
             $currentPage = 1;
 
             $baseQuery->chunk($perPage, function ($apps) use (&$currentPage, $yearLabel, $totalPages, $zip) {
                 $innerFileName = sprintf(
-                    "notas-enem-%s-%d-de-%d.txt",
+                    "inscricoes-enem-%s-%d-de-%d.txt",
                     $yearLabel,
                     $currentPage,
                     $totalPages
