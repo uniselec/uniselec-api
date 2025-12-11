@@ -28,6 +28,8 @@ class ApplicationOutcomeController extends BasicCrudController
 
     public function index(Request $request)
     {
+        ini_set('memory_limit', '-1');
+        set_time_limit(0);
         return parent::index($request);
     }
     public function store(Request $request)

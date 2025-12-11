@@ -169,7 +169,7 @@ data:
     total_backups=0
 
     # Listar TODOS os backups (auto-* e manual-*)
-    for backup_dir in /backup/auto-* /backup/manual-* 2>/dev/null; do
+    for backup_dir in /backup/auto-* /backup/manual-*; do
       # Verificar se o path existe (glob pode retornar string literal)
       if [ ! -d "$backup_dir" ]; then
         continue
