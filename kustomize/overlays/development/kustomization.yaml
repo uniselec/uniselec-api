@@ -87,7 +87,7 @@ secretGenerator:
 
 images:
 - name: dti-registro.unilab.edu.br/unilab/uniselec-api
-  newTag: dev-e3b1afd5
+  newTag: dev-e63bff2b
 
 labels:
 - pairs:
