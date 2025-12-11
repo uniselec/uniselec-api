@@ -41,7 +41,7 @@ data:
     log "Timestamp: $TIMESTAMP"
 
     # Verificar MariaDB está respondendo
-    if ! mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}" --silent 2>/dev/null; then
+    if ! mariadb-admin ping -u root --password="$MYSQL_ROOT_PASSWORD" --silent 2>/dev/null; then
       error "MariaDB não responde"
     fi
 
@@ -53,7 +53,7 @@ data:
     if ! mariadb-backup \
       --backup \
       --user=root \
-      --password="${MYSQL_ROOT_PASSWORD}" \
+      --password="$MYSQL_ROOT_PASSWORD" \
       --target-dir="$BACKUP_DIR" \
       --stream=mbstream \
       --parallel=2 > "$BACKUP_DIR/backup.mbstream" 2>&1; then
@@ -103,7 +103,7 @@ data:
     === CLUSTER STATUS ===
     CLUSTERINFO
 
-    mariadb -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "
+    mariadb -uroot --password="$MYSQL_ROOT_PASSWORD" -e "
       SELECT NOW() as backup_time;
       SHOW STATUS LIKE 'wsrep_cluster_size';
       SHOW STATUS LIKE 'wsrep_local_state_comment';
@@ -339,6 +339,183 @@ data:
       echo "Status: ✗ BACKUP INCOMPLETO ($errors erros)"
       exit 1
     fi
+
+  manual-backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    echo "================================================================"
+    echo "BACKUP MANUAL - MariaDB Galera"
+    echo "================================================================"
+    echo ""
+
+    # Verificar se está rodando no mariadb-1 (recomendado)
+    HOSTNAME=$(hostname)
+    if [ "$HOSTNAME" != "mariadb-1" ]; then
+      echo "AVISO: Este script deve ser executado no mariadb-1 (nó secundário)"
+      echo "Pod atual: $HOSTNAME"
+      echo ""
+      read -p "Deseja continuar mesmo assim? (yes/no): " -r
+      if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+        echo "Backup cancelado"
+        exit 0
+      fi
+    fi
+
+    # Gerar timestamp
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    BACKUP_DIR="/backup/manual-${TIMESTAMP}"
+
+    echo "Timestamp: $TIMESTAMP"
+    echo "Backup Dir: $BACKUP_DIR"
+    echo "Pod: $HOSTNAME"
+    echo ""
+
+    # Verificar espaço disponível
+    AVAILABLE_SPACE=$(df -BG /backup | tail -1 | awk '{print $4}' | sed 's/G//')
+    echo "Espaço disponível: ${AVAILABLE_SPACE}G"
+
+    if [ "$AVAILABLE_SPACE" -lt 50 ]; then
+      echo "ERRO: Espaço insuficiente (mínimo: 50G)"
+      echo "Limpe backups antigos com: rm -rf /backup/manual-* /backup/auto-*"
+      exit 1
+    fi
+
+    # Verificar MariaDB está respondendo
+    if ! mariadb-admin ping -u root --password="$MYSQL_ROOT_PASSWORD" --silent 2>/dev/null; then
+      echo "ERRO: MariaDB não responde"
+      exit 1
+    fi
+
+    echo "MariaDB: OK"
+    echo ""
+
+    # Mostrar status do cluster
+    echo "Status do Cluster:"
+    mariadb -uroot --password="$MYSQL_ROOT_PASSWORD" -N -e "
+      SELECT
+        VARIABLE_NAME,
+        VARIABLE_VALUE
+      FROM information_schema.GLOBAL_STATUS
+      WHERE VARIABLE_NAME IN (
+        'wsrep_local_state_comment',
+        'wsrep_cluster_size',
+        'wsrep_cluster_status'
+      )
+    " 2>/dev/null | column -t
+
+    echo ""
+    read -p "Iniciar backup? (yes/no): " -r
+    if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+      echo "Backup cancelado"
+      exit 0
+    fi
+
+    echo ""
+    echo "================================================================"
+    echo "EXECUTANDO BACKUP"
+    echo "================================================================"
+
+    # Criar diretório
+    mkdir -p "$BACKUP_DIR"
+
+    # Salvar metadados
+    cat > "$BACKUP_DIR/cluster-info.txt" <<CLUSTERINFO
+    Backup Type: MANUAL (Interactive)
+    Timestamp: $TIMESTAMP
+    Pod: $HOSTNAME
+    Namespace: ${POD_NAMESPACE:-uniselec-api-prd}
+    Created: $(date)
+
+    === CLUSTER STATUS ===
+    CLUSTERINFO
+
+    mariadb -uroot --password="$MYSQL_ROOT_PASSWORD" -e "
+      SELECT NOW() as backup_time;
+      SHOW STATUS LIKE 'wsrep_cluster_size';
+      SHOW STATUS LIKE 'wsrep_local_state_comment';
+    " >> "$BACKUP_DIR/cluster-info.txt" 2>/dev/null || true
+
+    echo "[1/4] Executando mariadb-backup..."
+    if ! mariadb-backup \
+      --backup \
+      --user=root \
+      --password="$MYSQL_ROOT_PASSWORD" \
+      --target-dir="$BACKUP_DIR" \
+      --stream=mbstream \
+      --parallel=2 > "$BACKUP_DIR/backup.mbstream" 2>&1; then
+      echo "ERRO: Backup falhou!"
+      exit 1
+    fi
+
+    echo "✓ Backup stream completo"
+
+    # Checksum
+    md5sum "$BACKUP_DIR/backup.mbstream" > "$BACKUP_DIR/backup.mbstream.md5"
+    ls -lh "$BACKUP_DIR/backup.mbstream" | awk '{print $5}' > "$BACKUP_DIR/backup.size"
+
+    echo "[2/4] Extraindo backup..."
+    cd "$BACKUP_DIR"
+    if ! mbstream -x < backup.mbstream 2>&1; then
+      echo "ERRO: Extração falhou!"
+      exit 1
+    fi
+
+    echo "✓ Backup extraído"
+
+    echo "[3/4] Preparando backup..."
+    if ! mariadb-backup \
+      --prepare \
+      --target-dir="$BACKUP_DIR" 2>&1; then
+      echo "ERRO: Preparação falhou!"
+      exit 1
+    fi
+
+    echo "✓ Backup preparado"
+
+    echo "[4/4] Validando backup..."
+
+    # Validar checksum
+    cd "$BACKUP_DIR"
+    if ! md5sum -c backup.mbstream.md5 2>/dev/null; then
+      echo "ERRO: Checksum inválido!"
+      exit 1
+    fi
+
+    # Validar arquivos obrigatórios
+    required_files=(
+      'xtrabackup_checkpoints'
+      'xtrabackup_info'
+      'ibdata1'
+    )
+
+    for file in "${required_files[@]}"; do
+      if [ ! -f "$file" ]; then
+        echo "ERRO: Arquivo obrigatório faltando: $file"
+        exit 1
+      fi
+    done
+
+    echo "✓ Backup validado"
+
+    # Relatório final
+    BACKUP_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1 || echo "Unknown")
+
+    echo ""
+    echo "================================================================"
+    echo "BACKUP COMPLETO"
+    echo "================================================================"
+    echo ""
+    echo "ID: $TIMESTAMP"
+    echo "Tamanho: $BACKUP_SIZE"
+    echo "Local: $BACKUP_DIR"
+    echo ""
+    echo "Para verificar: /scripts/verify-backup.sh $TIMESTAMP"
+    echo "Para restaurar: /scripts/execute-restore-safe.sh $TIMESTAMP"
+    echo ""
+
+    # Salvar status
+    echo "SUCCESS:$TIMESTAMP:manual:$BACKUP_SIZE" > "/backup/last_backup_status"
 
   execute-restore-safe.sh: |
     #!/bin/bash
