@@ -47,16 +47,18 @@ data:
 
     log "MariaDB OK"
 
-    # BACKUP FÍSICO - MESMO MÉTODO DO SCRIPT MANUAL
+    # BACKUP FÍSICO - MÉTODO VALIDADO (backup-galera-production.sh)
     log "Executando mariadb-backup (streaming)..."
 
-    if ! mariadb-backup \
+    mariadb-backup \
       --backup \
       --user=root \
       --password="$MYSQL_ROOT_PASSWORD" \
       --target-dir="$BACKUP_DIR" \
       --stream=mbstream \
-      --parallel=2 > "$BACKUP_DIR/backup.mbstream" 2>&1; then
+      --parallel=2 > "$BACKUP_DIR/backup.mbstream"
+
+    if [ $? -ne 0 ]; then
       error "mariadb-backup --backup falhou"
     fi
 
@@ -158,53 +160,73 @@ data:
 
   list-backups.sh: |
     #!/bin/bash
-    set -euo pipefail
 
     echo "=== BACKUPS DISPONÍVEIS ==="
     echo ""
     echo "Formato: TIMESTAMP | TAMANHO | TIPO | STATUS"
     echo "-----------------------------------------------------"
 
-    # Contador
-    total_backups=0
+    # Coletar dados em arquivo temporário
+    tmpfile=$(mktemp)
+    trap "rm -f $tmpfile" EXIT
 
-    # Listar TODOS os backups (auto-* e manual-*)
-    for backup_dir in /backup/auto-* /backup/manual-*; do
-      # Verificar se o path existe (glob pode retornar string literal)
-      if [ ! -d "$backup_dir" ]; then
-        continue
+    # Processar backups automáticos
+    for backup_dir in /backup/auto-*; do
+      if [ -d "$backup_dir" ]; then
+        basename_dir=$(basename "$backup_dir")
+        timestamp="${basename_dir#auto-}"
+
+        # Obter tamanho
+        size=$(du -sh "$backup_dir" 2>/dev/null | awk '{print $1}')
+
+        # Verificar integridade
+        if [ -f "$backup_dir/xtrabackup_checkpoints" ] && \
+          [ -f "$backup_dir/ibdata1" ] && \
+          [ -f "$backup_dir/backup.mbstream.md5" ]; then
+          status="✓ PRONTO"
+        else
+          status="✗ INCOMPLETO"
+        fi
+
+        echo "$timestamp|$size|AUTO|$status" >> "$tmpfile"
       fi
+    done
 
-      total_backups=$((total_backups + 1))
-      basename_dir=$(basename "$backup_dir")
+    # Processar backups manuais
+    for backup_dir in /backup/manual-*; do
+      if [ -d "$backup_dir" ]; then
+        basename_dir=$(basename "$backup_dir")
+        timestamp="${basename_dir#manual-}"
 
-      # Extrair tipo e timestamp
-      if [[ $basename_dir =~ ^auto-(.*)$ ]]; then
-        tipo="AUTO"
-        timestamp="${BASH_REMATCH[1]}"
-      elif [[ $basename_dir =~ ^manual-(.*)$ ]]; then
-        tipo="MANUAL"
-        timestamp="${BASH_REMATCH[1]}"
-      else
-        continue
+        # Obter tamanho
+        size=$(du -sh "$backup_dir" 2>/dev/null | awk '{print $1}')
+
+        # Verificar integridade
+        if [ -f "$backup_dir/xtrabackup_checkpoints" ] && \
+          [ -f "$backup_dir/ibdata1" ] && \
+          [ -f "$backup_dir/backup.mbstream.md5" ]; then
+          status="✓ PRONTO"
+        else
+          status="✗ INCOMPLETO"
+        fi
+
+        echo "$timestamp|$size|MANUAL|$status" >> "$tmpfile"
       fi
+    done
 
-      size=$(du -sh "$backup_dir" 2>/dev/null | cut -f1 || echo "N/A")
+    # Ordenar e imprimir
+    if [ -s "$tmpfile" ]; then
+      sort -r "$tmpfile" | while IFS='|' read -r timestamp size tipo status; do
+        printf "%-17s | %-8s | %-6s | %s\n" "$timestamp" "$size" "$tipo" "$status"
+      done
+    else
+      echo "(Nenhum backup encontrado)"
+    fi
 
-      # Verificar integridade
-      if [ -f "$backup_dir/xtrabackup_checkpoints" ] && \
-         [ -f "$backup_dir/ibdata1" ] && \
-         [ -f "$backup_dir/backup.mbstream.md5" ]; then
-        status="✓ PRONTO"
-      else
-        status="✗ INCOMPLETO"
-      fi
-
-      printf "%-17s | %-8s | %-6s | %s\n" "$timestamp" "$size" "$tipo" "$status"
-    done | sort -r
-
+    # Contar backups
+    total=$(wc -l < "$tmpfile" 2>/dev/null || echo 0)
     echo ""
-    echo "Total de backups: $total_backups"
+    echo "Total de backups: $total"
 
     # Status do último backup
     if [ -f "/backup/last_backup_status" ]; then
@@ -402,7 +424,7 @@ data:
         'wsrep_cluster_size',
         'wsrep_cluster_status'
       )
-    " 2>/dev/null | column -t
+    " 2>/dev/null
 
     echo ""
     read -p "Iniciar backup? (yes/no): " -r
@@ -437,13 +459,16 @@ data:
     " >> "$BACKUP_DIR/cluster-info.txt" 2>/dev/null || true
 
     echo "[1/4] Executando mariadb-backup..."
-    if ! mariadb-backup \
+
+    mariadb-backup \
       --backup \
       --user=root \
       --password="$MYSQL_ROOT_PASSWORD" \
       --target-dir="$BACKUP_DIR" \
       --stream=mbstream \
-      --parallel=2 > "$BACKUP_DIR/backup.mbstream" 2>&1; then
+      --parallel=2 > "$BACKUP_DIR/backup.mbstream"
+
+    if [ $? -ne 0 ]; then
       echo "ERRO: Backup falhou!"
       exit 1
     fi

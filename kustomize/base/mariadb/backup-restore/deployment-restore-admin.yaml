@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: restore-admin
+  name: disaster-recovery-admin
   labels:
     app: mariadb
-    component: restore-admin
+    component: disaster-recovery
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: mariadb
-      component: restore-admin
+      component: disaster-recovery
   template:
     metadata:
       labels:
         app: mariadb
-        component: restore-admin
+        component: disaster-recovery
     spec:
       serviceAccountName: mariadb
       tolerations:
@@ -53,6 +53,11 @@ spec:
           echo "  # /scripts/list-backups.sh"
           echo "  # /scripts/verify-backup.sh 20251210-020000"
           echo "  # /scripts/execute-restore-safe.sh 20251210-020000"
+          echo ""
+          echo "Testes:"
+          echo "  kubectl delete job test-backup-now -n uniselec-api-dev"
+          echo "  kubectl create job --from=cronjob/mariadb-backup-daily test-backup-now -n uniselec-api-dev"
+          echo "  kubectl logs -f job/test-backup-now -n uniselec-api-dev"
           echo ""
           echo "================================================================"
           echo "Aguardando comandos..."
@@ -99,6 +104,7 @@ spec:
           capabilities:
             add:
             - SYS_NICE
+
       volumes:
       - name: backup-scripts
         configMap:
@@ -106,10 +112,11 @@ spec:
           defaultMode: 0755
       - name: backup-volume
         persistentVolumeClaim:
-          claimName: mariadb-backup-pvc
+          claimName: backup-mariadb-1
       - name: mariadb-data
         persistentVolumeClaim:
           claimName: database-mariadb-0
+
       restartPolicy: Always
       affinity:
         podAffinity:
@@ -123,19 +130,3 @@ spec:
                   values:
                   - mariadb-0
               topologyKey: kubernetes.io/hostname
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mariadb-backup-pvc
-  labels:
-    app: mariadb
-    component: backup
-spec:
-  accessModes:
-  - ReadWriteMany
-  storageClassName: nfs-storage-k8s-v1
-  resources:
-    requests:
-      storage: 500Gi
-  volumeMode: Filesystem
