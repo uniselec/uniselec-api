@@ -1,6 +1,7 @@
 <?php
 
 namespace App\ModelFilters;
+
 use Illuminate\Database\Eloquent\Builder;
 
 class ApplicationOutcomeFilter extends DefaultModelFilter
@@ -28,7 +29,7 @@ class ApplicationOutcomeFilter extends DefaultModelFilter
         $this->whereHas(
             'application',
             fn(Builder $q) =>
-            $q->where('form_data->position->id', (int) $id)        // MySQL / MariaDB JSON path
+            $q->where('form_data->position->id', (int) $id)
         );
     }
 
@@ -36,9 +37,13 @@ class ApplicationOutcomeFilter extends DefaultModelFilter
     public function admissionCategoryId($id): void
     {
         $this->whereHas('application', function (Builder $q) use ($id) {
-            // procura no array admission_categories um objeto com o id informado
             $q->whereJsonContains('form_data->admission_categories', ['id' => (int) $id]);
         });
+    }
+
+    public function status($status)
+    {
+        $this->where('status', 'LIKE', "%$status%");
     }
     /**
      * Related Models that have ModelFilters as well as the method on the ModelFilter
