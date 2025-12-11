@@ -22,9 +22,6 @@ class ProcessApplicationOutcome
             ->update(['last_applications_processed_at' => Carbon::now()]);
     }
 
-    /* ---------------------------------------------------------------------- */
-    /* ----------------------   1) OUTCOME PLACEHOLDERS   -------------------- */
-    /* ---------------------------------------------------------------------- */
 
     private function ensureAllApplicationsHaveOutcomes(): void
     {
@@ -45,9 +42,6 @@ class ProcessApplicationOutcome
             );
     }
 
-    /* ---------------------------------------------------------------------- */
-    /* ----------------------   2) PROCESSAMENTO ENEM    --------------------- */
-    /* ---------------------------------------------------------------------- */
 
     private function processEnemScores(): void
     {
@@ -136,7 +130,7 @@ class ProcessApplicationOutcome
 
             // Verifica se houve ao menos uma reprovação por nota mínima
             if ($rejectedByMinimumScore = count($failedScoreNames) > 0) {
-                
+
                 // Transforma os slugs das áreas reprovadas em suas descrições legíveis
                 $failedDescriptions = collect($failedScoreNames)
                 ->map(fn ($key) => $knowledgeArea->firstWhere('slug', $key)->name)
@@ -154,7 +148,7 @@ class ProcessApplicationOutcome
             if ($rejectedByMinimumScore || (count($reasons) === 3)) {
                 $status = 'rejected';
             } elseif (count($reasons) === 1 && $birthdateInconsistency) {
-                $status = 'approved';
+                $status = 'pending';
             } elseif (!empty($reasons)) {
                 $status = 'pending';
             } else {
