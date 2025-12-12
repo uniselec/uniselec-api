@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\EnemOutcomePdfController;
 use App\Http\Controllers\Admin\EnemScoreController;
 use App\Http\Controllers\Admin\EnemScoreExportController;
 use App\Http\Controllers\Admin\EnemScoreImportController;
+use App\Http\Controllers\Admin\EnemScoreSummaryController;
 use App\Http\Controllers\Admin\KnowledgeAreaController;
 use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
@@ -77,6 +78,8 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::patch('application_outcomes/{id}', [ApplicationOutcomeController::class, 'patchUpdate'])->name('application-outcomes.patch');
 
         Route::get('/process_selections/{selection}/notify-status', [ProcessSelectionNotifyController::class, 'notifyByStatus']);
+        Route::get('enem_scores/summary/{process_selection}', EnemScoreSummaryController::class);
+
 
         Route::post('enem_scores/import', EnemScoreImportController::class)->name('enem_scores.import');
         Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
