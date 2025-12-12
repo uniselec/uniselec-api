@@ -598,35 +598,50 @@ data:
     # ============================================================
 
     log_info "Procurando backup: $TIMESTAMP"
+    log_info "Namespace: $NAMESPACE"
 
     BACKUP_DIR=""
     TIPO=""
 
-    if kubectl exec -n "$NAMESPACE" mariadb-1 -- test -d "/backup/auto-${TIMESTAMP}" 2>/dev/null; then
+    # Procurar backup LOCALMENTE no volume montado
+    if [ -d "/backup/auto-${TIMESTAMP}" ]; then
       BACKUP_DIR="/backup/auto-${TIMESTAMP}"
       TIPO="AUTOMÁTICO"
-    elif kubectl exec -n "$NAMESPACE" mariadb-1 -- test -d "/backup/manual-${TIMESTAMP}" 2>/dev/null; then
+    elif [ -d "/backup/manual-${TIMESTAMP}" ]; then
       BACKUP_DIR="/backup/manual-${TIMESTAMP}"
       TIPO="MANUAL"
     else
       log_error "Backup não encontrado: $TIMESTAMP"
       echo ""
       log_info "Para listar backups disponíveis:"
-      echo "  kubectl exec -n $NAMESPACE mariadb-1 -- /scripts/list-backups.sh"
+      echo "  /scripts/list-backups.sh"
+      echo ""
+      log_info "Backups locais em /backup:"
+      ls -lah /backup/ | grep -E "(auto-|manual-)" || echo "  (nenhum backup encontrado)"
       exit 1
     fi
 
     log_success "Backup encontrado: $BACKUP_DIR ($TIPO)"
 
-    # Validar integridade
+    # Validar integridade LOCALMENTE
     log_info "Validando integridade do backup..."
-    if ! kubectl exec -n "$NAMESPACE" mariadb-1 -- bash -c \
-      "test -f $BACKUP_DIR/xtrabackup_checkpoints && test -f $BACKUP_DIR/ibdata1" 2>/dev/null; then
+    if [ ! -f "$BACKUP_DIR/xtrabackup_checkpoints" ] || [ ! -f "$BACKUP_DIR/ibdata1" ]; then
       log_error "Backup inválido ou incompleto!"
+      log_error "  xtrabackup_checkpoints: $([ -f "$BACKUP_DIR/xtrabackup_checkpoints" ] && echo 'OK' || echo 'MISSING')"
+      log_error "  ibdata1: $([ -f "$BACKUP_DIR/ibdata1" ] && echo 'OK' || echo 'MISSING')"
       exit 1
     fi
 
     log_success "Backup validado!"
+
+    # Exibir informações do backup
+    if [ -f "$BACKUP_DIR/cluster-info.txt" ]; then
+      echo ""
+      echo "================================================================"
+      log_info "INFORMAÇÕES DO BACKUP"
+      echo "================================================================"
+      head -10 "$BACKUP_DIR/cluster-info.txt"
+    fi
 
     # ============================================================
     # AVISO E CONFIRMAÇÃO
@@ -643,6 +658,7 @@ data:
     echo ""
     echo " Namespace: $NAMESPACE"
     echo " Backup: $TIMESTAMP ($TIPO)"
+    echo " Local: $BACKUP_DIR"
     echo ""
     log_warning "PROCESSO AUTOMÁTICO (8 FASES):"
     echo " 1. Parar cluster MariaDB (3 nós)"
@@ -736,11 +752,14 @@ data:
     SAFETY_BACKUP_DIR="/backup/pre-restore-safety-$(date +%Y%m%d-%H%M%S)"
     log_info "Criando backup de segurança: $SAFETY_BACKUP_DIR"
 
-    kubectl exec -n "$NAMESPACE" mariadb-1 -- bash -c "
-      mkdir -p $SAFETY_BACKUP_DIR
-      echo 'Backup de segurança criado em: \$(date)' > $SAFETY_BACKUP_DIR/info.txt
-      echo 'Restore de: $BACKUP_DIR' >> $SAFETY_BACKUP_DIR/info.txt
-    " 2>/dev/null || true
+    mkdir -p "$SAFETY_BACKUP_DIR"
+    cat > "$SAFETY_BACKUP_DIR/info.txt" <<EOF
+    Backup de segurança criado em: $(date)
+    Namespace: $NAMESPACE
+    Restore de: $BACKUP_DIR
+    Timestamp do backup: $TIMESTAMP
+    Tipo: $TIPO
+    EOF
 
     log_success "Backup de segurança criado"
 
@@ -754,7 +773,7 @@ data:
     echo "================================================================"
 
     JOB_NAME="mariadb-restore-$(date +%s)"
-    log_info "Criando Job: $JOB_NAME"
+    log_info "Criando Job: $JOB_NAME (namespace: $NAMESPACE)"
 
     cat <<EOF | kubectl apply -f -
     apiVersion: batch/v1
@@ -789,7 +808,7 @@ data:
               echo "✓ Backup validado"
 
               echo "[2/5] Limpando datadir..."
-              rm -rf /data/*
+              find /data -mindepth 1 -delete
               echo "✓ Datadir limpo"
 
               echo "[3/5] Executando mariadb-backup --copy-back..."
@@ -798,6 +817,16 @@ data:
                 exit 1
               fi
               echo "✓ Restore completado"
+
+              echo "Removendo arquivos de backup do datadir..."
+              rm -f /data/backup.mbstream.md5
+              rm -f /data/backup.size
+              rm -f /data/cluster-info.txt
+              rm -f /data/backup.mbstream
+              rm -f /data/xtrabackup_checkpoints
+              rm -f /data/xtrabackup_info
+              rm -f /data/xtrabackup_binlog_info
+              rm -rf /data/.sst
 
               echo "[4/5] Corrigindo permissões..."
               chown -R 999:999 /data
@@ -983,10 +1012,6 @@ data:
         echo "  $pod: $STATE"
       done
     fi
-
-    # ============================================================
-    # LIMPEZA E RELATÓRIO FINAL
-    # ============================================================
 
     echo ""
     echo "================================================================"
