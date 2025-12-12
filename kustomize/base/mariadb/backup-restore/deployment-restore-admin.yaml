@@ -17,7 +17,7 @@ spec:
         app: mariadb
         component: disaster-recovery
     spec:
-      serviceAccountName: mariadb
+      serviceAccountName: mariadb-backup
       tolerations:
       - effect: NoSchedule
         operator: Exists
