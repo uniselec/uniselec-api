@@ -11,21 +11,27 @@ ENV DEBIAN_FRONTEND noninteractive
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+RUN { \
+  echo "upload_max_filesize=5M"; \
+  echo "post_max_size=6M"; \
+  } > /usr/local/etc/php/conf.d/uploads.ini
+
+
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-       locales \
-       curl \
-       nano \
-       unzip \
-       gnupg \
-       ca-certificates \
-       libfreetype6-dev \
-       libjpeg62-turbo-dev \
-       libpng-dev \
-       libzip-dev \
-       default-mysql-client \
-       iputils-ping \
-       netcat-openbsd \
+  locales \
+  curl \
+  nano \
+  unzip \
+  gnupg \
+  ca-certificates \
+  libfreetype6-dev \
+  libjpeg62-turbo-dev \
+  libpng-dev \
+  libzip-dev \
+  default-mysql-client \
+  iputils-ping \
+  netcat-openbsd \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 
@@ -38,8 +44,8 @@ RUN docker-php-ext-install pdo_mysql mysqli \
   && docker-php-ext-configure opcache --enable-opcache \
   \
   && docker-php-ext-configure gd \
-       --with-freetype=/usr/include/ \
-       --with-jpeg=/usr/include/ \
+  --with-freetype=/usr/include/ \
+  --with-jpeg=/usr/include/ \
   && docker-php-ext-install gd \
   \
   && docker-php-ext-configure zip \
