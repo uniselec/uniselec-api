@@ -24,6 +24,25 @@ spec:
       securityContext:
         fsGroup: 999
 
+      initContainers:
+      - name: tools
+        image: mariadb:10.11.15-jammy
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -e
+
+          apt-get update -qq
+          apt-get install -y -qq curl ca-certificates
+          curl -LO "https://dl.k8s.io/release/v1.31.3/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          mv kubectl /shared/kubectl
+
+          /shared/kubectl version --client | head -1
+        volumeMounts:
+        - name: shared-bin
+          mountPath: /shared
+
       containers:
       - name: disaster-recovery-admin
         image: mariadb:10.11.15-jammy
@@ -82,6 +101,9 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: PATH
+          value: "/shared:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
         volumeMounts:
         - name: backup-scripts
           mountPath: /scripts
@@ -90,6 +112,9 @@ spec:
           mountPath: /backup
         - name: mariadb-data
           mountPath: /var/lib/mysql
+        - name: shared-bin
+          mountPath: /shared
+
         resources:
           requests:
             cpu: 100m
@@ -116,6 +141,8 @@ spec:
       - name: mariadb-data
         persistentVolumeClaim:
           claimName: database-mariadb-0
+      - name: shared-bin
+        emptyDir: {}
 
       restartPolicy: Always
       affinity:
