@@ -8,9 +8,9 @@ metadata:
   annotations:
     description: "Backup diário às 02:00"
 spec:
-  schedule: "0 2 * * *"
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
+  schedule: "0 5 * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
   concurrencyPolicy: Forbid
   jobTemplate:
     spec:
@@ -26,7 +26,8 @@ spec:
           restartPolicy: Never
           containers:
           - name: backup-executor
-            image: bitnami/kubectl:1.31
+            image: alpine/k8s:1.31.3
+            imagePullPolicy: IfNotPresent
             command:
             - /bin/bash
             - -c

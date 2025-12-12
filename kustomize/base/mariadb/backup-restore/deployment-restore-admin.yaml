@@ -1,31 +1,50 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: restore-admin
+  name: disaster-recovery-admin
   labels:
     app: mariadb
-    component: restore-admin
+    component: disaster-recovery
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: mariadb
-      component: restore-admin
+      component: disaster-recovery
   template:
     metadata:
       labels:
         app: mariadb
-        component: restore-admin
+        component: disaster-recovery
     spec:
-      serviceAccountName: mariadb
+      serviceAccountName: mariadb-backup
       tolerations:
       - effect: NoSchedule
         operator: Exists
       securityContext:
         fsGroup: 999
 
+      initContainers:
+      - name: tools
+        image: mariadb:10.11.15-jammy
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -e
+
+          apt-get update -qq
+          apt-get install -y -qq curl ca-certificates
+          curl -LO "https://dl.k8s.io/release/v1.31.3/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          mv kubectl /shared/kubectl
+
+          /shared/kubectl version --client | head -1
+        volumeMounts:
+        - name: shared-bin
+          mountPath: /shared
+
       containers:
-      - name: restore-admin
+      - name: disaster-recovery-admin
         image: mariadb:10.11.15-jammy
         imagePullPolicy: IfNotPresent
         command:
@@ -33,31 +52,37 @@ spec:
         - -c
         - |
           echo "================================================================"
-          echo "RESTORE ADMIN POD - MariaDB Galera"
+          echo "DISASTER RECOVERY ADMIN - MariaDB Galera"
           echo "================================================================"
           echo ""
           echo "Pod iniciado em: $(date)"
           echo "Hostname: $(hostname)"
           echo ""
-          echo "Este pod permite executar restore de forma interativa."
+          echo "Este pod permite backup e restore de forma interativa."
           echo ""
           echo "Scripts disponíveis:"
-          echo "  /scripts/list-backups.sh             - Listar backups"
-          echo "  /scripts/verify-backup.sh TIMESTAMP  - Verificar backup"
+          echo "  /scripts/manual-backup.sh                  - Fazer backup manual"
+          echo "  /scripts/list-backups.sh                   - Listar backups"
+          echo "  /scripts/verify-backup.sh TIMESTAMP        - Verificar backup"
           echo "  /scripts/execute-restore-safe.sh TIMESTAMP - Executar restore"
           echo ""
           echo "Exemplo de uso:"
-          echo "  kubectl exec -it restore-admin-xxx -- /bin/bash"
+          echo "  kubectl exec -it disaster-recovery-admin-xxx -- /bin/bash"
+          echo "  # /scripts/manual-backup.sh"
           echo "  # /scripts/list-backups.sh"
           echo "  # /scripts/verify-backup.sh 20251210-020000"
           echo "  # /scripts/execute-restore-safe.sh 20251210-020000"
           echo ""
+          echo "Testes:"
+          echo "  kubectl delete job test-backup-now -n uniselec-api-dev"
+          echo "  kubectl create job --from=cronjob/mariadb-backup-daily test-backup-now -n uniselec-api-dev"
+          echo "  kubectl logs -f job/test-backup-now -n uniselec-api-dev"
+          echo ""
           echo "================================================================"
-          echo "Aguardando comandos... (Pod em sleep infinito)"
+          echo "Aguardando comandos..."
           echo "================================================================"
           echo ""
 
-          # Sleep infinito para manter o pod rodando
           while true; do
             sleep 3600
           done
@@ -76,18 +101,20 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: PATH
+          value: "/shared:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
         volumeMounts:
-        # 1. Scripts de backup/restore do ConfigMap
         - name: backup-scripts
           mountPath: /scripts
           readOnly: true
-        # 2. Volume de backup (NFS)
         - name: backup-volume
           mountPath: /backup
-        # 3. Datadir do mariadb-0
-        # Montar mesmo PVC do mariadb-0
         - name: mariadb-data
           mountPath: /var/lib/mysql
+        - name: shared-bin
+          mountPath: /shared
+
         resources:
           requests:
             cpu: 100m
@@ -102,20 +129,21 @@ spec:
           capabilities:
             add:
             - SYS_NICE
+
       volumes:
-      # 1. Scripts do ConfigMap
       - name: backup-scripts
         configMap:
           name: mariadb-backup-scripts
           defaultMode: 0755
-      # 2. Volume de backup (NFS) - PVC compartilhado
       - name: backup-volume
         persistentVolumeClaim:
-          claimName: mariadb-backup-pvc
-      # 3. Datadir do mariadb-0
+          claimName: backup-mariadb-1
       - name: mariadb-data
         persistentVolumeClaim:
           claimName: database-mariadb-0
+      - name: shared-bin
+        emptyDir: {}
+
       restartPolicy: Always
       affinity:
         podAffinity:
@@ -129,19 +157,3 @@ spec:
                   values:
                   - mariadb-0
               topologyKey: kubernetes.io/hostname
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mariadb-backup-pvc
-  labels:
-    app: mariadb
-    component: backup
-spec:
-  accessModes:
-  - ReadWriteMany
-  storageClassName: nfs-storage-k8s-v1
-  resources:
-    requests:
-      storage: 500Gi
-  volumeMode: Filesystem
