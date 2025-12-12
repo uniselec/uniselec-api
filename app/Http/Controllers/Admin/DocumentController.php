@@ -26,7 +26,7 @@ class DocumentController extends BasicCrudController
     {
         $request->validate([
             'title' => 'required|string|max:255',
-            'file' => 'required|file|max:10240', // Máximo de 10 MB
+            'file' => 'required|file|max:5120',
             'status' => 'in:draft,published,archived',
             'process_selection_id' => 'required|exists:process_selections,id'
         ]);
