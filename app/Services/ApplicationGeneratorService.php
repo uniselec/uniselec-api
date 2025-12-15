@@ -36,7 +36,7 @@ class ApplicationGeneratorService
             ->all();
 
         // 1) outcomes aprovados e ainda não gerados nesta lista
-        $outcomes = ApplicationOutcome::with('application')
+        $outcomes = ApplicationOutcome::with('application.enemScore')
             ->where('status', 'approved')
             ->whereHas('application', fn($q) => $q->where('process_selection_id', $psId))
             ->whereNotExists(function ($sub) use ($list) {
@@ -52,7 +52,7 @@ class ApplicationGeneratorService
         foreach ($outcomes as $out) {
             $data     = $out->application->form_data;
             $courseId = $data['position']['id'] ?? null;
-            if (!$courseId) {
+            if (! $courseId) {
                 continue;
             }
             foreach ($data['admission_categories'] ?? [] as $cat) {
@@ -73,35 +73,32 @@ class ApplicationGeneratorService
                     }
 
                     // 2) idade (mais velho primeiro)
-                    // supondo form_data['birthdate'] no formato YYYY-MM-DD
-                    $dobA = strtotime($a->application->form_data['birthdate']);
-                    $dobB = strtotime($b->application->form_data['birthdate']);
-                    if ($dobA !== $dobB) {
-                        return $dobA <=> $dobB; // menor timestamp = mais velho
+                    $birthA = $a->application->form_data['birthdate'] ?? null;
+                    $birthB = $b->application->form_data['birthdate'] ?? null;
+                    if ($birthA && $birthB && $birthA !== $birthB) {
+                        return strtotime($birthA) <=> strtotime($birthB);
                     }
 
-                    // 3) Redação
-                    $scoresA = $a->scores; // ou original_scores, conforme seu model
-                    $scoresB = $b->scores;
-                    if ($scoresA['redacao'] !== $scoresB['redacao']) {
-                        return $scoresB['redacao'] <=> $scoresA['redacao'];
+                    // 3–7) notas do ENEM: writing, language, math, science, humanities
+                    $scoresA = $a->application->enemScore->scores ?? [];
+                    $scoresB = $b->application->enemScore->scores ?? [];
+
+                    $metrics = [
+                        'writing_score',
+                        'language_score',
+                        'math_score',
+                        'science_score',
+                        'humanities_score',
+                    ];
+
+                    foreach ($metrics as $key) {
+                        $valA = (float) ($scoresA[$key] ?? 0);
+                        $valB = (float) ($scoresB[$key] ?? 0);
+                        if ($valA !== $valB) {
+                            return $valB <=> $valA;
+                        }
                     }
-                    // 4) Linguagens
-                    if ($scoresA['linguagens'] !== $scoresB['linguagens']) {
-                        return $scoresB['linguagens'] <=> $scoresA['linguagens'];
-                    }
-                    // 5) Matemática
-                    if ($scoresA['matematica'] !== $scoresB['matematica']) {
-                        return $scoresB['matematica'] <=> $scoresA['matematica'];
-                    }
-                    // 6) Ciências da Natureza
-                    if ($scoresA['natureza'] !== $scoresB['natureza']) {
-                        return $scoresB['natureza'] <=> $scoresA['natureza'];
-                    }
-                    // 7) Ciências Humanas
-                    if ($scoresA['humanas'] !== $scoresB['humanas']) {
-                        return $scoresB['humanas'] <=> $scoresA['humanas'];
-                    }
+
                     return 0;
                 });
 
@@ -126,7 +123,10 @@ class ApplicationGeneratorService
                         'admission_category_id' => $out->application
                             ->form_data['admission_categories'][array_search(
                             $catName,
-                            array_column($out->application->form_data['admission_categories'], 'name')
+                            array_column(
+                                $out->application->form_data['admission_categories'],
+                                'name'
+                            )
                         )]['id'],
                         'general_ranking'       => $globalRank,
                         'category_ranking'      => $categoryRank,
@@ -142,8 +142,9 @@ class ApplicationGeneratorService
 
         // 4) insere tudo de uma vez
         DB::transaction(function () use ($rows) {
-            if (!empty($rows)) {
-                ConvocationListApplication::insert($rows);
+            $batchSize = 500;
+            foreach (array_chunk($rows, $batchSize) as $batch) {
+                ConvocationListApplication::insert($batch);
             }
         });
 

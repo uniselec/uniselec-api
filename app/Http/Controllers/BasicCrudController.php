@@ -88,9 +88,9 @@ abstract class BasicCrudController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
-        
+
         $validatedData = $validator->validate();
-        
+
         $obj->update($validatedData);
         $resource = $this->resource();
         return new $resource($obj);
