@@ -62,23 +62,69 @@
             font-size: 11px;
             color: #444;
         }
+
+        /* Legenda */
+        .legend {
+            margin-top: 18px;
+            padding: 10px 12px;
+            border: 1px solid #333;
+            background: #f7f7f7;
+            font-size: 11px;
+            line-height: 1.35;
+        }
+
+        .legend h3 {
+            margin: 0 0 8px;
+            font-size: 12px;
+        }
+
+        .legend p {
+            margin: 6px 0;
+        }
+
+        .legend ul {
+            margin: 6px 0 8px 18px;
+            padding: 0;
+        }
+
+        .legend li {
+            margin: 3px 0;
+        }
     </style>
 </head>
 
 <body>
     <div class="header">
-        <h1>{{ $selectionName ?? 'Lista de Convocação' }}</h1>
+        <h1>{{ 'Lista de Convocação' }}</h1>
         <p class="muted">
-            {{ $selection?->description ?? '' }}
+            {{ $selectionName }}
         </p>
-        @if (!empty($publishedAt))
-            <p class="small">Publicada em: {{ $publishedAt }}</p>
-        @endif
+        UNILAB - Universidade da Integração Internacional da Lusofonia Afro-Brasileira
+    </div>
+
+    {{-- Legenda (agora logo abaixo do título) --}}
+    <div class="legend">
+        <h3>Legenda</h3>
+
+        <ul>
+            <li><strong>Convocado</strong>: candidato que tem direito subjetivo à ocupar a vaga;</li>
+            <li><strong>Convocado Fora de Vaga</strong>: candidato que tem apenas expectativa de ocupar a vaga, podendo ou não ocupá-la no caso de não preenchimento.</li>
+        </ul>
+
+        <p>
+            Para estarem aptos a ocupar as vagas, todos os candidatos convocados nesta chamada (incluindo aqueles convocados fora do número de vagas)
+            devem, obrigatoriamente, enviar a documentação de pré-matrícula e participar da banca de heteroidentificação ou verificação PCD,
+            se aplicável, seguindo o cronograma estabelecido.
+        </p>
+
+        <p>
+            Para mais detalhes, é indispensável a leitura do edital completo, com atenção especial ao item <strong>1.5</strong>.
+        </p>
     </div>
 
     @foreach ($groups as $group)
         <div class="block">
-            <h2>{{ $group['course_name'] }}</h2>
+            <h2>Curso: {{ $group['course_name'] }}</h2>
             <p class="subtitle">Categoria: {{ $group['category_name'] }}</p>
 
             <table>
