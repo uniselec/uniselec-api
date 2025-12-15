@@ -14,17 +14,23 @@ class ConvocationPdfExportService
         ini_set('memory_limit', '-1');
         set_time_limit(0);
 
-        // Se quiser pegar o objeto do selection (se existir relation), adapte aqui:
         $selectionName = optional($list->processSelection)->name ?? 'Processo Seletivo';
         $listName      = $list->name ?? 'Lista';
         $publishedAt   = optional($list->published_at)->format('d/m/Y H:i');
 
-        // Busca as CLAs já com application + course + category
-        // e filtra apenas called / called_out_of_quota
+        /**
+         * Importante:
+         * - Se a.name_source = 'enem' → exibir enem_scores.scores.name
+         * - Senão → exibir form_data.social_name (se houver) ou form_data.name
+         */
         $rows = DB::table('convocation_list_applications as cla')
             ->join('applications as a', 'a.id', '=', 'cla.application_id')
             ->join('courses as c', 'c.id', '=', 'cla.course_id')
             ->join('admission_categories as ac', 'ac.id', '=', 'cla.admission_category_id')
+
+            // enem_scores pode não existir → LEFT JOIN
+            ->leftJoin('enem_scores as es', 'es.application_id', '=', 'a.id')
+
             ->where('cla.convocation_list_id', $list->id)
             ->whereIn('cla.convocation_status', ['called', 'called_out_of_quota'])
             ->select([
@@ -35,6 +41,8 @@ class ConvocationPdfExportService
                 'cla.category_ranking',
                 'cla.convocation_status',
                 'a.form_data',
+                'a.name_source',
+                'es.scores as enem_scores', // JSON (string) no MariaDB
             ])
             ->orderBy('c.name')
             ->orderBy('ac.name')
@@ -42,14 +50,21 @@ class ConvocationPdfExportService
             ->orderBy('cla.category_ranking')
             ->get();
 
-        // Agrupa por curso+categoria e prepara linhas do PDF
         $groupsMap = [];
 
         foreach ($rows as $r) {
+
             $key = $r->course_id . ':' . $r->admission_category_id;
 
-            $formData = $this->decodeFormData($r->form_data);
-            $name = (string)($formData['name'] ?? '');
+            $formData  = $this->decodeFormData($r->form_data);
+            $enemScore = $this->decodeFormData($r->enem_scores);
+
+            $name = $this->resolveApplicationName(
+                nameSource: $r->name_source ?? null,
+                formData: $formData,
+                enemScore: $enemScore
+            );
+
             $cpf  = (string)($formData['cpf'] ?? '');
 
             $groupsMap[$key] ??= [
@@ -66,7 +81,7 @@ class ConvocationPdfExportService
             ];
         }
 
-        // Garante ordenação dentro de cada grupo (category_ranking e nome como desempate)
+        // Ordenação dentro do grupo: category_ranking, depois nome (desempate)
         $groups = array_values(array_map(function ($group) {
             usort($group['items'], function ($a, $b) {
                 $ra = $a['category_ranking'];
@@ -76,9 +91,7 @@ class ConvocationPdfExportService
                 if ($ra === null && $rb !== null) return 1;
                 if ($ra !== null && $rb === null) return -1;
 
-                if ($ra !== $rb) {
-                    return ($ra <=> $rb);
-                }
+                if ($ra !== $rb) return ($ra <=> $rb);
 
                 return mb_strtolower($a['name']) <=> mb_strtolower($b['name']);
             });
@@ -101,6 +114,32 @@ class ConvocationPdfExportService
         ]);
     }
 
+    private function resolveApplicationName(?string $nameSource, array $formData, array $enemScore): string
+    {
+        // Regra: se name_source = enem → usar enem_scores.scores.name
+
+        if ($nameSource === 'enem') {
+            $enemName = $enemScore['name'];
+
+            if (is_string($enemName) && trim($enemName) !== '') {
+                return $enemName;
+            }
+        }
+
+        // Fallback padrão do seu sistema
+        $socialName = $formData['social_name'] ?? null;
+        if (is_string($socialName) && trim($socialName) !== '') {
+            return $socialName;
+        }
+
+        $name = $formData['name'] ?? null;
+        if (is_string($name) && trim($name) !== '') {
+            return $name;
+        }
+
+        return 'N/D';
+    }
+
     private function mapConvocationStatus(?string $status): string
     {
         return match ($status) {
@@ -112,7 +151,7 @@ class ConvocationPdfExportService
 
     private function decodeFormData($formData): array
     {
-        // Se você estiver usando cast array no Eloquent, aqui no DB::table pode vir string JSON
+        // No DB::table normalmente vem string JSON; pode vir null
         if (is_array($formData)) return $formData;
 
         if (is_string($formData) && $formData !== '') {
