@@ -11,6 +11,8 @@ use App\Http\Controllers\Admin\ConvocationListApplicationController;
 use App\Http\Controllers\Admin\ConvocationListApplicationGenerationController;
 use App\Http\Controllers\Admin\ConvocationListApplicationResponseController;
 use App\Http\Controllers\Admin\ConvocationListController;
+use App\Http\Controllers\Admin\ConvocationListCsvController;
+use App\Http\Controllers\Admin\ConvocationListPdfController;
 use App\Http\Controllers\Admin\ConvocationListSeatAllocationController;
 use App\Http\Controllers\Admin\ConvocationListSeatController;
 use App\Http\Controllers\Admin\ConvocationListSeatGenerationController;
@@ -43,7 +45,10 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::get('process_selections/{selection}/applications/export', [ReportController::class, 'exportApplications'])->name('admin.super_user.processSelection.applications.export');
         Route::get('process-selections/{selection}/export-enem-csv', [EnemScoreExportController::class, 'export'])->name('admin.selections.export_enem_csv');
         Route::get('process-selections/{selection}/export-enem-outcomes', [EnemOutcomeExportController::class, 'export'])->name('admin.super_user.processSelection.export_enem_outcomes');
-        Route::get('process-selections/{selection}/export-enem-outcomes-pdf',EnemOutcomePdfController::class)->name('admin.super_user.processSelection.export_enem_outcomes_pdf');
+        Route::get('process-selections/{selection}/export-enem-outcomes-pdf', EnemOutcomePdfController::class)->name('admin.super_user.processSelection.export_enem_outcomes_pdf');
+        Route::get('convocation_lists/{list}/export-pdfs', [ConvocationListPdfController::class, 'export'])->name('admin.super_user.convocation_lists.export_pdfs');
+        Route::get('convocation_lists/{list}/export-csv', [ConvocationListCsvController::class, 'exportCsv'])->name('admin.super_user.convocation_lists.export_csv');
+
 
         Route::apiResource('admins', AdminController::class)->names('admin.super_user.admins');
         Route::apiResource('academic_units', AcademicUnitController::class)->names('admin.super_user.academic_units');
@@ -95,6 +100,7 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
 
         Route::patch('application_outcomes/{id}', [ApplicationOutcomeController::class, 'patchUpdate'])->name('admin.super_user.application-outcomes.patch');
         Route::get('/process_selections/{selection}/notify-status', [ProcessSelectionNotifyController::class, 'notifyByStatus']);
+
 
         Route::post('enem_scores/import', EnemScoreImportController::class)->name('admin.super_user.enem_scores.import');
         Route::get('enem_scores/summary/{process_selection}', EnemScoreSummaryController::class);
