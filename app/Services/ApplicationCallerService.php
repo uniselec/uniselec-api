@@ -15,12 +15,11 @@ class ApplicationCallerService
     }
 
     /**
-     * Tenta convocar a inscrição $claId na lista $listId,
-     * alocando vagas de acordo com current_admission_category_id.
-     *
-     * Regra: ao convocar o alvo, convoca também todos os candidatos acima (até o alvo),
-     * e TODOS os convocados (called e called_out_of_quota) devem ser "skipped" nas outras
-     * modalidades dentro da mesma convocation_list.
+     * Regra:
+     * - Ao convocar o alvo, convoca também todos os candidatos acima (até o alvo).
+     * - Somente quem ficar "called" (com vaga/seat reservado) deve virar "skipped" nas outras modalidades
+     *   dentro da MESMA convocation_list.
+     * - Quem ficar "called_out_of_quota" NÃO elimina outras modalidades.
      */
     public function call(int $listId, int $claId): void
     {
@@ -34,7 +33,7 @@ class ApplicationCallerService
                 return;
             }
 
-            // 1) Conta vagas “open” usando current_admission_category_id
+            // 1) Conta vagas abertas (open) na categoria atual
             $availableSeats = ConvocationListSeat::where([
                 ['convocation_list_id',           $listId],
                 ['course_id',                     $target->course_id],
@@ -42,8 +41,7 @@ class ApplicationCallerService
                 ['status',                        'open'],
             ])->lockForUpdate()->count();
 
-            // 2) Busca candidatos pending OU already out_of_quota até o target
-            // (mantendo a lógica original: ordenação por general_ranking)
+            // 2) Candidatos até o target (por general_ranking)
             $candidates = ConvocationListApplication::where('convocation_list_id', $listId)
                 ->where('course_id', $target->course_id)
                 ->where('admission_category_id', $target->admission_category_id)
@@ -52,8 +50,8 @@ class ApplicationCallerService
                 ->lockForUpdate()
                 ->get();
 
-            // Guarda TODAS as applications que forem convocadas nesse “call”
-            $calledApplicationIds = [];
+            // SOMENTE applications que realmente ficaram "called" (com seat)
+            $calledWithSeatApplicationIds = [];
 
             foreach ($candidates as $cla) {
                 if ($cla->general_ranking > $target->general_ranking) {
@@ -61,7 +59,6 @@ class ApplicationCallerService
                 }
 
                 if ($availableSeats > 0) {
-                    // 3) Reserva um seat “open” baseado em current_admission_category_id
                     $seat = ConvocationListSeat::where([
                         ['convocation_list_id',           $listId],
                         ['course_id',                     $cla->course_id],
@@ -77,8 +74,11 @@ class ApplicationCallerService
                         $cla->seat_id            = $seat->id;
                         $cla->convocation_status = 'called';
                         $availableSeats--;
+
+                        // ✅ só entra aqui se virou called
+                        $calledWithSeatApplicationIds[] = (int) $cla->application_id;
                     } else {
-                        // segurança: se por qualquer motivo não achar seat, cai para fora de vaga
+                        // sem seat por algum motivo: fora de vaga
                         $cla->convocation_status = 'called_out_of_quota';
                     }
                 } else {
@@ -87,19 +87,20 @@ class ApplicationCallerService
 
                 $cla->save();
 
-                $calledApplicationIds[] = (int) $cla->application_id;
-
                 if ($cla->id === $target->id) {
                     break;
                 }
             }
 
-            $calledApplicationIds = array_values(array_unique($calledApplicationIds));
+            $calledWithSeatApplicationIds = array_values(array_unique($calledWithSeatApplicationIds));
 
-            if (!empty($calledApplicationIds)) {
+            // 3) Só elimina outras modalidades quando a application ficou "called"
+            if (!empty($calledWithSeatApplicationIds)) {
                 ConvocationListApplication::where('convocation_list_id', $listId)
-                    ->whereIn('application_id', $calledApplicationIds)
-                    ->whereNotIn('convocation_status', ['called', 'called_out_of_quota'])
+                    ->whereIn('application_id', $calledWithSeatApplicationIds)
+                    // não mexe no registro que já é called (o que “ganhou a vaga”)
+                    // e nem no que já está skipped
+                    ->whereNotIn('convocation_status', ['called', 'skipped'])
                     ->update(['convocation_status' => 'skipped']);
             }
         });

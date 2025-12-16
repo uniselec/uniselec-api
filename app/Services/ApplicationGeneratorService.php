@@ -6,30 +6,29 @@ use App\Models\ApplicationOutcome;
 use App\Models\ConvocationList;
 use App\Models\ConvocationListApplication;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 
 class ApplicationGeneratorService
 {
     /**
      * Gera registros em convocation_list_applications:
      * - agrupa por curso e categoria
-     * - ordena por final_score e, em caso de empate, por:
-     *     a) idade (mais velho primeiro)
-     *     b) nota de Redação
-     *     c) nota de Linguagens
-     *     d) nota de Matemática
-     *     e) nota de Ciências da Natureza
-     *     f) nota de Ciências Humanas
+     * - ordena por final_score e, em caso de empate, por critérios
      * - define general/category ranking
      * - inicializa convocation_status, result_status e response_status
+     *
+     * Regra adicional (a partir da 2ª lista):
+     * - Se a application já estiver em lista anterior do mesmo processo com
+     *   convocation_status = called OU skipped => na nova lista entra como skipped
      *
      * @return int Total de linhas inseridas
      */
     public function generate(ConvocationList $list): int
     {
-        $ps          = $list->processSelection;
-        $psId        = $ps->id;
-        $courses     = collect($ps->courses)->keyBy('id');
+        $ps      = $list->processSelection;
+        $psId    = $ps->id;
+        $courses = collect($ps->courses)->keyBy('id');
+
+        // todas as listas anteriores do mesmo processo
         $prevListIds = $ps->convocationLists()
             ->where('id', '<', $list->id)
             ->pluck('id')
@@ -55,6 +54,7 @@ class ApplicationGeneratorService
             if (! $courseId) {
                 continue;
             }
+
             foreach ($data['admission_categories'] ?? [] as $cat) {
                 $grouped[$courseId][$cat['name']][] = $out;
             }
@@ -79,7 +79,7 @@ class ApplicationGeneratorService
                         return strtotime($birthA) <=> strtotime($birthB);
                     }
 
-                    // 3–7) notas do ENEM: writing, language, math, science, humanities
+                    // 3–7) notas do ENEM
                     $scoresA = $a->application->enemScore->scores ?? [];
                     $scoresB = $b->application->enemScore->scores ?? [];
 
@@ -109,28 +109,38 @@ class ApplicationGeneratorService
                     $categoryRank = $idx + 1;
                     $appId        = $out->application_id;
 
-                    // já foi called+accepted em lista anterior?
-                    $acceptedPrev = ConvocationListApplication::whereIn('convocation_list_id', $prevListIds)
+                    // ✅ NOVA REGRA: se já foi called OU skipped em lista anterior => skip agora
+                    $skipPrev = !empty($prevListIds)
+                        ? ConvocationListApplication::whereIn('convocation_list_id', $prevListIds)
                         ->where('application_id', $appId)
-                        ->where('convocation_status', 'called')
-                        ->where('response_status', 'accepted')
-                        ->exists();
+                        ->whereIn('convocation_status', ['called', 'skipped'])
+                        ->exists()
+                        : false;
+
+                    $admissionCategories = $out->application->form_data['admission_categories'] ?? [];
+                    $catIndex = array_search(
+                        $catName,
+                        array_column($admissionCategories, 'name'),
+                        true
+                    );
+
+                    $catId = ($catIndex !== false)
+                        ? ($admissionCategories[$catIndex]['id'] ?? null)
+                        : null;
+
+                    if (! $catId) {
+                        // se não conseguir resolver a categoria, ignora por segurança
+                        continue;
+                    }
 
                     $rows[] = [
                         'convocation_list_id'   => $list->id,
                         'application_id'        => $appId,
                         'course_id'             => $courseId,
-                        'admission_category_id' => $out->application
-                            ->form_data['admission_categories'][array_search(
-                            $catName,
-                            array_column(
-                                $out->application->form_data['admission_categories'],
-                                'name'
-                            )
-                        )]['id'],
+                        'admission_category_id' => $catId,
                         'general_ranking'       => $globalRank,
                         'category_ranking'      => $categoryRank,
-                        'convocation_status'    => $acceptedPrev ? 'skipped' : 'pending',
+                        'convocation_status' => $skipPrev ? 'skipped' : 'pending',
                         'result_status'         => ($categoryRank <= $quota) ? 'classified' : 'classifiable',
                         'response_status'       => 'pending',
                         'created_at'            => now(),
