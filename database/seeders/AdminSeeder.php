@@ -12,10 +12,10 @@ class AdminSeeder extends Seeder
     public function run(): void
     {
         DB::table('admins')->updateOrInsert(
-            ['email' => 'jefponte@gmail.com'],
+            ['email' => 'admin@selecoes-staging.unilab.edu.br'],
             [
                 'name'       => 'Jefferson Uchoa Ponte',
-                'role'       => 'super_user',
+                'role'       => 'promoter',
                 'password'   => Hash::make('rootroot'),
                 'updated_at' => Carbon::now(),
                 'created_at' => Carbon::now(),

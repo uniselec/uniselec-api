@@ -26,22 +26,37 @@ class ConvocationListApplicationController extends BasicCrudController
 
     public function index(Request $request)
     {
-        $perPage = (int) $request->get('per_page', $this->defaultPerPage);
+        // se quiser aumentar a memória só aqui
+        ini_set('memory_limit', '512M');
+
+        $perPage   = (int) $request->get('per_page', $this->defaultPerPage);
         $hasFilter = in_array(Filterable::class, class_uses($this->model()));
-        $query = $this->queryBuilder();
+        $query     = $this->queryBuilder();
+
         if ($hasFilter) {
             $query = $query->filter($request->all());
         }
+
         $query->whereNotNull('created_at');
-        $data = $request->has('all') || ! $this->defaultPerPage
+
+        // agora o $query já vem ordenado no queryBuilder()
+        $items = $request->has('all') || ! $this->defaultPerPage
             ? $query->get()
             : $query->paginate($perPage);
+
         $resourceCollectionClass = $this->resourceCollection();
-        $refClass = new ReflectionClass($this->resourceCollection());
-        return $refClass->isSubclassOf(ResourceCollection::class)
-            ? new $resourceCollectionClass($data)
-            : $resourceCollectionClass::collection($data);
+        $refClass                = new \ReflectionClass($resourceCollectionClass);
+
+        if ($items instanceof \Illuminate\Pagination\LengthAwarePaginator) {
+            return $refClass->isSubclassOf(ResourceCollection::class)
+                ? new $resourceCollectionClass($items)
+                : $resourceCollectionClass::collection($items);
+        }
+
+        return new $resourceCollectionClass($items);
     }
+
+
     protected function model()
     {
         return ConvocationListApplication::class;
@@ -66,20 +81,25 @@ class ConvocationListApplicationController extends BasicCrudController
     {
         return ConvocationListApplicationResource::class;
     }
-    public function queryBuilder(): Builder
+    protected function queryBuilder(): Builder
     {
-        return parent::queryBuilder()->with([
-            'application:id,form_data',
-            'course:id,name,modality,academic_unit',
-            'category:id,name',
-            'seat:id,seat_code,status',
-            'application' => function ($q) {
-                $q->select('id', 'form_data', 'process_selection_id')
-                    ->with([
-                        'enemScore:id,application_id,scores,original_scores',
-                        'applicationOutcome:id,application_id,status,classification_status,convocation_status,average_score,final_score,ranking,reason',
-                    ]);
-            },
-        ]);
+        return parent::queryBuilder()
+            ->with([
+                'application:id,form_data',
+                'course:id,name,modality,academic_unit',
+                'category:id,name',
+                'seat:id,seat_code,status',
+                'application' => function ($q) {
+                    $q->select('id', 'form_data', 'process_selection_id')
+                        ->with([
+                            'enemScore:id,application_id,scores,original_scores',
+                            'applicationOutcome:id,application_id,status,classification_status,convocation_status,average_score,final_score,ranking,reason',
+                        ]);
+                },
+            ])
+            // garante que toda consulta use esta ordenação
+            ->orderBy('course_id', 'asc')
+            ->orderBy('admission_category_id', 'asc')
+            ->orderBy('category_ranking', 'asc');
     }
 }

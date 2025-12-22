@@ -2,11 +2,8 @@
 
 namespace App\Services;
 
-use App\Models\{
-    ConvocationList,
-    ConvocationListApplication,
-    ConvocationListSeat
-};
+use App\Models\ConvocationListApplication;
+use App\Models\ConvocationListSeat;
 use Illuminate\Support\Facades\DB;
 
 class ApplicationCallerService
@@ -18,37 +15,43 @@ class ApplicationCallerService
     }
 
     /**
-     * Tenta convocar a inscrição $claId na lista $listId,
-     * alocando vagas de acordo com current_admission_category_id.
-     *
-     * @return void
+     * Regra:
+     * - Ao convocar o alvo, convoca também todos os candidatos acima (até o alvo).
+     * - Somente quem ficar "called" (com vaga/seat reservado) deve virar "skipped" nas outras modalidades
+     *   dentro da MESMA convocation_list.
+     * - Quem ficar "called_out_of_quota" NÃO elimina outras modalidades.
      */
     public function call(int $listId, int $claId): void
     {
         DB::transaction(function () use ($listId, $claId) {
             $target = ConvocationListApplication::where('id', $claId)
                 ->where('convocation_list_id', $listId)
+                ->lockForUpdate()
                 ->firstOrFail();
 
             if ($target->convocation_status === 'skipped') {
                 return;
             }
 
-            // 1) Conta vagas “open” usando current_admission_category_id
+            // 1) Conta vagas abertas (open) na categoria atual
             $availableSeats = ConvocationListSeat::where([
-                ['convocation_list_id',             $listId],
-                ['course_id',                       $target->course_id],
-                ['current_admission_category_id',   $target->admission_category_id],
-                ['status',                          'open'],
+                ['convocation_list_id',           $listId],
+                ['course_id',                     $target->course_id],
+                ['current_admission_category_id', $target->admission_category_id],
+                ['status',                        'open'],
             ])->lockForUpdate()->count();
 
-            // 2) Busca candidatos pending OU already out_of_quota até o target
+            // 2) Candidatos até o target (por general_ranking)
             $candidates = ConvocationListApplication::where('convocation_list_id', $listId)
                 ->where('course_id', $target->course_id)
                 ->where('admission_category_id', $target->admission_category_id)
                 ->whereIn('convocation_status', ['pending', 'called_out_of_quota'])
                 ->orderBy('general_ranking')
+                ->lockForUpdate()
                 ->get();
+
+            // SOMENTE applications que realmente ficaram "called" (com seat)
+            $calledWithSeatApplicationIds = [];
 
             foreach ($candidates as $cla) {
                 if ($cla->general_ranking > $target->general_ranking) {
@@ -56,7 +59,6 @@ class ApplicationCallerService
                 }
 
                 if ($availableSeats > 0) {
-                    // 3) Reserva um seat “open” baseado em current_admission_category_id
                     $seat = ConvocationListSeat::where([
                         ['convocation_list_id',           $listId],
                         ['course_id',                     $cla->course_id],
@@ -64,13 +66,21 @@ class ApplicationCallerService
                         ['status',                        'open'],
                     ])->lockForUpdate()->first();
 
-                    $seat->status         = 'reserved';
-                    $seat->application_id = $cla->application_id;
-                    $seat->save();
+                    if ($seat) {
+                        $seat->status         = 'reserved';
+                        $seat->application_id = $cla->application_id;
+                        $seat->save();
 
-                    $cla->seat_id            = $seat->id;
-                    $cla->convocation_status = 'called';
-                    $availableSeats--;
+                        $cla->seat_id            = $seat->id;
+                        $cla->convocation_status = 'called';
+                        $availableSeats--;
+
+                        // ✅ só entra aqui se virou called
+                        $calledWithSeatApplicationIds[] = (int) $cla->application_id;
+                    } else {
+                        // sem seat por algum motivo: fora de vaga
+                        $cla->convocation_status = 'called_out_of_quota';
+                    }
                 } else {
                     $cla->convocation_status = 'called_out_of_quota';
                 }
@@ -82,12 +92,15 @@ class ApplicationCallerService
                 }
             }
 
-            // 4) Se o target foi chamado com vaga, pula outras inscrições do mesmo usuário
-            $target->refresh();
-            if ($target->convocation_status === 'called') {
+            $calledWithSeatApplicationIds = array_values(array_unique($calledWithSeatApplicationIds));
+
+            // 3) Só elimina outras modalidades quando a application ficou "called"
+            if (!empty($calledWithSeatApplicationIds)) {
                 ConvocationListApplication::where('convocation_list_id', $listId)
-                    ->where('application_id', $target->application_id)
-                    ->where('id', '<>', $target->id)
+                    ->whereIn('application_id', $calledWithSeatApplicationIds)
+                    // não mexe no registro que já é called (o que “ganhou a vaga”)
+                    // e nem no que já está skipped
+                    ->whereNotIn('convocation_status', ['called', 'skipped'])
                     ->update(['convocation_status' => 'skipped']);
             }
         });

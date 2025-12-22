@@ -17,14 +17,14 @@ class DatabaseSeeder extends Seeder
     {
 
         $this->call([
-            AcademicUnitSeeder::class,
-            AdmissionCategorySeeder::class,
-            BonusOptionSeeder::class,
-            CourseSeeder::class,
+            // AcademicUnitSeeder::class,
+            // AdmissionCategorySeeder::class,
+            // BonusOptionSeeder::class,
+            // CourseSeeder::class,
             // ProcessSelectionSeeder::class,   // novo
-            AdminSeeder::class,
-            // UsersTableSeeder::class,
-            KnowledgeAreaSeeder::class,
+            // AdminSeeder::class,
+            // // UsersTableSeeder::class,
+            // KnowledgeAreaSeeder::class,
         ]);
     }
 }

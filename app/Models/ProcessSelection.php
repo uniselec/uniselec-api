@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+
 class ProcessSelection extends Model
 {
     use HasFactory;
@@ -32,7 +33,7 @@ class ProcessSelection extends Model
     ];
 
     protected $casts = [
-        'courses' => 'array',
+        'courses'             => 'array',
         'admission_categories' => 'array',
         'knowledge_areas' => 'array',
         'bonus_options' => 'array',
@@ -50,7 +51,7 @@ class ProcessSelection extends Model
     {
         return $this->hasMany(Document::class);
     }
-    
+
     public function convocationLists(): HasMany
     {
         return $this->hasMany(ConvocationList::class);
@@ -59,7 +60,7 @@ class ProcessSelection extends Model
     protected function lastApplicationsProcessedAt(): Attribute
     {
         return Attribute::make(
-            get: fn ($value) => $value
+            get: fn($value) => $value
                 ? \Carbon\Carbon::parse($value)->format('d/m/Y H:i')
                 : null
         );
