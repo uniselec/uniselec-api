@@ -720,7 +720,7 @@ staging:deploy:
         git config user.email "${GIT_AUTHOR_EMAIL}"
         git config user.name "${GIT_AUTHOR_NAME}"
         git add kustomization.yaml
-        git commit -m "ci: update ${DEPLOY_ENV} image to latest [skip ci]"
+        git commit -m "ci: update ${DEPLOY_ENV} image to ${IMAGE_TAG}"
 
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Fazendo fetch do remote"
         git fetch https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git ${GIT_BRANCH}
