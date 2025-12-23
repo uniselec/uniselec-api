@@ -328,8 +328,6 @@ build:docker:
       - runner_system_failure
       - script_failure
   timeout: 30m
-  # services:
-  #   - docker:dind
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
@@ -699,7 +697,7 @@ staging:deploy:
     KUSTOMIZE_PATH: kustomize/overlays/staging
     ARGOCD_TIMEOUT: "${ARGOCD_TIMEOUT_STG}"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   before_script:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] GitOps Staging Deploy - ArgoCD"
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Branch ${CI_COMMIT_BRANCH} | Commit ${CI_COMMIT_SHORT_SHA}"
@@ -720,7 +718,7 @@ staging:deploy:
         git config user.email "${GIT_AUTHOR_EMAIL}"
         git config user.name "${GIT_AUTHOR_NAME}"
         git add kustomization.yaml
-        git commit -m "ci: update ${DEPLOY_ENV} image to ${IMAGE_TAG}"
+        git commit -m "ci: update ${DEPLOY_ENV} image to ${IMAGE_TAG} [skip ci]"
 
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Fazendo fetch do remote"
         git fetch https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git ${GIT_BRANCH}
@@ -926,9 +924,14 @@ notification:staging:
     - kubernetes
   retry: 2
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: on_success
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+      when: on_success
+  needs:
+    - job: staging:deploy
   before_script:
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando e-mail staging"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando conclusão de staging"
     - service postfix start
   script:
     - |
@@ -972,17 +975,24 @@ approval:production:
   image: ${BASE_IMAGE}
   tags:
     - kubernetes
-  interruptible: true
+  interruptible: false
   retry:
     max: 1
     when:
       - runner_system_failure
+  timeout: 3h
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
       when: manual
+      allow_failure: false
+  needs:
+    - job: notification:staging
   script:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Production Approval Gate"
     - echo "AGUARDANDO APROVAÇÃO MANUAL PARA PRODUÇÃO"
+  environment:
+    name: production-approval
+    action: prepare
   allow_failure: false
 
 # STAGE 13
@@ -991,7 +1001,7 @@ production:deploy:
   image: ${BASE_IMAGE}
   tags:
     - kubernetes
-  interruptible: true
+  interruptible: false
   retry:
     max: 1
     when:
@@ -1230,10 +1240,12 @@ notify:success:
     - kubernetes
   retry: 2
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG != null'
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
       when: on_success
+  needs:
+    - job: production:deploy
   before_script:
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando e-mail"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando sucesso em production"
     - service postfix start
   script:
     - |
