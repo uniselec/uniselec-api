@@ -33,7 +33,6 @@ RUN apt-get update \
   iputils-ping \
   netcat-openbsd \
   git \
-  openssh-client \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 
