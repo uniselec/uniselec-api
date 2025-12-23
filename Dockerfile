@@ -114,6 +114,10 @@ COPY --from=dev /var/www/html /var/www/html
 
 WORKDIR /var/www/html
 
+RUN git config --global --add safe.directory /var/www/html \
+ && git config --global --add safe.directory /var/www/html/vendor \
+ && git config --global safe.directory '*'
+
 RUN composer install --prefer-dist --no-interaction --no-dev \
   && chown -R www-data:www-data /var/www/html/storage \
   && chmod -R 775 /var/www/html/storage \
