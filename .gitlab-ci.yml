@@ -1230,7 +1230,7 @@ notify:success:
     - kubernetes
   retry: 2
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG != null'
       when: on_success
   before_script:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando e-mail"
