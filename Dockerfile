@@ -32,6 +32,7 @@ RUN apt-get update \
   default-mysql-client \
   iputils-ping \
   netcat-openbsd \
+  git \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 
