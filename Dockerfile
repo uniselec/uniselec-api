@@ -83,7 +83,7 @@ RUN curl -sS https://getcomposer.org/installer -o composer-setup.php \
   && php composer-setup.php --install-dir=/usr/local/bin --filename=composer \
   && composer self-update
 
-RUN composer install --ignore-platform-reqs --no-interaction --no-progress --no-scripts --optimize-autoloader
+RUN composer install --prefer-dist --ignore-platform-reqs --no-interaction --no-progress --no-scripts --optimize-autoloader
 
 RUN cp bash/apache/000-default.conf /etc/apache2/sites-available/000-default.conf && apachectl configtest
 
