@@ -69,7 +69,7 @@ configMapGenerator:
 
 images:
 - name: dti-registro.unilab.edu.br/unilab/uniselec-api
-  newTag: stg-4d611a20
+  newTag: stg-04c63baa
 
 labels:
 - pairs:
