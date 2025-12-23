@@ -492,7 +492,7 @@ development:deploy:
         PUSH_OK=false
         for i in {1..3}; do
           if git rebase FETCH_HEAD; then
-            if git push https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git develop; then
+            if git push https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git develop -o ci.skip; then
               echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Image tag atualizada no Git (tentativa $i)"
               PUSH_OK=true
               break
@@ -727,7 +727,7 @@ staging:deploy:
         PUSH_OK=false
         for i in {1..3}; do
           if git rebase FETCH_HEAD; then
-            if git push https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git ${GIT_BRANCH}; then
+            if git push https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git ${GIT_BRANCH} -o ci.skip; then
               echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Image tag atualizada no Git (tentativa $i)"
               PUSH_OK=true
               break
@@ -1045,7 +1045,7 @@ production:deploy:
         PUSH_OK=false
         for i in {1..3}; do
           if git rebase FETCH_HEAD; then
-            if git push https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git HEAD:${GIT_BRANCH}; then
+            if git push https://${TOKEN_PAT_NAME}:${TOKEN_PAT_ACCESS}@${REPO_DOMAIN}/${REPO_PATH}.git HEAD:${GIT_BRANCH} -o ci.skip; then
               echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Image tag atualizada no Git (tentativa $i)"
               PUSH_OK=true
               break
