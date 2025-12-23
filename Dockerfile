@@ -32,10 +32,7 @@ RUN apt-get update \
   default-mysql-client \
   iputils-ping \
   netcat-openbsd \
-  git \
-  openssh-client \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
 
 COPY . /var/www/html
 
@@ -83,8 +80,7 @@ RUN curl -sS https://getcomposer.org/installer -o composer-setup.php \
   && php composer-setup.php --install-dir=/usr/local/bin --filename=composer \
   && composer self-update
 
-RUN composer install --ignore-platform-reqs --no-interaction --no-progress --no-scripts --optimize-autoloader \
-  || (sleep 2 && composer install --ignore-platform-reqs --no-interaction --no-progress --no-scripts --optimize-autoloader --prefer-source)
+RUN composer install --ignore-platform-reqs --no-interaction --no-progress --no-scripts --optimize-autoloader
 
 RUN cp bash/apache/000-default.conf /etc/apache2/sites-available/000-default.conf && apachectl configtest
 
@@ -114,10 +110,6 @@ RUN cp bash/php/conf.d/opcache.ini /usr/local/etc/php/conf.d/opcache.ini \
 COPY --from=dev /var/www/html /var/www/html
 
 WORKDIR /var/www/html
-
-RUN git config --global --add safe.directory /var/www/html \
- && git config --global --add safe.directory /var/www/html/vendor \
- && git config --global safe.directory '*'
 
 RUN composer install --prefer-dist --no-interaction --no-dev \
   && chown -R www-data:www-data /var/www/html/storage \
