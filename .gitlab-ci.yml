@@ -937,14 +937,15 @@ notification:staging:
     - |
       JOB_URL=$(echo "$CI_JOB_URL" | awk -F'/' '{$NF+=1}1' OFS='/')
       PIPELINE_URL="${CI_PROJECT_URL}/-/pipelines/${CI_PIPELINE_ID}"
-      TAGS_URL="${CI_PROJECT_URL}/-/tags"
+      NEW_TAG_URL="${CI_PROJECT_URL}/-/tags/new?ref=${CI_COMMIT_SHA}"  # ← NOVO: Link direto
+
       if [[ -n "$CI_COMMIT_TAG" ]]; then
         DEPLOY_LINK="🚀 Link para aprovação do deploy: $JOB_URL"
         EMAIL_SUBJECT="Pipeline CI/CD - Production - Aprovação para Produção"
         BRANCH_OR_TAG="Tag: <a href='$CI_PROJECT_URL/-/tags'>$CI_COMMIT_TAG</a>"
         EMAIL_MESSAGE="Olá, Deploy de Staging concluído. Job de CD aguardando aprovação manual para Produção."
       else
-        DEPLOY_LINK="🔗 Acesso as tags do projeto: ${TAGS_URL}"
+        DEPLOY_LINK="🔗 Criar TAG para produção: ${NEW_TAG_URL}"
         EMAIL_SUBJECT="Pipeline CI/CD - Staging - Criar TAG para Produção"
         BRANCH_OR_TAG="Branch: <a href='$REPO_URL'>$CI_COMMIT_REF_NAME</a>"
         EMAIL_MESSAGE="Olá, Deploy de Staging concluído. Para deploy em Produção, criar TAG vX.Y.Z"
