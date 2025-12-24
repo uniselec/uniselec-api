@@ -909,11 +909,9 @@ staging:deploy:
 
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Deploy staging finalizado"
   after_script:
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Limpando recursos temporários"
-    - rm -f ${KUBECONFIG}
-    - rm -f /tmp/argocd-*.yaml
-    - rm -f /tmp/*.log
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Pipeline staging finalizada com status ${CI_JOB_STATUS}"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Limpeza"
+    - rm -f ${KUBECONFIG} /tmp/argocd-*.yaml /tmp/*.log 2>/dev/null || true
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Pipeline finalizada com status ${CI_JOB_STATUS}"
   allow_failure: false
 
 # STAGE 11
