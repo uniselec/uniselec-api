@@ -23,8 +23,8 @@ variables:
   APP_NAME: uniselec-api
   GIT_BRANCH: "main"
   # Repositório Git
-  REPO_URL: "https://dti-gitlab.unilab.edu.br/dti/uniselec-api.git"
-  REPO_DOMAIN: "dti-gitlab.unilab.edu.br"
+  REPO_URL: "https://gitlab.unilab.edu.br/dti/uniselec-api.git"
+  REPO_DOMAIN: "gitlab.unilab.edu.br"
   REPO_PATH: "dti/uniselec-api"
   GIT_AUTHOR_NAME: "GitLab CI"
   GIT_AUTHOR_EMAIL: "gitlab-ci@unilab.edu.br"
