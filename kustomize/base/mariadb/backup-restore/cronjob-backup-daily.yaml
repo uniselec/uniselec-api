@@ -1,0 +1,134 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mariadb-backup-daily
+  labels:
+    app: mariadb
+    component: backup
+  annotations:
+    description: "Backup diário às 02:00"
+spec:
+  schedule: "0 5 * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+            app: mariadb
+            component: backup
+        spec:
+          serviceAccountName: mariadb-backup
+          restartPolicy: Never
+          containers:
+          - name: backup-executor
+            image: alpine/k8s:1.31.3
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              NAMESPACE="${NAMESPACE}"
+              BACKUP_POD="mariadb-1"
+
+              echo "================================================================"
+              echo "BACKUP AUTOMÁTICO - MariaDB Galera"
+              echo "================================================================"
+              echo "Timestamp: $(TZ=America/Fortaleza date '+%Y-%m-%d %H:%M:%S %Z')"
+              echo "Schedule: 05:00 UTC = 02:00 Fortaleza (BRT)"
+              echo "Namespace: ${NAMESPACE}"
+              echo "Pod: ${BACKUP_POD}"
+              echo ""
+
+              # Verificar pod está Ready
+              echo "[1/3] Verificando pod ${BACKUP_POD}..."
+              kubectl wait --for=condition=ready pod/${BACKUP_POD} -n ${NAMESPACE} --timeout=300s || {
+                echo "Pod não está Ready"
+                exit 1
+              }
+              echo "Pod está Ready"
+
+              # Verificar script existe (montado do ConfigMap)
+              echo ""
+              echo "[2/3] Verificando script do ConfigMap..."
+              if ! kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- test -f /scripts/backup-galera-automated.sh; then
+                echo "Script /scripts/backup-galera-automated.sh não encontrado!"
+                echo ""
+                echo "Scripts disponíveis:"
+                kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- ls -lh /scripts/ || true
+                exit 1
+              fi
+              echo "Script encontrado: /scripts/backup-galera-automated.sh"
+
+              # ============================================================
+              # EXECUTAR SCRIPT DO CONFIGMAP (backup-galera-automated.sh)
+              # Este script já contém TODA a lógica do backup manual!
+              # ============================================================
+              echo ""
+              echo "[3/3] Executando /scripts/backup-galera-automated.sh..."
+              echo "================================================================"
+              echo ""
+
+              kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- \
+                /bin/bash /scripts/backup-galera-automated.sh
+
+              EXIT_CODE=$?
+
+              echo ""
+              echo "================================================================"
+
+              if [ $EXIT_CODE -eq 0 ]; then
+                echo "BACKUP COMPLETADO"
+                echo "================================================================"
+                echo ""
+
+                # Mostrar último backup criado
+                echo "Último backup:"
+                kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- \
+                  bash -c 'ls -lhtd /backup/auto-* 2>/dev/null | head -1' || echo "Nenhum backup encontrado"
+
+                echo ""
+                echo "Status:"
+                kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- \
+                  cat /backup/last_backup_status 2>/dev/null || echo "N/A"
+
+                echo ""
+                echo "Espaço em /backup:"
+                kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- \
+                  df -h /backup | tail -1
+
+                echo ""
+                echo "Listar todos os backups:"
+                echo "  kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- /scripts/list-backups.sh"
+
+                exit 0
+              else
+                echo "BACKUP FALHOU (exit code: $EXIT_CODE)"
+                echo "================================================================"
+                echo ""
+
+                # Mostrar log de erro
+                echo "Log de erro:"
+                kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- \
+                  tail -30 /backup/backup.log 2>/dev/null || echo "Log não disponível"
+
+                exit 1
+              fi
+            env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi

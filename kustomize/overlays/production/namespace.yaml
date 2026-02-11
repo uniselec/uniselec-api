@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: uniselec-api
+  labels:
+    name: uniselec-api
+    app: uniselec-api
+    environment: production
+    managed-by: kustomize
+    project: uniselec

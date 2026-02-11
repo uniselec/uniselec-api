@@ -1,0 +1,161 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: ${APP_NAME}-${DEPLOY_ENV}-as
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: ${APP_NAME}
+    app.kubernetes.io/instance: ${APP_NAME}-${DEPLOY_ENV}
+    app.kubernetes.io/component: argocd-applicationset
+    app.kubernetes.io/part-of: ${APP_NAME}
+    app.kubernetes.io/managed-by: argocd
+    environment: ${DEPLOY_ENV}
+    app: ${APP_NAME}-${DEPLOY_ENV}
+spec:
+  generators:
+    - list:
+        elements:
+          - name: ${APP_NAME}-${DEPLOY_ENV}
+            repoURL: ${REPO_URL}
+            path: ${KUSTOMIZE_PATH}
+            cluster: https://${CLUSTER_REMOTE1_DOMAIN}:6443
+            namespace: ${APP_NAMESPACE}
+  template:
+    metadata:
+      name: '{{name}}'
+      labels:
+        app.kubernetes.io/name: ${APP_NAME}
+        app.kubernetes.io/instance: ${APP_NAME}-${DEPLOY_ENV}
+        app.kubernetes.io/managed-by: argocd
+        environment: ${DEPLOY_ENV}
+        app: ${APP_NAME}
+      annotations:
+        argocd.argoproj.io/sync-wave: "0"
+        notifications.argoproj.io/subscribe.on-sync-succeeded.slack: gitops-deployments
+    spec:
+      project: ${APP_NAME}-${DEPLOY_ENV}-ap
+      source:
+        repoURL: '{{repoURL}}'
+        targetRevision: ${GIT_BRANCH}
+        path: '{{path}}'
+      destination:
+        server: '{{cluster}}'
+        namespace: '{{namespace}}'
+      ignoreDifferences:
+
+        - group: autoscaling
+          kind: HorizontalPodAutoscaler
+          jsonPointers:
+            - /status
+            - /spec/behavior
+            - /metadata/annotations/autoscaling.alpha.kubernetes.io~1current-metrics
+            - /metadata/annotations/autoscaling.alpha.kubernetes.io~1metrics
+
+        - group: apps
+          kind: StatefulSet
+          jsonPointers:
+            - /status
+            - /spec/replicas
+            - /spec/volumeClaimTemplates
+          managedFieldsManagers:
+            - kube-controller-manager
+
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+            - /status
+            - /metadata/annotations/deployment.kubernetes.io~1revision
+
+        - group: ""
+          kind: PersistentVolumeClaim
+          jsonPointers:
+            - /status
+            - /spec/volumeName
+            - /metadata/annotations/pv.kubernetes.io~1bind-completed
+            - /metadata/annotations/pv.kubernetes.io~1bound-by-controller
+            - /metadata/annotations/volume.beta.kubernetes.io~1storage-provisioner
+            - /metadata/annotations/volume.kubernetes.io~1storage-provisioner
+          jqPathExpressions:
+            - .metadata.ownerReferences[]?.controller
+
+        - group: ""
+          kind: Service
+          jsonPointers:
+            - /spec/clusterIP
+            - /spec/clusterIPs
+            - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+
+        - group: ""
+          kind: ConfigMap
+          jsonPointers:
+            - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+
+        - group: batch
+          kind: Job
+          jsonPointers:
+            - /status
+            - /spec/selector
+            - /spec/template/metadata/labels/controller-uid
+            - /spec/template/metadata/labels/job-name
+            - /spec/template/metadata/labels/batch.kubernetes.io~1controller-uid
+            - /spec/template/metadata/labels/batch.kubernetes.io~1job-name
+          jqPathExpressions:
+            - .spec.template.metadata.labels
+            - .status.conditions
+
+        - group: batch
+          kind: CronJob
+          jsonPointers:
+            - /status
+            - /spec/jobTemplate/spec/selector
+            - /spec/jobTemplate/spec/template/metadata/labels/controller-uid
+            - /spec/jobTemplate/spec/template/metadata/labels/job-name
+            - /spec/jobTemplate/spec/template/metadata/labels/batch.kubernetes.io~1controller-uid
+            - /spec/jobTemplate/spec/template/metadata/labels/batch.kubernetes.io~1job-name
+          jqPathExpressions:
+            - .spec.jobTemplate.spec.template.metadata.labels
+            - .status.conditions
+            - .status.lastScheduleTime
+            - .status.lastSuccessfulTime
+
+        - group: networking.k8s.io
+          kind: Ingress
+          jsonPointers:
+            - /status
+
+        - group: policy
+          kind: PodDisruptionBudget
+          jsonPointers:
+            - /status
+            - /status/currentHealthy
+            - /status/desiredHealthy
+            - /status/disruptionsAllowed
+            - /status/expectedPods
+
+        - group: ""
+          kind: ServiceAccount
+          jqPathExpressions:
+            - .secrets
+
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+          - ApplyOutOfSyncOnly=false
+          - Validate=true
+          - SkipDryRunOnMissingResource=true
+          - RespectIgnoreDifferences=true
+          - ServerSideApply=true
+          - Replace=false
+          - FailOnSharedResource=false
+        retry:
+          limit: 20
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 10m
+      revisionHistoryLimit: 10

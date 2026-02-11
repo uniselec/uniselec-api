@@ -1,0 +1,1051 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mariadb-backup-scripts
+  labels:
+    app: mariadb
+    component: backup
+data:
+  backup-galera-automated.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    log() {
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a /backup/backup.log
+    }
+
+    error() {
+      echo "[ERROR][$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a /backup/backup.log
+      exit 1
+    }
+
+    # VALIDAÇÃO: Este script DEVE rodar no mariadb-1
+    HOSTNAME=$(hostname)
+    EXPECTED_POD="mariadb-1"
+
+    if [ "$HOSTNAME" != "$EXPECTED_POD" ]; then
+      log "Skip: Este script deve ser executado no pod $EXPECTED_POD"
+      log "Pod atual: $HOSTNAME"
+      exit 0
+    fi
+
+    # INICIAR BACKUP
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    BACKUP_DIR="/backup/auto-${TIMESTAMP}"
+
+    mkdir -p "$BACKUP_DIR"
+
+    log "=== BACKUP AUTOMÁTICO GALERA ==="
+    log "Pod: $HOSTNAME"
+    log "Dir: $BACKUP_DIR"
+    log "Timestamp: $TIMESTAMP"
+
+    # Verificar MariaDB está respondendo
+    if ! mariadb-admin ping -u root --password="$MYSQL_ROOT_PASSWORD" --silent 2>/dev/null; then
+      error "MariaDB não responde"
+    fi
+
+    log "MariaDB OK"
+
+    # BACKUP FÍSICO - MÉTODO VALIDADO (backup-galera-production.sh)
+    log "Executando mariadb-backup (streaming)..."
+
+    mariadb-backup \
+      --backup \
+      --user=root \
+      --password="$MYSQL_ROOT_PASSWORD" \
+      --target-dir="$BACKUP_DIR" \
+      --stream=mbstream \
+      --parallel=2 > "$BACKUP_DIR/backup.mbstream"
+
+    if [ $? -ne 0 ]; then
+      error "mariadb-backup --backup falhou"
+    fi
+
+    log "Backup stream completo"
+
+    # Checksum (compatível com script manual)
+    md5sum "$BACKUP_DIR/backup.mbstream" > "$BACKUP_DIR/backup.mbstream.md5"
+    ls -lh "$BACKUP_DIR/backup.mbstream" | awk '{print $5}' > "$BACKUP_DIR/backup.size"
+
+    log "Checksum calculado"
+
+    # PREPARAÇÃO DO BACKUP
+    log "Preparando backup..."
+
+    cd "$BACKUP_DIR"
+
+    if ! mbstream -x < backup.mbstream 2>&1; then
+      error "mbstream -x falhou"
+    fi
+
+    log "Backup extraído"
+
+    if ! mariadb-backup \
+      --prepare \
+      --target-dir="$BACKUP_DIR" 2>&1; then
+      error "mariadb-backup --prepare falhou"
+    fi
+
+    log "Backup preparado"
+
+    # Validar xtrabackup_checkpoints
+    if [ ! -f "$BACKUP_DIR/xtrabackup_checkpoints" ]; then
+      error "xtrabackup_checkpoints não encontrado"
+    fi
+
+    # METADADOS DO CLUSTER
+    cat > "$BACKUP_DIR/cluster-info.txt" <<CLUSTERINFO
+    Backup Type: AUTOMATED (CronJob)
+    Timestamp: $TIMESTAMP
+    Pod: $HOSTNAME
+    Namespace: ${POD_NAMESPACE:-uniselec-api-dev}
+    Created: $(date)
+
+    === CLUSTER STATUS ===
+    CLUSTERINFO
+
+    mariadb -uroot --password="$MYSQL_ROOT_PASSWORD" -e "
+      SELECT NOW() as backup_time;
+      SHOW STATUS LIKE 'wsrep_cluster_size';
+      SHOW STATUS LIKE 'wsrep_local_state_comment';
+    " >> "$BACKUP_DIR/cluster-info.txt" 2>/dev/null || true
+
+    log "Metadados salvos"
+
+    # VALIDAÇÃO
+    log "Validando backup..."
+
+    # Checksum
+    cd "$BACKUP_DIR"
+    if ! md5sum -c backup.mbstream.md5 2>/dev/null; then
+      error "Checksum inválido"
+    fi
+
+    # Arquivos obrigatórios
+    required_files=(
+      'xtrabackup_checkpoints'
+      'xtrabackup_info'
+      'ibdata1'
+    )
+
+    for file in "${required_files[@]}"; do
+      if [ ! -f "$file" ]; then
+        error "Arquivo obrigatório faltando: $file"
+      fi
+    done
+
+    log "Backup validado"
+
+    # LIMPEZA DE BACKUPS ANTIGOS
+    log "Limpando backups > 7 dias..."
+    find /backup -maxdepth 1 -name "auto-*" -type d -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
+    find /backup -maxdepth 1 -name "manual-*" -type d -mtime +7 -exec rm -rf {} \; 2>/dev/null || true
+    find /backup -name "backup-*.log" -mtime +7 -delete 2>/dev/null || true
+
+    log "Limpeza concluída"
+
+    # RELATÓRIO FINAL
+    BACKUP_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1 || echo "Unknown")
+
+    log "=== BACKUP COMPLETO ==="
+    log "ID: $TIMESTAMP"
+    log "Tamanho: $BACKUP_SIZE"
+    log "Local: $BACKUP_DIR"
+
+    # Salvar status para monitoramento
+    echo "SUCCESS:$TIMESTAMP:automated:$BACKUP_SIZE" > "/backup/last_backup_status"
+
+    log "Backup finalizado com sucesso"
+
+  list-backups.sh: |
+    #!/bin/bash
+
+    echo "=== BACKUPS DISPONÍVEIS ==="
+    echo ""
+    echo "Formato: TIMESTAMP | TAMANHO | TIPO | STATUS"
+    echo "-----------------------------------------------------"
+
+    # Coletar dados em arquivo temporário
+    tmpfile=$(mktemp)
+    trap "rm -f $tmpfile" EXIT
+
+    # Processar backups automáticos
+    for backup_dir in /backup/auto-*; do
+      if [ -d "$backup_dir" ]; then
+        basename_dir=$(basename "$backup_dir")
+        timestamp="${basename_dir#auto-}"
+
+        # Obter tamanho
+        size=$(du -sh "$backup_dir" 2>/dev/null | awk '{print $1}')
+
+        # Verificar integridade
+        if [ -f "$backup_dir/xtrabackup_checkpoints" ] && \
+          [ -f "$backup_dir/ibdata1" ] && \
+          [ -f "$backup_dir/backup.mbstream.md5" ]; then
+          status="✓ PRONTO"
+        else
+          status="✗ INCOMPLETO"
+        fi
+
+        echo "$timestamp|$size|AUTO|$status" >> "$tmpfile"
+      fi
+    done
+
+    # Processar backups manuais
+    for backup_dir in /backup/manual-*; do
+      if [ -d "$backup_dir" ]; then
+        basename_dir=$(basename "$backup_dir")
+        timestamp="${basename_dir#manual-}"
+
+        # Obter tamanho
+        size=$(du -sh "$backup_dir" 2>/dev/null | awk '{print $1}')
+
+        # Verificar integridade
+        if [ -f "$backup_dir/xtrabackup_checkpoints" ] && \
+          [ -f "$backup_dir/ibdata1" ] && \
+          [ -f "$backup_dir/backup.mbstream.md5" ]; then
+          status="✓ PRONTO"
+        else
+          status="✗ INCOMPLETO"
+        fi
+
+        echo "$timestamp|$size|MANUAL|$status" >> "$tmpfile"
+      fi
+    done
+
+    # Ordenar e imprimir
+    if [ -s "$tmpfile" ]; then
+      sort -r "$tmpfile" | while IFS='|' read -r timestamp size tipo status; do
+        printf "%-17s | %-8s | %-6s | %s\n" "$timestamp" "$size" "$tipo" "$status"
+      done
+    else
+      echo "(Nenhum backup encontrado)"
+    fi
+
+    # Contar backups
+    total=$(wc -l < "$tmpfile" 2>/dev/null || echo 0)
+    echo ""
+    echo "Total de backups: $total"
+
+    # Status do último backup
+    if [ -f "/backup/last_backup_status" ]; then
+      echo ""
+      echo "Último backup: $(cat /backup/last_backup_status)"
+    fi
+
+    # Status do último restore
+    if [ -f "/backup/last_restore_status" ]; then
+      echo "Último restore: $(cat /backup/last_restore_status)"
+    fi
+
+    echo ""
+    echo "Comandos úteis:"
+    echo "  Verificar backup:  /scripts/verify-backup.sh <timestamp>"
+    echo "  Executar restore:  /scripts/execute-restore-safe.sh <timestamp>"
+    echo ""
+    echo "Exemplo:"
+    echo "  /scripts/verify-backup.sh 20251210-020000"
+
+  verify-backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    if [ -z "${1:-}" ]; then
+      echo "Uso: $0 <timestamp>"
+      echo ""
+      echo "Exemplo: $0 20251210-020000"
+      echo ""
+      echo "Para listar backups disponíveis:"
+      echo "  /scripts/list-backups.sh"
+      exit 1
+    fi
+
+    TIMESTAMP="$1"
+
+    # Procurar backup (auto ou manual)
+    BACKUP_DIR=""
+    TIPO=""
+
+    if [ -d "/backup/auto-${TIMESTAMP}" ]; then
+      BACKUP_DIR="/backup/auto-${TIMESTAMP}"
+      TIPO="AUTOMÁTICO"
+    elif [ -d "/backup/manual-${TIMESTAMP}" ]; then
+      BACKUP_DIR="/backup/manual-${TIMESTAMP}"
+      TIPO="MANUAL"
+    else
+      echo "Backup não encontrado: $TIMESTAMP"
+      echo ""
+      echo "Backups disponíveis:"
+      /scripts/list-backups.sh
+      exit 1
+    fi
+
+    echo "Verificando backup: $TIMESTAMP"
+    echo "Tipo: $TIPO"
+    echo "Local: $BACKUP_DIR"
+    echo "========================="
+
+    # Inicializar contador de erros
+    errors=0
+
+    # Verificar checksum
+    echo -n "Checksum MD5: "
+    if [ -f "$BACKUP_DIR/backup.mbstream.md5" ]; then
+      cd "$BACKUP_DIR"
+      if md5sum -c backup.mbstream.md5 &>/dev/null; then
+        echo "✓ OK"
+      else
+        echo "✗ FALHOU"
+        errors=$((errors + 1))
+      fi
+    else
+      echo "✗ NÃO ENCONTRADO"
+      errors=$((errors + 1))
+    fi
+
+    # Verificar xtrabackup_checkpoints
+    echo -n "xtrabackup_checkpoints: "
+    if [ -f "$BACKUP_DIR/xtrabackup_checkpoints" ]; then
+      echo "✓ OK"
+      backup_type=$(grep backup_type "$BACKUP_DIR/xtrabackup_checkpoints" 2>/dev/null || echo "unknown")
+      to_lsn=$(grep to_lsn "$BACKUP_DIR/xtrabackup_checkpoints" 2>/dev/null || echo "unknown")
+      echo "  $backup_type"
+      echo "  $to_lsn"
+    else
+      echo "✗ NÃO ENCONTRADO"
+      errors=$((errors + 1))
+    fi
+
+    # Verificar arquivos críticos
+    echo -n "Arquivos críticos: "
+    required_files=('xtrabackup_info' 'ibdata1')
+    missing_files=()
+
+    for file in "${required_files[@]}"; do
+      if [ ! -f "$BACKUP_DIR/$file" ]; then
+        missing_files+=("$file")
+        errors=$((errors + 1))
+      fi
+    done
+
+    if [ ${#missing_files[@]} -eq 0 ]; then
+      echo "✓ OK"
+    else
+      echo "✗ FALTANDO: ${missing_files[*]}"
+    fi
+
+    # Verificar tamanho do backup
+    echo -n "Tamanho: "
+    backup_size=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1 || echo "Unknown")
+    echo "$backup_size"
+
+    # Verificar cluster-info
+    if [ -f "$BACKUP_DIR/cluster-info.txt" ]; then
+      echo ""
+      echo "=== INFORMAÇÕES DO CLUSTER ==="
+      head -20 "$BACKUP_DIR/cluster-info.txt"
+    fi
+
+    echo ""
+    echo "========================="
+
+    # Status final
+    if [ $errors -eq 0 ]; then
+      echo "Status: ✓ PRONTO PARA RESTORE"
+      echo ""
+      echo "Comando de restore:"
+      echo "  /scripts/execute-restore-safe.sh $TIMESTAMP"
+      exit 0
+    else
+      echo "Status: ✗ BACKUP INCOMPLETO ($errors erros)"
+      exit 1
+    fi
+
+  manual-backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    echo "================================================================"
+    echo "BACKUP MANUAL - MariaDB Galera"
+    echo "================================================================"
+    echo ""
+
+    # Verificar se está rodando no mariadb-1 (recomendado)
+    HOSTNAME=$(hostname)
+    if [ "$HOSTNAME" != "mariadb-1" ]; then
+      echo "AVISO: Este script deve ser executado no mariadb-1 (nó secundário)"
+      echo "Pod atual: $HOSTNAME"
+      echo ""
+      read -p "Deseja continuar mesmo assim? (yes/no): " -r
+      if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+        echo "Backup cancelado"
+        exit 0
+      fi
+    fi
+
+    # Gerar timestamp
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    BACKUP_DIR="/backup/manual-${TIMESTAMP}"
+
+    echo "Timestamp: $TIMESTAMP"
+    echo "Backup Dir: $BACKUP_DIR"
+    echo "Pod: $HOSTNAME"
+    echo ""
+
+    # Verificar espaço disponível
+    AVAILABLE_SPACE=$(df -BG /backup | tail -1 | awk '{print $4}' | sed 's/G//')
+    echo "Espaço disponível: ${AVAILABLE_SPACE}G"
+
+    if [ "$AVAILABLE_SPACE" -lt 50 ]; then
+      echo "ERRO: Espaço insuficiente (mínimo: 50G)"
+      echo "Limpe backups antigos com: rm -rf /backup/manual-* /backup/auto-*"
+      exit 1
+    fi
+
+    # Verificar MariaDB está respondendo
+    if ! mariadb-admin ping -u root --password="$MYSQL_ROOT_PASSWORD" --silent 2>/dev/null; then
+      echo "ERRO: MariaDB não responde"
+      exit 1
+    fi
+
+    echo "MariaDB: OK"
+    echo ""
+
+    # Mostrar status do cluster
+    echo "Status do Cluster:"
+    mariadb -uroot --password="$MYSQL_ROOT_PASSWORD" -N -e "
+      SELECT
+        VARIABLE_NAME,
+        VARIABLE_VALUE
+      FROM information_schema.GLOBAL_STATUS
+      WHERE VARIABLE_NAME IN (
+        'wsrep_local_state_comment',
+        'wsrep_cluster_size',
+        'wsrep_cluster_status'
+      )
+    " 2>/dev/null
+
+    echo ""
+    read -p "Iniciar backup? (yes/no): " -r
+    if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+      echo "Backup cancelado"
+      exit 0
+    fi
+
+    echo ""
+    echo "================================================================"
+    echo "EXECUTANDO BACKUP"
+    echo "================================================================"
+
+    # Criar diretório
+    mkdir -p "$BACKUP_DIR"
+
+    # Salvar metadados
+    cat > "$BACKUP_DIR/cluster-info.txt" <<CLUSTERINFO
+    Backup Type: MANUAL (Interactive)
+    Timestamp: $TIMESTAMP
+    Pod: $HOSTNAME
+    Namespace: ${POD_NAMESPACE:-uniselec-api-dev}
+    Created: $(date)
+
+    === CLUSTER STATUS ===
+    CLUSTERINFO
+
+    mariadb -uroot --password="$MYSQL_ROOT_PASSWORD" -e "
+      SELECT NOW() as backup_time;
+      SHOW STATUS LIKE 'wsrep_cluster_size';
+      SHOW STATUS LIKE 'wsrep_local_state_comment';
+    " >> "$BACKUP_DIR/cluster-info.txt" 2>/dev/null || true
+
+    echo "[1/4] Executando mariadb-backup..."
+
+    mariadb-backup \
+      --backup \
+      --user=root \
+      --password="$MYSQL_ROOT_PASSWORD" \
+      --target-dir="$BACKUP_DIR" \
+      --stream=mbstream \
+      --parallel=2 > "$BACKUP_DIR/backup.mbstream"
+
+    if [ $? -ne 0 ]; then
+      echo "ERRO: Backup falhou!"
+      exit 1
+    fi
+
+    echo "✓ Backup stream completo"
+
+    # Checksum
+    md5sum "$BACKUP_DIR/backup.mbstream" > "$BACKUP_DIR/backup.mbstream.md5"
+    ls -lh "$BACKUP_DIR/backup.mbstream" | awk '{print $5}' > "$BACKUP_DIR/backup.size"
+
+    echo "[2/4] Extraindo backup..."
+    cd "$BACKUP_DIR"
+    if ! mbstream -x < backup.mbstream 2>&1; then
+      echo "ERRO: Extração falhou!"
+      exit 1
+    fi
+
+    echo "✓ Backup extraído"
+
+    echo "[3/4] Preparando backup..."
+    if ! mariadb-backup \
+      --prepare \
+      --target-dir="$BACKUP_DIR" 2>&1; then
+      echo "ERRO: Preparação falhou!"
+      exit 1
+    fi
+
+    echo "✓ Backup preparado"
+
+    echo "[4/4] Validando backup..."
+
+    # Validar checksum
+    cd "$BACKUP_DIR"
+    if ! md5sum -c backup.mbstream.md5 2>/dev/null; then
+      echo "ERRO: Checksum inválido!"
+      exit 1
+    fi
+
+    # Validar arquivos obrigatórios
+    required_files=(
+      'xtrabackup_checkpoints'
+      'xtrabackup_info'
+      'ibdata1'
+    )
+
+    for file in "${required_files[@]}"; do
+      if [ ! -f "$file" ]; then
+        echo "ERRO: Arquivo obrigatório faltando: $file"
+        exit 1
+      fi
+    done
+
+    echo "✓ Backup validado"
+
+    # Relatório final
+    BACKUP_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1 || echo "Unknown")
+
+    echo ""
+    echo "================================================================"
+    echo "BACKUP COMPLETO"
+    echo "================================================================"
+    echo ""
+    echo "ID: $TIMESTAMP"
+    echo "Tamanho: $BACKUP_SIZE"
+    echo "Local: $BACKUP_DIR"
+    echo ""
+    echo "Para verificar: /scripts/verify-backup.sh $TIMESTAMP"
+    echo "Para restaurar: /scripts/execute-restore-safe.sh $TIMESTAMP"
+    echo ""
+
+    # Salvar status
+    echo "SUCCESS:$TIMESTAMP:manual:$BACKUP_SIZE" > "/backup/last_backup_status"
+
+  execute-restore-safe.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    # ============================================================
+    # RESTORE AUTOMÁTICO COM SST GRADUAL
+    # ============================================================
+    # Este script automatiza TODO o processo de restore:
+    # 1. Restaura dados no mariadb-0 via Job
+    # 2. Reinicia cluster gradualmente (SST automático)
+    # 3. Valida sincronização do cluster
+    # ============================================================
+
+    if [ -z "${1:-}" ]; then
+      echo "Uso: $0 <timestamp>"
+      echo ""
+      echo "Para listar backups disponíveis:"
+      echo "  /scripts/list-backups.sh"
+      echo ""
+      echo "Exemplo:"
+      echo "  /scripts/execute-restore-safe.sh 20251211-140048"
+      exit 1
+    fi
+
+    TIMESTAMP="$1"
+    NAMESPACE="${POD_NAMESPACE:-uniselec-api-dev}"
+    MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-}"
+
+    # Cores
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m'
+
+    log_info() {
+      echo -e "${BLUE}[$(date '+%H:%M:%S')]${NC} $1"
+    }
+
+    log_success() {
+      echo -e "${GREEN}[$(date '+%H:%M:%S')]${NC} ✓ $1"
+    }
+
+    log_warning() {
+      echo -e "${YELLOW}[$(date '+%H:%M:%S')]${NC} ⚠ $1"
+    }
+
+    log_error() {
+      echo -e "${RED}[$(date '+%H:%M:%S')]${NC} ✗ $1"
+    }
+
+    # ============================================================
+    # VALIDAR BACKUP
+    # ============================================================
+
+    log_info "Procurando backup: $TIMESTAMP"
+    log_info "Namespace: $NAMESPACE"
+
+    BACKUP_DIR=""
+    TIPO=""
+
+    # Procurar backup LOCALMENTE no volume montado
+    if [ -d "/backup/auto-${TIMESTAMP}" ]; then
+      BACKUP_DIR="/backup/auto-${TIMESTAMP}"
+      TIPO="AUTOMÁTICO"
+    elif [ -d "/backup/manual-${TIMESTAMP}" ]; then
+      BACKUP_DIR="/backup/manual-${TIMESTAMP}"
+      TIPO="MANUAL"
+    else
+      log_error "Backup não encontrado: $TIMESTAMP"
+      echo ""
+      log_info "Para listar backups disponíveis:"
+      echo "  /scripts/list-backups.sh"
+      echo ""
+      log_info "Backups locais em /backup:"
+      ls -lah /backup/ | grep -E "(auto-|manual-)" || echo "  (nenhum backup encontrado)"
+      exit 1
+    fi
+
+    log_success "Backup encontrado: $BACKUP_DIR ($TIPO)"
+
+    # Validar integridade LOCALMENTE
+    log_info "Validando integridade do backup..."
+    if [ ! -f "$BACKUP_DIR/xtrabackup_checkpoints" ] || [ ! -f "$BACKUP_DIR/ibdata1" ]; then
+      log_error "Backup inválido ou incompleto!"
+      log_error "  xtrabackup_checkpoints: $([ -f "$BACKUP_DIR/xtrabackup_checkpoints" ] && echo 'OK' || echo 'MISSING')"
+      log_error "  ibdata1: $([ -f "$BACKUP_DIR/ibdata1" ] && echo 'OK' || echo 'MISSING')"
+      exit 1
+    fi
+
+    log_success "Backup validado!"
+
+    # Exibir informações do backup
+    if [ -f "$BACKUP_DIR/cluster-info.txt" ]; then
+      echo ""
+      echo "================================================================"
+      log_info "INFORMAÇÕES DO BACKUP"
+      echo "================================================================"
+      head -10 "$BACKUP_DIR/cluster-info.txt"
+    fi
+
+    # ============================================================
+    # AVISO E CONFIRMAÇÃO
+    # ============================================================
+
+    echo ""
+    echo "================================================================"
+    log_warning "AVISO CRÍTICO DE DOWNTIME"
+    echo "================================================================"
+    echo ""
+    echo " DOWNTIME TOTAL: 20-40 minutos estimados"
+    echo " CLUSTER MARIADB SERÁ REINICIADO (3 nós)"
+    echo " DADOS ATUAIS SERÃO SOBRESCRITOS"
+    echo ""
+    echo " Namespace: $NAMESPACE"
+    echo " Backup: $TIMESTAMP ($TIPO)"
+    echo " Local: $BACKUP_DIR"
+    echo ""
+    log_warning "PROCESSO AUTOMÁTICO (8 FASES):"
+    echo " 1. Parar cluster MariaDB (3 nós)"
+    echo " 2. Restaurar dados via Job no mariadb-0"
+    echo " 3. Configurar bootstrap Galera"
+    echo " 4. Iniciar mariadb-0 (bootstrap)"
+    echo " 5. Aguardar mariadb-0 sincronizar"
+    echo " 6. Iniciar mariadb-1 (SST automático ~5-15 min)"
+    echo " 7. Iniciar mariadb-2 (SST automático ~5-15 min)"
+    echo " 8. Validar cluster completo"
+    echo ""
+
+    read -p "Você tem CERTEZA ABSOLUTA? Digite 'RESTORE' para continuar: " -r
+    if [[ $REPLY != "RESTORE" ]]; then
+      log_info "Restore cancelado pelo usuário"
+      exit 0
+    fi
+
+    # ============================================================
+    # FUNÇÃO: Aguardar Pod Estar Synced
+    # ============================================================
+
+    wait_for_sync() {
+      local pod="$1"
+      local max_wait="${2:-600}"
+      local elapsed=0
+
+      log_info "Aguardando $pod sincronizar (timeout: ${max_wait}s)..."
+
+      while [ $elapsed -lt $max_wait ]; do
+        local state=$(kubectl exec -n "$NAMESPACE" "$pod" -- \
+          mariadb -uroot -p"${MYSQL_ROOT_PASSWORD}" -N -e \
+          "SHOW STATUS LIKE 'wsrep_local_state_comment'" 2>/dev/null | awk '{print $2}' || echo "Unknown")
+
+        local ready=$(kubectl exec -n "$NAMESPACE" "$pod" -- \
+          mariadb -uroot -p"${MYSQL_ROOT_PASSWORD}" -N -e \
+          "SHOW STATUS LIKE 'wsrep_ready'" 2>/dev/null | awk '{print $2}' || echo "OFF")
+
+        if [ "$state" = "Synced" ] && [ "$ready" = "ON" ]; then
+          log_success "$pod está Synced! (${elapsed}s)"
+          return 0
+        fi
+
+        echo -n "."
+        sleep 10
+        elapsed=$((elapsed + 10))
+      done
+
+      echo ""
+      log_error "$pod NÃO sincronizou após ${max_wait}s"
+      return 1
+    }
+
+    # ============================================================
+    # FASE 1: PARAR CLUSTER MARIADB
+    # ============================================================
+
+    echo ""
+    echo "================================================================"
+    log_info "FASE 1/8: PARANDO CLUSTER MARIADB"
+    echo "================================================================"
+
+    log_info "Escalando StatefulSet mariadb para 0 réplicas..."
+    kubectl scale statefulset mariadb -n "$NAMESPACE" --replicas=0
+
+    log_info "Aguardando pods do MariaDB terminarem..."
+    kubectl wait --for=delete pod/mariadb-0 -n "$NAMESPACE" --timeout=300s 2>/dev/null || true
+    kubectl wait --for=delete pod/mariadb-1 -n "$NAMESPACE" --timeout=300s 2>/dev/null || true
+    kubectl wait --for=delete pod/mariadb-2 -n "$NAMESPACE" --timeout=300s 2>/dev/null || true
+
+    # Forçar delete se necessário
+    for pod in mariadb-0 mariadb-1 mariadb-2; do
+      if kubectl get pod "$pod" -n "$NAMESPACE" &>/dev/null; then
+        log_warning "$pod ainda existe, forçando delete..."
+        kubectl delete pod "$pod" -n "$NAMESPACE" --force --grace-period=0 || true
+      fi
+    done
+
+    sleep 10
+    log_success "Cluster MariaDB parado"
+
+    # ============================================================
+    # FASE 2: CRIAR BACKUP DE SEGURANÇA
+    # ============================================================
+
+    echo ""
+    echo "================================================================"
+    log_info "FASE 2/8: BACKUP DE SEGURANÇA"
+    echo "================================================================"
+
+    SAFETY_BACKUP_DIR="/backup/pre-restore-safety-$(date +%Y%m%d-%H%M%S)"
+    log_info "Criando backup de segurança: $SAFETY_BACKUP_DIR"
+
+    mkdir -p "$SAFETY_BACKUP_DIR"
+    cat > "$SAFETY_BACKUP_DIR/info.txt" <<EOF
+    Backup de segurança criado em: $(date)
+    Namespace: $NAMESPACE
+    Restore de: $BACKUP_DIR
+    Timestamp do backup: $TIMESTAMP
+    Tipo: $TIPO
+    EOF
+
+    log_success "Backup de segurança criado"
+
+    # ============================================================
+    # FASE 3: EXECUTAR RESTORE VIA JOB
+    # ============================================================
+
+    echo ""
+    echo "================================================================"
+    log_info "FASE 3/8: EXECUTANDO RESTORE VIA JOB"
+    echo "================================================================"
+
+    JOB_NAME="mariadb-restore-$(date +%s)"
+    log_info "Criando Job: $JOB_NAME (namespace: $NAMESPACE)"
+
+    cat <<EOF | kubectl apply -f -
+    apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: $JOB_NAME
+      namespace: $NAMESPACE
+      labels:
+        app: mariadb
+        component: restore
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app: mariadb
+            component: restore
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: restore-executor
+            image: mariadb:10.11.15-jammy
+            command: ["/bin/bash", "-c"]
+            args:
+            - |
+              set -euo pipefail
+
+              echo "[1/5] Validando backup: $BACKUP_DIR"
+              [ ! -d "$BACKUP_DIR" ] && echo "Backup não encontrado" && exit 1
+              [ ! -f "$BACKUP_DIR/xtrabackup_checkpoints" ] && echo "xtrabackup_checkpoints não encontrado" && exit 1
+              echo "✓ Backup validado"
+
+              echo "[2/5] Limpando datadir..."
+              find /data -mindepth 1 -delete
+              echo "✓ Datadir limpo"
+
+              echo "[3/5] Executando mariadb-backup --copy-back..."
+              if ! mariadb-backup --copy-back --target-dir="$BACKUP_DIR" --datadir=/data 2>&1 | tail -20; then
+                echo "✗ mariadb-backup falhou!"
+                exit 1
+              fi
+              echo "✓ Restore completado"
+
+              echo "Removendo arquivos de backup do datadir..."
+              rm -f /data/backup.mbstream.md5
+              rm -f /data/backup.size
+              rm -f /data/cluster-info.txt
+              rm -f /data/backup.mbstream
+              rm -f /data/xtrabackup_checkpoints
+              rm -f /data/xtrabackup_info
+              rm -f /data/xtrabackup_binlog_info
+              rm -rf /data/.sst
+
+              echo "[4/5] Corrigindo permissões..."
+              chown -R 999:999 /data
+              echo "✓ Permissões corrigidas"
+
+              echo "[5/5] Configurando bootstrap Galera..."
+              cat > /data/grastate.dat <<'GRASTATE'
+              version: 2.1
+              uuid: 00000000-0000-0000-0000-000000000000
+              seqno: -1
+              safe_to_bootstrap: 1
+              GRASTATE
+              echo "✓ Bootstrap configurado"
+
+              echo ""
+              echo "================================================================"
+              echo "✓✓✓ RESTORE DO MARIADB-0 COMPLETADO ✓✓✓"
+              echo "================================================================"
+              echo "Próxima fase: Iniciar cluster gradualmente (SST automático)"
+
+            volumeMounts:
+            - name: target-data
+              mountPath: /data
+            - name: source-backup
+              mountPath: /backup
+              readOnly: true
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                cpu: 2
+                memory: 4Gi
+          volumes:
+          - name: target-data
+            persistentVolumeClaim:
+              claimName: database-mariadb-0
+          - name: source-backup
+            persistentVolumeClaim:
+              claimName: backup-mariadb-1
+    EOF
+
+    log_info "Aguardando Job completar (timeout: 30min)..."
+
+    if kubectl wait --for=condition=complete job/$JOB_NAME -n "$NAMESPACE" --timeout=1800s 2>/dev/null; then
+      log_success "Job completado!"
+      kubectl logs -n "$NAMESPACE" job/$JOB_NAME --tail=20
+    else
+      log_error "Job falhou ou timeout!"
+      kubectl logs -n "$NAMESPACE" job/$JOB_NAME --tail=50
+      exit 1
+    fi
+
+    # ============================================================
+    # FASE 4: INICIAR MARIADB-0 (BOOTSTRAP)
+    # ============================================================
+
+    echo ""
+    echo "================================================================"
+    log_info "FASE 4/8: INICIANDO MARIADB-0 (BOOTSTRAP)"
+    echo "================================================================"
+
+    log_info "Escalando StatefulSet para 1 réplica..."
+    kubectl scale statefulset mariadb -n "$NAMESPACE" --replicas=1
+
+    log_info "Aguardando mariadb-0 ficar Ready (timeout: 10min)..."
+    if kubectl wait --for=condition=ready pod/mariadb-0 -n "$NAMESPACE" --timeout=600s 2>/dev/null; then
+      log_success "mariadb-0 está Ready!"
+    else
+      log_error "mariadb-0 não iniciou no timeout!"
+      kubectl logs -n "$NAMESPACE" mariadb-0 --tail=100
+      exit 1
+    fi
+
+    # ============================================================
+    # FASE 5: AGUARDAR MARIADB-0 SINCRONIZAR
+    # ============================================================
+
+    echo ""
+    echo "================================================================"
+    log_info "FASE 5/8: AGUARDANDO MARIADB-0 SINCRONIZAR"
+    echo "================================================================"
+
+    sleep 30  # Aguardar MariaDB inicializar completamente
+
+    if wait_for_sync "mariadb-0" 300; then
+      log_success "mariadb-0 está Synced e pronto para ser Donor!"
+    else
+      log_error "mariadb-0 não sincronizou!"
+      kubectl logs -n "$NAMESPACE" mariadb-0 --tail=50
+      exit 1
+    fi
+
+    # ============================================================
+    # FASE 6: INICIAR MARIADB-1 (SST AUTOMÁTICO)
+    # ============================================================
+
+    echo ""
+    echo "================================================================"
+    log_info "FASE 6/8: INICIANDO MARIADB-1 (SST AUTOMÁTICO)"
+    echo "================================================================"
+
+    log_info "Escalando StatefulSet para 2 réplicas..."
+    log_warning "mariadb-1 fará SST do mariadb-0 (pode demorar 5-15 min)"
+    kubectl scale statefulset mariadb -n "$NAMESPACE" --replicas=2
+
+    log_info "Aguardando mariadb-1 ficar Ready (timeout: 15min)..."
+    kubectl wait --for=condition=ready pod/mariadb-1 -n "$NAMESPACE" --timeout=900s 2>/dev/null || \
+      log_warning "Timeout aguardando Ready (SST pode estar em progresso)"
+
+    if wait_for_sync "mariadb-1" 900; then
+      log_success "mariadb-1 está Synced! (SST completado)"
+    else
+      log_warning "mariadb-1 ainda não sincronizou completamente, mas continuando..."
+    fi
+
+    # ============================================================
+    # FASE 7: INICIAR MARIADB-2 (SST AUTOMÁTICO)
+    # ============================================================
+
+    echo ""
+    echo "================================================================"
+    log_info "FASE 7/8: INICIANDO MARIADB-2 (SST AUTOMÁTICO)"
+    echo "================================================================"
+
+    log_info "Escalando StatefulSet para 3 réplicas..."
+    log_warning "mariadb-2 fará SST (pode demorar 5-15 min)"
+    kubectl scale statefulset mariadb -n "$NAMESPACE" --replicas=3
+
+    log_info "Aguardando mariadb-2 ficar Ready (timeout: 15min)..."
+    kubectl wait --for=condition=ready pod/mariadb-2 -n "$NAMESPACE" --timeout=900s 2>/dev/null || \
+      log_warning "Timeout aguardando Ready (SST pode estar em progresso)"
+
+    if wait_for_sync "mariadb-2" 900; then
+      log_success "mariadb-2 está Synced! (SST completado)"
+    else
+      log_warning "mariadb-2 ainda não sincronizou completamente, mas continuando..."
+    fi
+
+    # ============================================================
+    # FASE 8: VALIDAR CLUSTER COMPLETO
+    # ============================================================
+
+    echo ""
+    echo "================================================================"
+    log_info "FASE 8/8: VALIDANDO CLUSTER COMPLETO"
+    echo "================================================================"
+
+    log_info "Aguardando estabilização do cluster (60s)..."
+    sleep 60
+
+    log_info "Verificando saúde do cluster Galera..."
+
+    ALL_HEALTHY=true
+    for pod in mariadb-0 mariadb-1 mariadb-2; do
+      STATE=$(kubectl exec -n "$NAMESPACE" "$pod" -- \
+        mariadb -uroot -p"${MYSQL_ROOT_PASSWORD}" -N -e \
+        "SHOW STATUS LIKE 'wsrep_local_state_comment'" 2>/dev/null | awk '{print $2}' || echo "Unknown")
+
+      SIZE=$(kubectl exec -n "$NAMESPACE" "$pod" -- \
+        mariadb -uroot -p"${MYSQL_ROOT_PASSWORD}" -N -e \
+        "SHOW STATUS LIKE 'wsrep_cluster_size'" 2>/dev/null | awk '{print $2}' || echo "0")
+
+      if [ "$STATE" = "Synced" ] && [ "$SIZE" = "3" ]; then
+        log_success "$pod: $STATE (cluster_size=$SIZE)"
+      else
+        log_warning "$pod: $STATE (cluster_size=$SIZE)"
+        ALL_HEALTHY=false
+      fi
+    done
+
+    if ! $ALL_HEALTHY; then
+      log_warning "Cluster ainda não está 100% sincronizado"
+      log_info "Aguardando mais 2 minutos..."
+      sleep 120
+
+      # Verificar novamente
+      log_info "Verificação final..."
+      for pod in mariadb-0 mariadb-1 mariadb-2; do
+        STATE=$(kubectl exec -n "$NAMESPACE" "$pod" -- \
+          mariadb -uroot -p"${MYSQL_ROOT_PASSWORD}" -N -e \
+          "SHOW STATUS LIKE 'wsrep_local_state_comment'" 2>/dev/null | awk '{print $2}' || echo "Unknown")
+        echo "  $pod: $STATE"
+      done
+    fi
+
+    echo ""
+    echo "================================================================"
+    log_info "LIMPEZA"
+    echo "================================================================"
+
+    log_info "Removendo Job de restore..."
+    kubectl delete job $JOB_NAME -n "$NAMESPACE" || true
+
+    # Salvar status
+    kubectl exec -n "$NAMESPACE" mariadb-1 -- bash -c \
+      "echo 'RESTORE_SUCCESS:$TIMESTAMP:$TIPO:$(date +%Y%m%d-%H%M%S)' > /backup/last_restore_status" 2>/dev/null || true
+
+    echo ""
+    echo "================================================================"
+    log_success "✓✓✓ RESTORE COMPLETADO COM SUCESSO ✓✓✓"
+    echo "================================================================"
+    echo ""
+    echo " Backup Restaurado: $TIMESTAMP ($TIPO)"
+    echo " Namespace: $NAMESPACE"
+    echo " Cluster MariaDB: 3 nós"
+    echo ""
+    log_info "BACKUP DE SEGURANÇA (para rollback):"
+    echo "  $SAFETY_BACKUP_DIR"
+    echo ""
+    log_info "VALIDAÇÕES RECOMENDADAS:"
+    echo " 1. Verificar cluster status:"
+    echo "    kubectl exec mariadb-0 -n $NAMESPACE -- mariadb -uroot -p\"\$PASS\" -e \"SHOW STATUS LIKE 'wsrep%'\""
+    echo ""
+    echo " 2. Verificar dados restaurados:"
+    echo "    kubectl exec mariadb-0 -n $NAMESPACE -- mariadb -uroot -p\"\$PASS\" -e \"SHOW DATABASES\""
+    echo ""
+    echo " 3. Monitorar logs dos pods:"
+    echo "    kubectl logs -f mariadb-0 -n $NAMESPACE"
+    echo ""
+    log_success "Restore finalizado em: $(date)"
+    echo ""

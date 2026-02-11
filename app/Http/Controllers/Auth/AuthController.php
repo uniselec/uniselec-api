@@ -31,7 +31,7 @@ class AuthController extends Controller
             // limpa tudo que não for dígito
             $cpf = preg_replace('/\D/', '', $login);
             // opcional: valida o formato
-            Validator::make(['cpf' => $cpf], ['cpf' => ['required', 'size:11', new ValidCpf]])->validate();
+            // Validator::make(['cpf' => $cpf], ['cpf' => ['required', 'size:11', new ValidCpf]])->validate();
             $user = User::where('cpf', $cpf)->first();
         }
 

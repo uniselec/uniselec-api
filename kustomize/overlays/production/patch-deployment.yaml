@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uniselec-api
+spec:
+  template:
+    metadata:
+      labels:
+        environment: production
+    spec:
+      containers:
+        - name: uniselec-api
+          resources:
+            requests:
+              cpu: 300m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi

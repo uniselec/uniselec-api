@@ -12,18 +12,26 @@ use App\Http\Controllers\Admin\ConvocationListApplicationController;
 use App\Http\Controllers\Admin\ConvocationListApplicationGenerationController;
 use App\Http\Controllers\Admin\ConvocationListApplicationResponseController;
 use App\Http\Controllers\Admin\ConvocationListController;
+use App\Http\Controllers\Admin\ConvocationListCsvController;
+use App\Http\Controllers\Admin\ConvocationListPdfController;
 use App\Http\Controllers\Admin\ConvocationListSeatAllocationController;
 use App\Http\Controllers\Admin\ConvocationListSeatController;
 use App\Http\Controllers\Admin\ConvocationListSeatGenerationController;
 use App\Http\Controllers\Admin\ConvocationListSeatRedistributionController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DocumentController;
+use App\Http\Controllers\Admin\EnemOutcomeExportController;
+use App\Http\Controllers\Admin\EnemOutcomePdfController;
 use App\Http\Controllers\Admin\EnemScoreController;
+use App\Http\Controllers\Admin\EnemScoreExportController;
 use App\Http\Controllers\Admin\EnemScoreImportController;
+use App\Http\Controllers\Admin\EnemScoreSummaryController;
 use App\Http\Controllers\Admin\KnowledgeAreaController;
 use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
 use App\Http\Controllers\Admin\ProcessSelectionNotifyController;
+use App\Http\Controllers\Admin\RegistrationStatsController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
@@ -32,24 +40,35 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
     Route::middleware(['abilities:super_user'])->prefix('super_user')->group(function () {
-        Route::post('/resend-password-link', [AdminController::class, 'resendPasswordResetLink'])->name('admin.resend-password-link');
-        Route::post('/resend-password-link-user', [UserController::class, 'resendPasswordResetLink'])->name('admin.resend-password-link-user');
+        Route::post('/resend-password-link', [AdminController::class, 'resendPasswordResetLink'])->name('admin.super_user.resend-password-link');
+        Route::post('/resend-password-link-user', [UserController::class, 'resendPasswordResetLink'])->name('admin.super_user.resend-password-link-user');
+
+        Route::get('process_selections/{selection}/applications/export', [ReportController::class, 'exportApplications'])->name('admin.super_user.processSelection.applications.export');
+        Route::get('process-selections/{selection}/export-enem-csv', [EnemScoreExportController::class, 'export'])->name('admin.selections.export_enem_csv');
+        Route::get('process-selections/{selection}/export-enem-outcomes', [EnemOutcomeExportController::class, 'export'])->name('admin.super_user.processSelection.export_enem_outcomes');
+        Route::get('process-selections/{selection}/export-enem-outcomes-pdf', EnemOutcomePdfController::class)->name('admin.super_user.processSelection.export_enem_outcomes_pdf');
+        Route::get('convocation_lists/{list}/export-pdfs', [ConvocationListPdfController::class, 'export'])->name('admin.super_user.convocation_lists.export_pdfs');
+        Route::get('convocation_lists/{list}/export-csv', [ConvocationListCsvController::class, 'exportCsv'])->name('admin.super_user.convocation_lists.export_csv');
 
 
+        Route::apiResource('admins', AdminController::class)->names('admin.super_user.admins');
+        Route::apiResource('academic_units', AcademicUnitController::class)->names('admin.super_user.academic_units');
+        Route::apiResource('courses', CourseController::class)->names('admin.super_user.courses');
+        Route::apiResource('process_selections', ProcessSelectionController::class)->only(['index', 'show', 'store', 'update'])->names('admin.super_user.processSelection');
+        Route::apiResource('admission_categories', AdmissionCategoryController::class)->names('admin.super_user.admission_categories');
+        Route::apiResource('bonus_options', BonusOptionController::class)->names('admin.super_user.bonus_options');
+        Route::apiResource('documents', DocumentController::class)->names('docum.super_userents.api');
+        Route::apiResource('knowledge_areas', KnowledgeAreaController::class)->names('admin.super_user.knowledge_areas');
 
-        Route::apiResource('admins', AdminController::class)->names('admin.admins');
-        Route::apiResource('academic_units', AcademicUnitController::class)->names('admin.academic_units');
-        Route::apiResource('courses', CourseController::class)->names('admin.courses');
-        Route::apiResource('process_selections', ProcessSelectionController::class)->names('admin.processSelection');
-        Route::apiResource('admission_categories', AdmissionCategoryController::class)->names('admin.admission_categories');
-        Route::apiResource('bonus_options', BonusOptionController::class)->names('admin.bonus_options');
-        Route::apiResource('documents', DocumentController::class)->names('documents.api');
-        Route::apiResource('knowledge_areas', KnowledgeAreaController::class)->names('admin.knowledge_areas');
+        Route::patch('documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('admin.super_user.documents.updateStatus');
 
-        Route::patch('documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('documents.updateStatus');
 
-        Route::apiResource('applications', ApplicationController::class)->only(['index', 'show'])->names('admin.applications');
+        Route::apiResource('applications', ApplicationController::class)->only(['index', 'show'])->names('admin.super_user.applications');
         Route::patch('applications/{id}/resolve-inconsistencies', [ApplicationController::class, 'resolveInconsistencies'])->name('admin.applications.resolve-inconsistencies');
+        Route::apiResource('application_outcomes', ApplicationOutcomeController::class)->only(['index', 'show'])->names('admin.super_user.application_outcomes');
+        Route::apiResource('users', UserController::class)->only(['index', 'show'])->names('admin.super_user.users');
+        Route::apiResource('enem_scores', EnemScoreController::class)->only(['index', 'show'])->names('admin.super_user.enem_.super_userscores.api');;
+
         Route::apiResource('application_outcomes', ApplicationOutcomeController::class)->only(['index', 'show'])->names('admin.applications');
         Route::apiResource('appeals', AppealController::class)->names('admin.appeals');
         Route::prefix('appeals/{appeal}')->group(function () {
@@ -59,14 +78,14 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::apiResource('enem_scores', EnemScoreController::class)->only(['index', 'show'])->names('enem_scores.api');;
         Route::put('profile', [RegisterController::class, 'updateProfileAdmin'])->name('admin.super_user.profile.update');
 
-        Route::apiResource('convocation_list_applications', ConvocationListApplicationController::class)->names('admin.super_user.convocation_list_applications');
-        Route::apiResource('convocation_lists', ConvocationListController::class)->names('admin.super_user.convocation_lists');
-        Route::apiResource('convocation_list_seats', ConvocationListSeatController::class)->names('admin.super_user.convocation_list_seats');
+        Route::apiResource('convocation_list_applications', ConvocationListApplicationController::class)->names('admin.super_user.super_user.convocation_list_applications');
+        Route::apiResource('convocation_lists', ConvocationListController::class)->names('admin.super_user.super_user.convocation_lists');
+        Route::apiResource('convocation_list_seats', ConvocationListSeatController::class)->names('admin.super_user.super_user.convocation_list_seats');
 
         Route::post('convocation_lists/{list}/generate-seats', [ConvocationListSeatGenerationController::class, 'store'])->name('admin.super_user.cconvocation_lists.generate_seats');
-        Route::post('convocation_lists/{convocationList}/generate-applications', [ConvocationListApplicationGenerationController::class, 'store'])->name('convocation_lists.generate_applications');
-        Route::post('convocation_lists/{convocationList}/allocate-seats', [ConvocationListSeatAllocationController::class, 'store'])->name('convocation_lists.allocate_seats');
-        Route::post('convocation_lists/{convocationList}/redistribute-seats', [ConvocationListSeatRedistributionController::class, 'store'])->name('convocation_lists.redistribute_seats');
+        Route::post('convocation_lists/{convocationList}/generate-applications', [ConvocationListApplicationGenerationController::class, 'store'])->name('admin.super_user.convocation_lists.generate_applications');
+        Route::post('convocation_lists/{convocationList}/allocate-seats', [ConvocationListSeatAllocationController::class, 'store'])->name('admin.super_user.convocation_lists.allocate_seats');
+        Route::post('convocation_lists/{convocationList}/redistribute-seats', [ConvocationListSeatRedistributionController::class, 'store'])->name('admin.super_user.convocation_lists.redistribute_seats');
         Route::post(
             'convocation_list_applications/{cla}/call',
             ConvocationCallerController::class
@@ -76,6 +95,11 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
             'convocation_list_seats/{seat}/redistribute',
             [ConvocationListSeatRedistributionController::class, 'redistribute']
         )->name('convocation_list_seats.redistribute');
+        Route::get(
+            'process-selections/{selection}/convocation-summary',
+            [\App\Http\Controllers\Admin\ConvocationSummaryController::class, 'index']
+        )->name('admin.super_user.processSelection.convocation_summary');
+
 
         Route::prefix('convocation_list_applications')->group(function () {
             Route::post('{cla}/call',    [ConvocationListApplicationResponseController::class, 'call']);
@@ -83,16 +107,25 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
             Route::post('{cla}/decline', [ConvocationListApplicationResponseController::class, 'decline']);
             Route::post('{cla}/reject',  [ConvocationListApplicationResponseController::class, 'reject']);
         });
+        Route::prefix('stats')->group(function () {
+            Route::get('by-admission-category', [RegistrationStatsController::class, 'byAdmissionCategory']);
+            Route::get('by-course',               [RegistrationStatsController::class, 'byCourse']);
+            Route::get('by-campus',               [RegistrationStatsController::class, 'byCampus']);
+            Route::get('by-course-category', [RegistrationStatsController::class, 'byCourseCategory']);
+        });
+
 
         Route::post('process_selections/{selection}/outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
         // Route::post('process_selections/{selection}/outcomes_without_pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);
 
-        Route::patch('application_outcomes/{id}', [ApplicationOutcomeController::class, 'patchUpdate'])->name('application-outcomes.patch');
+        Route::patch('application_outcomes/{id}', [ApplicationOutcomeController::class, 'patchUpdate'])->name('admin.super_user.application-outcomes.patch');
         Route::get('/process_selections/{selection}/notify-status', [ProcessSelectionNotifyController::class, 'notifyByStatus']);
 
-        Route::post('enem_scores/import', EnemScoreImportController::class)->name('enem_scores.import');
-        Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
-        Route::get('/me', [AuthController::class, 'me'])->name('user.profile');
-        Route::post('/register', [RegisterController::class, 'registerAdmin'])->name('admin.register');
+
+        Route::post('enem_scores/import', EnemScoreImportController::class)->name('admin.super_user.enem_scores.import');
+        Route::get('enem_scores/summary/{process_selection}', EnemScoreSummaryController::class);
+        Route::post('/logout', [AuthController::class, 'logout'])->name('admin.super_user.logout');
+        Route::get('/me', [AuthController::class, 'me'])->name('admin.super_user.user.profile');
+        Route::post('/register', [RegisterController::class, 'registerAdmin'])->name('admin.super_user.register');
     });
 });

@@ -2,11 +2,12 @@
 
 namespace App\Http\Resources;
 
+use Carbon\Carbon;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class ApplicationResource extends JsonResource
 {
-    
+
     /**
      * Transform the resource into an array.
      *
@@ -16,11 +17,18 @@ class ApplicationResource extends JsonResource
     public function toArray($request)
     {
         $formHash = md5(json_encode($this->form_data));
+        $ps = $this->processSelection;
+
+        $now = Carbon::now();
+        $inPeriod = $ps
+            ? $now->betweenIncluded($ps->start_date, $ps->end_date)
+            : false;
 
         return [
             'id' => $this->id,
             'user_id' => $this->user_id,
             'form_data' => $this->form_data,
+            'in_registration_period'   => $inPeriod,
             'verification_expected' => $formHash,
             'verification_code' => $this->verification_code,
             'valid_verification_code' => $formHash === $this->verification_code,
@@ -50,7 +58,7 @@ class ApplicationResource extends JsonResource
         }
 
         return $source === 'application'
-        ? ($this->form_data[$formKey] ?? null)
+            ? ($this->form_data[$formKey] ?? null)
             : ($this->enemScore?->scores[$formKey] ?? null);
     }
 }

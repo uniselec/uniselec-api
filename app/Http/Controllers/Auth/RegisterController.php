@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\Auth;
+
 use Illuminate\Support\Facades\Validator;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
@@ -95,13 +96,23 @@ class RegisterController extends Controller
     public function updateProfileClient(Request $request)
     {
         $user = $request->user();
+
         if (!$user instanceof User) {
             return response()->json(['message' => 'User is not a client.'], 403);
         }
 
         $validator = Validator::make($request->all(), [
-            'password'           => 'nullable|string|min:8|confirmed',
-        ], [], []);
+            'name' => 'sometimes|required|string|max:255',
+            'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
+            'password' => [
+                'nullable',
+                'string',
+                'min:8',
+                'confirmed',
+                // se quiser reforçar a regra do front:
+                // 'regex:/^(?=.*[0-9])(?=.*[^A-Za-z0-9]).+$/',
+            ],
+        ]);
 
         if ($validator->fails()) {
             return response()->json([
@@ -110,19 +121,33 @@ class RegisterController extends Controller
             ], 422);
         }
 
+        // Só campos válidos entram aqui (name, email, password, password_confirmation)
         $data = $validator->validated();
 
+        // Trata senha: se veio preenchida, faz hash; se não, remove
         if (!empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
         } else {
             unset($data['password']);
         }
+
+        // Não queremos tentar dar update com password_confirmation
+        unset($data['password_confirmation']);
+
+        // Atualiza apenas os campos presentes em $data
         $user->update($data);
+
+        // Gera novo token (mantendo o padrão que você já usa)
         $token = $user->createToken('api-web')->plainTextToken;
         $user['token'] = $token;
         $user->refresh();
-        return response()->json(['token' => $token, 'user' => new UserResource($user)], 200);
+
+        return response()->json([
+            'token' => $token,
+            'user'  => new UserResource($user),
+        ], 200);
     }
+
     public function updateProfileAdmin(Request $request)
     {
         $user = $request->user();
@@ -159,5 +184,4 @@ class RegisterController extends Controller
             200
         );
     }
-
 }

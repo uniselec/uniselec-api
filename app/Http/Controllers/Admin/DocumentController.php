@@ -34,6 +34,8 @@ class DocumentController extends BasicCrudController
         }
 
         $request->validate([
+            'title' => 'required|string|max:255',
+            'file' => 'required|file|max:5120',
             'title' => [
                 'required',
                 'string',

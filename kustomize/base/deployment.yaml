@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uniselec-api
+  labels:
+    app: uniselec-api
+spec:
+  selector:
+    matchLabels:
+      app: uniselec-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: uniselec-api
+    spec:
+      initContainers:
+      - name: init-storage
+        image: busybox:latest
+        command:
+        - sh
+        - -c
+        - |
+          echo "Criando estrutura de diretórios Laravel"
+          mkdir -p /storage/app/public
+          mkdir -p /storage/framework/cache/data
+          mkdir -p /storage/framework/sessions
+          mkdir -p /storage/framework/testing
+          mkdir -p /storage/framework/views
+          mkdir -p /storage/logs
+          chmod -R 777 /storage
+          echo "Estrutura criada"
+        volumeMounts:
+        - name: storage-volume
+          mountPath: /storage
+      containers:
+      - name: uniselec-api
+        image: dti-registro.unilab.edu.br/unilab/uniselec-api:latest
+        imagePullPolicy: Always
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          echo "Configurando permissões Laravel"
+
+          # Permissões para storage
+          chown -R www-data:www-data /var/www/html/storage
+          chmod -R 775 /var/www/html/storage
+
+          # Permissões para bootstrap/cache
+          chown -R www-data:www-data /var/www/html/bootstrap/cache
+          chmod -R 775 /var/www/html/bootstrap/cache
+
+          echo "Permissões configuradas. Iniciando Apache..."
+
+          # Iniciar Apache em foreground
+          exec apache2-foreground
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /up
+            port: 80
+            httpHeaders:
+            - name: Accept
+              value: application/json
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 11
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /up
+            port: 80
+            httpHeaders:
+            - name: Accept
+              value: application/json
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 13
+          failureThreshold: 3
+        envFrom:
+          - configMapRef:
+              name: uniselec-api-config
+          - configMapRef:
+              name: mariadb-env
+          - secretRef:
+              name: mariadb-secret-env
+          - secretRef:
+              name: laravel-secrets
+        env:
+        - name: TZ
+          value: "America/Fortaleza"
+        - name: KUBERNETES_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: KUBERNETES_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: KUBERNETES_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: KUBERNETES_CONTAINER_CPU_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              containerName: uniselec-api
+              resource: limits.cpu
+              divisor: 1m
+        - name: KUBERNETES_CONTAINER_MEMORY_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              containerName: uniselec-api
+              resource: limits.memory
+              divisor: 1Mi
+        volumeMounts:
+        - name: storage-volume
+          mountPath: /var/www/html/storage
+      volumes:
+      - name: storage-volume
+        persistentVolumeClaim:
+          claimName: pvc-uniselec-storage
+      imagePullSecrets:
+      - name: regcred
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always

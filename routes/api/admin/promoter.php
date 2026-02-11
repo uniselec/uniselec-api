@@ -13,12 +13,16 @@ use App\Http\Controllers\Admin\ConvocationListSeatController;
 use App\Http\Controllers\Admin\ConvocationListSeatRedistributionController;
 use App\Http\Controllers\Admin\CourseController;
 use App\Http\Controllers\Admin\DocumentController;
+use App\Http\Controllers\Admin\EnemOutcomeExportController;
+use App\Http\Controllers\Admin\EnemOutcomePdfController;
 use App\Http\Controllers\Admin\EnemScoreController;
+use App\Http\Controllers\Admin\EnemScoreExportController;
 use App\Http\Controllers\Admin\EnemScoreImportController;
 use App\Http\Controllers\Admin\KnowledgeAreaController;
 use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
 use App\Http\Controllers\Admin\ProcessSelectionNotifyController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
@@ -28,15 +32,21 @@ use Illuminate\Support\Carbon;
 
 Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
     Route::middleware(['abilities:promoter'])->prefix('promoter')->group(function () {
-        Route::post('/resend-password-link', [AdminController::class, 'resendPasswordResetLink'])->name('admin.resend-password-link');
+        Route::post('/resend-password-link', [AdminController::class, 'resendPasswordResetLink'])->name('admin.promoter.resend-password-link');
         Route::post('/resend-password-link-user', [UserController::class, 'resendPasswordResetLink'])->name('admin.resend-password-link-user');
 
 
+        Route::get('process_selections/{selection}/applications/export', [ReportController::class, 'exportApplications'])->name('admin.promoter.processSelection.applications.export');
+        Route::get('process-selections/{selection}/export-enem-csv',[EnemScoreExportController::class, 'export'])->name('admin.promoter.selections.export_enem_csv');
+        Route::get('process-selections/{selection}/export-enem-outcomes',[EnemOutcomeExportController::class, 'export'])->name('admin.promoter.processSelection.export_enem_outcomes');
+        Route::get('process-selections/{selection}/export-enem-outcomes-pdf',EnemOutcomePdfController::class)->name('admin.promoter.processSelection.export_enem_outcomes_pdf');
 
         Route::apiResource('admins', AdminController::class)->names('admin.promoter.admins');
         Route::apiResource('academic_units', AcademicUnitController::class)->names('admin.promoter.academic_units');
         Route::apiResource('courses', CourseController::class)->names('admin.promoter.courses');
-        Route::apiResource('process_selections', ProcessSelectionController::class)->names('admin.promoter.processSelection');
+        Route::apiResource('process_selections', ProcessSelectionController::class)
+        ->only(['index', 'show', 'store', 'update'])
+        ->names('admin.promoter.processSelection');
         Route::apiResource('admission_categories', AdmissionCategoryController::class)->names('admin.promoter.admission_categories');
         Route::apiResource('bonus_options', BonusOptionController::class)->names('admin.promoter.bonus_options');
         Route::apiResource('documents', DocumentController::class)->names('documents.api');
@@ -45,8 +55,13 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::patch('documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('documents.updateStatus');
 
         Route::apiResource('applications', ApplicationController::class)->only(['index', 'show'])->names('admin.promoter.applications');
-        Route::apiResource('application_outcomes', ApplicationOutcomeController::class)->only(['index', 'show'])->names('admin.promoter.applications');
+
+
+        Route::apiResource('application_outcomes', ApplicationOutcomeController::class)->only(['index', 'show'])->names('admin.promoter.application_outcomes');
         Route::patch('applications/{application_id}/resolve-inconsistencies', [ApplicationController::class, 'resolveInconsistencies'])->name('admin.promoter.applications.resolve-inconsistencies');
+
+
+
         Route::apiResource('appeals', AppealController::class)->names('admin.appeals');
         Route::prefix('appeals/{appeal}')->group(function () {
             Route::get('/appeal_documents/{appealDocument}/download', [AppealDocumentController::class, 'download']);
