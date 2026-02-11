@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AcademicUnitController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdmissionCategoryController;
+use App\Http\Controllers\Admin\AppealController;
 use App\Http\Controllers\Admin\ApplicationController;
 use App\Http\Controllers\Admin\ApplicationOutcomeController;
 use App\Http\Controllers\Admin\BonusOptionController;
@@ -34,8 +35,7 @@ use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
-
-
+use App\Http\Controllers\Client\AppealDocumentController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
@@ -69,6 +69,13 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
         Route::apiResource('users', UserController::class)->only(['index', 'show'])->names('admin.super_user.users');
         Route::apiResource('enem_scores', EnemScoreController::class)->only(['index', 'show'])->names('admin.super_user.enem_.super_userscores.api');;
 
+        Route::apiResource('application_outcomes', ApplicationOutcomeController::class)->only(['index', 'show'])->names('admin.applications');
+        Route::apiResource('appeals', AppealController::class)->names('admin.appeals');
+        Route::prefix('appeals/{appeal}')->group(function () {
+            Route::get('/appeal_documents/{appealDocument}/download', [AppealDocumentController::class, 'download']);
+        });
+        Route::apiResource('users', UserController::class)->only(['index', 'show']);
+        Route::apiResource('enem_scores', EnemScoreController::class)->only(['index', 'show'])->names('enem_scores.api');;
         Route::put('profile', [RegisterController::class, 'updateProfileAdmin'])->name('admin.super_user.profile.update');
 
         Route::apiResource('convocation_list_applications', ConvocationListApplicationController::class)->names('admin.super_user.super_user.convocation_list_applications');

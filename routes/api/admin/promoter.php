@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AcademicUnitController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdmissionCategoryController;
+use App\Http\Controllers\Admin\AppealController;
 use App\Http\Controllers\Admin\ApplicationController;
 use App\Http\Controllers\Admin\ApplicationOutcomeController;
 use App\Http\Controllers\Admin\BonusOptionController;
@@ -25,8 +26,7 @@ use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
-
-
+use App\Http\Controllers\Client\AppealDocumentController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Carbon;
 
@@ -62,6 +62,10 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
 
 
 
+        Route::apiResource('appeals', AppealController::class)->names('admin.appeals');
+        Route::prefix('appeals/{appeal}')->group(function () {
+            Route::get('/appeal_documents/{appealDocument}/download', [AppealDocumentController::class, 'download']);
+        });
         Route::apiResource('users', UserController::class)->only(['index', 'show']);
         Route::apiResource('enem_scores', EnemScoreController::class)->only(['index', 'show'])->names('enem_scores.api');;
         Route::put('profile', [RegisterController::class, 'updateProfileAdmin'])->name('admin.promoter.profile.update');

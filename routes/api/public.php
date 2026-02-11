@@ -1,6 +1,10 @@
 <?php
 
+// use App\Http\Controllers\Client\AppealDocumentController;
 
+use App\Http\Controllers\Admin\AppealController as AdminAppealController;
+use App\Http\Controllers\Client\AppealDocumentController;
+use App\Http\Controllers\Client\AppealController;
 use App\Http\Controllers\Public\DocumentController;
 use App\Http\Controllers\Public\EnrollmentVerificationController;
 use App\Http\Controllers\Public\ProcessSelectionController;

@@ -8,6 +8,7 @@ use App\Http\Resources\DocumentResource;
 use App\Models\Document;
 use Illuminate\Http\Request;
 use OpenApi\Annotations as OA;
+use Illuminate\Validation\Rule;
 
 class DocumentController extends BasicCrudController
 {
@@ -24,15 +25,43 @@ class DocumentController extends BasicCrudController
 
     public function store(Request $request)
     {
+        $file = $request->file('file');
+
+        if ($file) {
+            $request->merge([
+                'filename' => $file->getClientOriginalName(),
+            ]);
+        }
+
         $request->validate([
             'title' => 'required|string|max:255',
             'file' => 'required|file|max:5120',
+            'title' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('documents', 'title')
+                ->where(fn ($query) => $query->where('process_selection_id', $request->process_selection_id)),
+            ],
+
+            'file' => 'required|file|max:10240', // 10 MB
+
+            'filename' => [
+                'required',
+                'string',
+                Rule::unique('documents', 'filename')
+                ->where(fn ($query) => $query->where('process_selection_id', $request->process_selection_id)),
+            ],
+
             'status' => 'in:draft,published,archived',
-            'process_selection_id' => 'required|exists:process_selections,id'
+            'process_selection_id' => 'required|exists:process_selections,id',
+        ],[
+            'title.unique' => 'Já existe um documento com este título neste processo seletivo.',
+            'filename.unique' => 'Já existe um documento com este nome de arquivo neste processo seletivo.'  
         ]);
 
-        $file = $request->file('file');
-        $filename = $file->getClientOriginalName();
+        $filename = $request->filename; 
+
         $path = $file->store('documents', 'public');
 
         $document = Document::create([
@@ -51,10 +80,21 @@ class DocumentController extends BasicCrudController
     {
         $document = Document::findOrFail($id);
 
+        $process_selection_id = $request->process_selection_id ?? $document->process_selection_id;
+
         $request->validate([
-            'title' => 'string|max:255',
+            'title' => [
+                'sometimes',
+                'string',
+                'max:255',
+                Rule::unique('documents', 'title')
+                    ->where(fn ($q) => $q->where('process_selection_id', $process_selection_id))
+                    ->ignore($document->id),
+            ],
             'status' => 'in:draft,published,archived',
-            'process_selection_id' => 'exists:process_selections,id'
+            'process_selection_id' => 'sometimes|exists:process_selections,id',
+        ], [
+            'title.unique' => 'Já existe um documento com este título neste processo seletivo.',
         ]);
 
         $document->update($request->only(['title', 'description', 'status', 'process_selection_id']));
