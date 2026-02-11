@@ -28,9 +28,9 @@ jobs:
     - name: 📂 Install Dependencies
       run: composer install --no-dev --optimize-autoloader
 
-    - name: 📂 Sync files
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-      with:
-        server: ${{ secrets.FTP_SERVER_STAGING }}
-        username: ${{ secrets.FTP_USERNAME_STAGING }}
-        password: ${{ secrets.FTP_PASSWORD_STAGING }}
+    # - name: 📂 Sync files
+    #   uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+    #   with:
+    #     server: ${{ secrets.FTP_SERVER_STAGING }}
+    #     username: ${{ secrets.FTP_USERNAME_STAGING }}
+    #     password: ${{ secrets.FTP_PASSWORD_STAGING }}
