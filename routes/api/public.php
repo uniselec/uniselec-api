@@ -18,7 +18,7 @@ Route::get('/', function () {
         'version-info' => 'v4.0.0',
     ]);
 });
-Route::get('health/ready', [HealthController::class, 'ready']);
+Route::get('healthcheck', HealthController::class)->name('healthcheck');
 Route::apiResource('process_selections', ProcessSelectionController::class)->only(['index', 'show'])->names('admin.processSelection');
 Route::apiResource('documents', DocumentController::class)->only(['index', 'show'])->names('admin.documents');
 Route::apiResource('enrollment_verification', EnrollmentVerificationController::class)->only(['show']);
