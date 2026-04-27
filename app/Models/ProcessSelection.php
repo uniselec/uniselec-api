@@ -39,7 +39,6 @@ class ProcessSelection extends Model
         'bonus_options' => 'array',
         'allowed_enem_years' => 'array',
         'remap_rules'  => 'array',
-        'last_applications_processed_at' => 'datetime',
     ];
 
     public function applications()
@@ -55,14 +54,5 @@ class ProcessSelection extends Model
     public function convocationLists(): HasMany
     {
         return $this->hasMany(ConvocationList::class);
-    }
-
-    protected function lastApplicationsProcessedAt(): Attribute
-    {
-        return Attribute::make(
-            get: fn($value) => $value
-                ? \Carbon\Carbon::parse($value)->format('d/m/Y H:i')
-                : null
-        );
     }
 }
