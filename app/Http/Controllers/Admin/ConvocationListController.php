@@ -92,6 +92,21 @@ class ConvocationListController extends BasicCrudController
     }
 
 
+    public function destroy($id)
+    {
+        $list = $this->findOrFail($id);
+
+        if ($list->status !== 'draft') {
+            return response()->json([
+                'message' => 'Somente listas com status rascunho podem ser excluídas.',
+            ], 422);
+        }
+
+        $list->delete();
+
+        return response()->noContent();
+    }
+
     protected function model()
     {
         return ConvocationList::class;
