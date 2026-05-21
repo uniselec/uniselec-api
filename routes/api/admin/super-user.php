@@ -29,6 +29,7 @@ use App\Http\Controllers\Admin\KnowledgeAreaController;
 use App\Http\Controllers\Admin\ProcessApplicationOutcomeController;
 use App\Http\Controllers\Admin\ProcessSelectionController;
 use App\Http\Controllers\Admin\ProcessSelectionNotifyController;
+use App\Http\Controllers\Admin\RegistrationStatsController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
@@ -99,6 +100,13 @@ Route::middleware(['auth:sanctum'])->prefix('admin')->group(function () {
             Route::post('{cla}/decline', [ConvocationListApplicationResponseController::class, 'decline']);
             Route::post('{cla}/reject',  [ConvocationListApplicationResponseController::class, 'reject']);
         });
+        Route::prefix('stats')->group(function () {
+            Route::get('by-admission-category', [RegistrationStatsController::class, 'byAdmissionCategory']);
+            Route::get('by-course',               [RegistrationStatsController::class, 'byCourse']);
+            Route::get('by-campus',               [RegistrationStatsController::class, 'byCampus']);
+            Route::get('by-course-category', [RegistrationStatsController::class, 'byCourseCategory']);
+        });
+
 
         Route::post('process_selections/{selection}/outcomes', [ProcessApplicationOutcomeController::class, 'processOutcomes']);
         // Route::post('process_selections/{selection}/outcomes_without_pending', [ProcessApplicationOutcomeController::class, 'processOutcomesWithoutPending']);
