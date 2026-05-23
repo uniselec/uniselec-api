@@ -1,11 +1,4 @@
 #!/bin/bash
-# ============================================================
-# Script paralelo de latência real de replicação Galera
-# ============================================================
-# Autor: erivandosena@gmail.com
-# Data: 2025-11-20
-# Versão: 1.0.0
-# ============================================================
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -16,7 +9,6 @@ DB="test_latency"
 TABLE="latency_test"
 ITERATIONS=3
 
-# Usuário e senha do MariaDB (em produção, use Secrets!)
 DB_USER="root"
 DB_PASSWORD="Password123"
 
@@ -24,7 +16,6 @@ echo "=== Teste paralelo otimizado de latência Galera Cluster ==="
 echo "Nós: ${NODES[*]}"
 echo ""
 
-# Cria banco e tabela se não existirem
 for NODE in "${NODES[@]}"; do
     echo "--- Verificando banco e tabela no nó $NODE ---"
     kubectl exec -n "$NAMESPACE" "$NODE" -- mariadb -u "$DB_USER" -p"$DB_PASSWORD" -e \
@@ -40,7 +31,6 @@ for ((iter=1; iter<=ITERATIONS; iter++)); do
     declare -A INSERT_IDS
     JOBS=()
 
-    # Inserção em paralelo
     for ORIGIN in "${NODES[@]}"; do
         TMP_FILE=$(mktemp)
         (
@@ -55,7 +45,6 @@ for ((iter=1; iter<=ITERATIONS; iter++)); do
         JOBS+=("$TMP_FILE")
     done
 
-    # Espera todas as inserções terminarem e lê os resultados
     for TMP_FILE in "${JOBS[@]}"; do
         wait
         IFS='|' read -r ORIGIN INSERT_ID INSERT_TIME < "$TMP_FILE"
@@ -67,14 +56,12 @@ for ((iter=1; iter<=ITERATIONS; iter++)); do
 
     echo ""
 
-    # Medição da latência de replicação
     for ORIGIN in "${NODES[@]}"; do
         ORIGIN_TS=${INSERT_TIMES[$ORIGIN]}
         for TARGET in "${NODES[@]}"; do
             if [ "$ORIGIN" == "$TARGET" ]; then
                 DIFF_MS=0
             else
-                # Espera até o registro aparecer no nó TARGET
                 while true; do
                     TARGET_TS=$(kubectl exec -n "$NAMESPACE" "$TARGET" -c mariadb -- mariadb \
                         -u"$DB_USER" -p"$DB_PASSWORD" -e \

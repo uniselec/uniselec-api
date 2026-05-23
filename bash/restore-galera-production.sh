@@ -1,77 +1,28 @@
 #!/bin/bash
-# ============================================================
-# RESTORE MANUAL - MariaDB Galera Cluster (PRODUÇÃO)
-# ============================================================
-# Autor: erivandosena@gmail.com
-# Data: 2025-11-30
-# Versão: 1.0.0
-# ============================================================
-#
-# Script para restore manual de cluster MariaDB Galera em produção
-#
-# ATENÇÃO: Este script causa DOWNTIME total do banco de dados!
-#
-# Baseado em:
-# - MariaDB Backup Documentation: https://mariadb.com/kb/en/mariabackup/
-# - Galera Cluster Documentation: https://mariadb.com/kb/en/galera-cluster/
-# - Script de teste validado: test-backup-restore-complete.sh
-#
-# PROCEDIMENTO VALIDADO:
-# 1. Parar aplicação
-# 2. Parar cluster MariaDB
-# 3. Restaurar dados no mariadb-0
-# 4. Configurar bootstrap do Galera
-# 5. Iniciar mariadb-0 (bootstrap)
-# 6. Iniciar mariadb-1 e mariadb-2 (SST automático)
-# 7. Validar cluster
-# 8. Reiniciar aplicação
-#
-# ============================================================
-# INSTRUÇÕES DE USO - RESTORE MANUAL
-# ============================================================
-# 1 Definir senha
-# export MYSQL_ROOT_PASSWORD="password_aqui"
-# 2 Definir namespace
-# export NAMESPACE="uniselec-api-prd"
-# 3 Executar restore
-# bash restore-galera-production.sh /backup/manual-20251130-140530
-# ============================================================
 
 set -euo pipefail
-
-# ============================================================
-# CONFIGURAÇÕES
-# ============================================================
 
 NAMESPACE="${NAMESPACE:-uniselec-api-prd}"
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-Password123}"
 
-# Diretório de backup a ser restaurado (passado como argumento)
 BACKUP_DIR="${1:-}"
 
-# Aplicação Laravel (será parada durante restore)
 LARAVEL_DEPLOYMENT="uniselec-api"
 
-# Pods do cluster
 PRIMARY_POD="mariadb-0"
 SECONDARY_POD="mariadb-1"
 TERTIARY_POD="mariadb-2"
 
-# Timeouts
 POD_DELETE_TIMEOUT=300
 POD_READY_TIMEOUT=600
 SST_TIMEOUT=900
 
-# Cores
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# ============================================================
-# FUNÇÕES AUXILIARES
-# ============================================================
 
 log_info() {
     echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} [INFO] $1"
@@ -96,7 +47,6 @@ section() {
     echo "================================================================"
 }
 
-# Função para verificar saúde do cluster
 check_cluster_health() {
     log_info "Verificando saúde do cluster Galera..."
 
@@ -130,7 +80,6 @@ check_cluster_health() {
     fi
 }
 
-# Aguardar pod estar sincronizado
 wait_for_sync() {
     local pod="$1"
     local max_wait="${2:-300}"
@@ -162,13 +111,9 @@ wait_for_sync() {
     return 1
 }
 
-# ============================================================
-# VALIDAÇÕES PRÉ-RESTORE
-# ============================================================
 
 section "VALIDAÇÕES PRÉ-RESTORE"
 
-# Validar argumentos
 if [ -z "$BACKUP_DIR" ]; then
     log_error "Uso: $0 <backup-dir>"
     log_error "Exemplo: $0 /backup/manual-20251130-140530"
@@ -178,18 +123,14 @@ if [ -z "$BACKUP_DIR" ]; then
     exit 1
 fi
 
-# Validar senha
 if [ -z "$MYSQL_ROOT_PASSWORD" ]; then
     log_error "MYSQL_ROOT_PASSWORD não definida!"
     log_error "Execute: export MYSQL_ROOT_PASSWORD=<sua-senha>"
     exit 1
 fi
 
-# Validar que backup existe
-# IMPORTANTE: Backup pode estar em mariadb-1 (onde foi feito) ou mariadb-0
 log_info "Validando backup em: $BACKUP_DIR"
 
-# Tentar encontrar backup em mariadb-1 primeiro (padrão de backup)
 BACKUP_SOURCE_POD=""
 if kubectl exec -n "$NAMESPACE" "$SECONDARY_POD" -- test -d "$BACKUP_DIR" 2>/dev/null; then
     BACKUP_SOURCE_POD="$SECONDARY_POD"
@@ -209,7 +150,6 @@ else
     exit 1
 fi
 
-# Validar arquivos críticos do backup
 log_info "Verificando integridade do backup..."
 VALIDATION_ERRORS=$(kubectl exec -n "$NAMESPACE" "$BACKUP_SOURCE_POD" -- bash -c "
 cd $BACKUP_DIR
@@ -239,14 +179,10 @@ fi
 
 log_success "Backup válido"
 
-# Mostrar informações do backup
 log_info "Informações do backup:"
 kubectl exec -n "$NAMESPACE" "$BACKUP_SOURCE_POD" -- cat "$BACKUP_DIR/xtrabackup_checkpoints" || true
 kubectl exec -n "$NAMESPACE" "$BACKUP_SOURCE_POD" -- cat "$BACKUP_DIR/cluster-info.txt" 2>/dev/null || true
 
-# ============================================================
-# AVISO DE DOWNTIME E CONFIRMAÇÃO
-# ============================================================
 
 section "⚠️  AVISO CRÍTICO DE DOWNTIME ⚠️"
 
@@ -273,7 +209,7 @@ echo "  7. Iniciar mariadb-1 e mariadb-2 (SST)"
 echo "  8. Validar cluster"
 echo "  9. Reiniciar aplicação"
 echo ""
-log_warning "Este processo é IRREVERSÍVEL sem um backup"
+log_warning "Este processo � IRREVERSÍVEL sem um backup"
 echo ""
 
 read -p "Você tem certeza ABSOLUTA? Digite 'RESTORE PRODUCTION' para continuar: " -r
@@ -282,7 +218,6 @@ if [[ $REPLY != "RESTORE PRODUCTION" ]]; then
     exit 0
 fi
 
-# Segunda confirmação
 echo ""
 log_warning "ÚLTIMA CONFIRMAÇÃO"
 read -p "Confirmar restore em PRODUÇÃO? (yes/no): " -r
@@ -291,13 +226,10 @@ if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
     exit 0
 fi
 
-# ============================================================
-# FASE 1: PARAR APLICAÇÃO
-# ============================================================
 
 section "FASE 1: PARANDO APLICAÇÃO"
 
-log_info "Escalando $LARAVEL_DEPLOYMENT para 0 réplicas..."
+log_info "Escalando $LARAVEL_DEPLOYMENT para 0 r�plicas..."
 kubectl scale deployment "$LARAVEL_DEPLOYMENT" -n "$NAMESPACE" --replicas=0
 
 log_info "Aguardando pods da aplicação terminarem..."
@@ -305,9 +237,6 @@ kubectl wait --for=delete pod -l app="$LARAVEL_DEPLOYMENT" -n "$NAMESPACE" --tim
 
 log_success "Aplicação parada"
 
-# ============================================================
-# FASE 2: BACKUP DE SEGURANÇA DOS DADOS ATUAIS
-# ============================================================
 
 section "FASE 2: BACKUP DE SEGURANÇA"
 
@@ -324,12 +253,10 @@ mkdir -p $SAFETY_BACKUP_DIR
 
 echo 'Copiando dados atuais para backup de segurança...'
 if [ -d /var/lib/mysql ] && [ \"\$(ls -A /var/lib/mysql 2>/dev/null)\" ]; then
-    # Copiar apenas arquivos essenciais (grastate.dat, ibdata1, etc)
     cp /var/lib/mysql/grastate.dat $SAFETY_BACKUP_DIR/ 2>/dev/null || true
     cp /var/lib/mysql/ibdata1 $SAFETY_BACKUP_DIR/ 2>/dev/null || true
     cp /var/lib/mysql/xtrabackup_* $SAFETY_BACKUP_DIR/ 2>/dev/null || true
 
-    # Salvar informações do cluster
     echo 'Backup de segurança criado em: $(date)' > $SAFETY_BACKUP_DIR/info.txt
     echo 'Dados salvos antes de restore de: $BACKUP_DIR' >> $SAFETY_BACKUP_DIR/info.txt
 
@@ -341,13 +268,10 @@ fi
 
 log_success "Backup de segurança criado em: $SAFETY_BACKUP_DIR"
 
-# ============================================================
-# FASE 3: PARAR CLUSTER MARIADB
-# ============================================================
 
 section "FASE 3: PARANDO CLUSTER MARIADB"
 
-log_info "Escalando StatefulSet mariadb para 0 réplicas..."
+log_info "Escalando StatefulSet mariadb para 0 r�plicas..."
 kubectl scale statefulset mariadb -n "$NAMESPACE" --replicas=0
 
 log_info "Aguardando pods do MariaDB terminarem..."
@@ -355,7 +279,6 @@ kubectl wait --for=delete pod/$PRIMARY_POD -n "$NAMESPACE" --timeout=${POD_DELET
 kubectl wait --for=delete pod/$SECONDARY_POD -n "$NAMESPACE" --timeout=${POD_DELETE_TIMEOUT}s || true
 kubectl wait --for=delete pod/$TERTIARY_POD -n "$NAMESPACE" --timeout=${POD_DELETE_TIMEOUT}s || true
 
-# Verificar que todos os pods foram deletados
 for pod in $PRIMARY_POD $SECONDARY_POD $TERTIARY_POD; do
     if kubectl get pod "$pod" -n "$NAMESPACE" &>/dev/null; then
         log_warning "$pod ainda existe, forçando delete..."
@@ -367,9 +290,6 @@ sleep 10
 
 log_success "Cluster MariaDB parado"
 
-# ============================================================
-# FASE 4: EXECUTAR RESTORE
-# ============================================================
 
 section "FASE 4: EXECUTANDO RESTORE"
 
@@ -404,7 +324,6 @@ spec:
           echo "Source: $BACKUP_DIR"
           echo "Target: /var/lib/mysql"
 
-          # Validar backup
           if [ ! -f "$BACKUP_DIR/xtrabackup_checkpoints" ]; then
             echo "ERRO: Backup inválido - xtrabackup_checkpoints não encontrado"
             exit 1
@@ -460,8 +379,6 @@ spec:
           claimName: database-mariadb-0
       - name: backup-storage
         persistentVolumeClaim:
-          # Usar PVC onde o backup está localizado
-          # Detectado automaticamente em BACKUP_SOURCE_POD
           claimName: backup-$BACKUP_SOURCE_POD
 EOF
 
@@ -481,9 +398,6 @@ fi
 
 log_success "Restore completado!"
 
-# ============================================================
-# FASE 5: CONFIGURAR BOOTSTRAP DO GALERA
-# ============================================================
 
 section "FASE 5: CONFIGURANDO BOOTSTRAP GALERA"
 
@@ -513,7 +427,6 @@ spec:
         - |
           echo "Configurando grastate.dat para bootstrap..."
           cat > /data/grastate.dat <<'GRASTATE'
-          # WSREP saved state - RESTORE POINT
           version: 2.1
           uuid:    00000000-0000-0000-0000-000000000000
           seqno:   -1
@@ -545,9 +458,6 @@ else
     exit 1
 fi
 
-# ============================================================
-# FASE 6: INICIAR MARIADB-0 (BOOTSTRAP)
-# ============================================================
 
 section "FASE 6: INICIANDO MARIADB-0 (BOOTSTRAP)"
 
@@ -572,9 +482,6 @@ wait_for_sync "$PRIMARY_POD" 300 || {
 
 log_success "mariadb-0 está Synced e pronto!"
 
-# ============================================================
-# FASE 7: INICIAR MARIADB-1 E MARIADB-2 (SST)
-# ============================================================
 
 section "FASE 7: INICIANDO MARIADB-1 E MARIADB-2 (SST)"
 
@@ -605,9 +512,6 @@ wait_for_sync "$TERTIARY_POD" 600 || {
 log_info "Aguardando estabilização do cluster (60s)..."
 sleep 60
 
-# ============================================================
-# FASE 8: VALIDAÇÃO DO CLUSTER
-# ============================================================
 
 section "FASE 8: VALIDAÇÃO DO CLUSTER"
 
@@ -637,7 +541,6 @@ else
     fi
 fi
 
-# Validação adicional de dados
 log_info "Validando acesso aos dados restaurados..."
 DATABASES=$(kubectl exec -n "$NAMESPACE" "$PRIMARY_POD" -- \
     mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" -N -e "SHOW DATABASES" 2>/dev/null | grep -v -E "^(information_schema|mysql|performance_schema|sys)$")
@@ -645,9 +548,6 @@ DATABASES=$(kubectl exec -n "$NAMESPACE" "$PRIMARY_POD" -- \
 log_success "Databases encontrados:"
 echo "$DATABASES"
 
-# ============================================================
-# FASE 9: REINICIAR APLICAÇÃO
-# ============================================================
 
 section "FASE 9: REINICIANDO APLICAÇÃO"
 
@@ -661,18 +561,12 @@ kubectl wait --for=condition=available deployment/$LARAVEL_DEPLOYMENT -n "$NAMES
 
 log_success "Aplicação reiniciada!"
 
-# ============================================================
-# FASE 10: LIMPEZA
-# ============================================================
 
 section "FASE 10: LIMPEZA"
 
 log_info "Removendo Job de restore..."
 kubectl delete job $RESTORE_JOB_NAME -n "$NAMESPACE" || true
 
-# ============================================================
-# RELATÓRIO FINAL
-# ============================================================
 
 section "RELATÓRIO FINAL DO RESTORE"
 
@@ -682,7 +576,7 @@ echo ""
 echo "  Backup Restaurado:  $BACKUP_DIR"
 echo "  Namespace:          $NAMESPACE"
 echo "  Cluster MariaDB:    3 nós Synced"
-echo "  Aplicação:          $LARAVEL_DEPLOYMENT (1 réplica)"
+echo "  Aplicação:          $LARAVEL_DEPLOYMENT (1 r�plica)"
 echo ""
 log_info "BACKUP DE SEGURANÇA (para rollback):"
 echo "  $SAFETY_BACKUP_DIR"
@@ -691,7 +585,7 @@ log_info "VALIDAÇÕES FINAIS RECOMENDADAS:"
 echo "  1. Testar login na aplicação"
 echo "  2. Verificar dados críticos no banco"
 echo "  3. Monitorar logs da aplicação"
-echo "  4. Verificar métricas de performance"
+echo "  4. Verificar m�tricas de performance"
 echo ""
 log_info "Para verificar status do cluster:"
 echo "  kubectl exec -n $NAMESPACE mariadb-0 -- mariadb -uroot -p... -e \"SHOW STATUS LIKE 'wsrep%'\""

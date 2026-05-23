@@ -1,51 +1,13 @@
 #!/bin/bash
 
-####################################################################################################
-# 
-# Nome do arquivo: setup-databases.sh
-# Autor: Erivando Sena <erivandoramos@unilab.edu.br>
-# Data de criacao: 29/04/2023
-#
-# Descricao: Este script foi desenvolvido como parte do projeto [Stack DEVOPS DTI] da 
-#            Universidade da Integracao Internacional da Lusofonia Afro-Brasileira (UNILAB).
-#
-# Direitos autorais (c) 2023 Erivando Sena/UNILAB.
-#
-# E concedida permissao para usar, copiar, modificar e distribuir este software apenas para 
-# uso pessoal ou em sua organizacao, desde que este aviso de direitos autorais apareca em 
-# todas as copias. 
-# Este software e fornecido "como esta" e sem garantias expressas ou implicitas, incluindo, 
-# mas nao se limitando a, garantias implicitas de comercializacao e adequacao a um proposito 
-# especifico. 
-# Em nenhum caso, o autor sera responsavel por quaisquer danos diretos, indiretos, 
-# incidentais, especiais, exemplares ou consequentes (incluindo, mas nao se limitando 
-# a, aquisicao de bens ou servicos substitutos, perda de uso, dados ou lucros, ou 
-# interrupcao dos negocios) decorrentes do uso, incapacidade de uso ou resultados do 
-# uso deste software.
-#
-# Este programa e distribuido na esperanca de que possa ser util, mas SEM NENHUMA 
-# GARANTIA; sem uma garantia implicita de ADEQUACAO a qualquer MERCADO ou APLICACAO EM PARTICULAR.
-# Veja a Licenca Publica Geral GNU para mais detalhes.
-#
-####################################################################################################
-
-# Connection options:
-#   -h, --host=HOSTNAME      host do servidor de banco de dados
-#   -p, --port=PORT          porta do servidor de banco de dados
-#   -U, --username=USERNAME  nome de usuario do banco de dados
-#   -w, --no-password        nunca solicitar senha
-#   -W, --password           forcar prompt de senha (should happen automatically)
-
-# set -euo pipefail
 set +eu
 
 readonly MAX_ATTEMPTS=25
 readonly WAIT_TIME=15
 
-connection_string_root_con="postgresql://$PG_USER_ROOT:$PG_ROOT_PASSWORD@$PG_HOST:$PG_PORT/$PG_DATABASE" 
-connection_string_root_con_bd="postgresql://$PG_USER_ROOT:$PG_ROOT_PASSWORD@$PG_HOST:$PG_PORT" 
+connection_string_root_con="postgresql://$PG_USER_ROOT:$PG_ROOT_PASSWORD@$PG_HOST:$PG_PORT/$PG_DATABASE"
+connection_string_root_con_bd="postgresql://$PG_USER_ROOT:$PG_ROOT_PASSWORD@$PG_HOST:$PG_PORT"
 
-# funcoes gerais
 function verifica_postgres() {
     local connection_string="$1"
     local attempts=0
@@ -63,7 +25,7 @@ function verifica_postgres() {
     echo "Servidor PostgreSQL UP!"
 }
 
-function database_exists() { 
+function database_exists() {
     local database_name="$1"
     local result=$(psql -tA $connection_string_root_con -c "SELECT 1 FROM pg_database WHERE datname='$database_name';" | grep -c 1)
     return $result
@@ -75,13 +37,13 @@ function user_exists() {
     return $result
 }
 
-function create_user_admin() { 
+function create_user_admin() {
     local username=$1
     if [[ $(user_exists "$username") -eq 0 ]]; then
         psql -v ON_ERROR_STOP=1 -d $connection_string_root_con <<-EOSQL
             CREATE ROLE $username WITH
                 SUPERUSER
-                LOGIN 
+                LOGIN
                 CREATEDB
                 CREATEROLE
                 REPLICATION
@@ -99,7 +61,7 @@ function create_user_regular() {
     if [[ $(user_exists "$username") -eq 0 ]]; then
         psql -v ON_ERROR_STOP=1 -d $connection_string_root_con <<-EOSQL
             CREATE ROLE $username WITH
-                LOGIN 
+                LOGIN
                 CREATEDB
                 CREATEROLE
                 REPLICATION
@@ -143,7 +105,7 @@ function create_database() {
             ENCODING = 'UTF8'
             CONNECTION LIMIT = -1
             IS_TEMPLATE = False;
-            
+
         COMMENT ON DATABASE "$database" IS 'Dadabase PostgreSQL $database';
 EOSQL
 }
@@ -198,10 +160,8 @@ function remove_schema() {
 EOSQL
 }
 
-# Aguarda conexao com o PostgreSQL
 verifica_postgres "$connection_string_root_con"
 
-# Setup database
 if ! database_exists "$PG_DATABASE"; then
     create_database "$PG_DATABASE" "$PG_USER"
 fi
@@ -210,7 +170,6 @@ if ! database_exists "$PG_DATABASE_HOMOLOGACAO"; then
     create_database "$PG_DATABASE_HOMOLOGACAO" "$PG_USER"
 fi
 
-# Setup user admin
 array_users=(${USERS_DUMP})
 for i in ${!array_users[@]}; do
     username="${array_users[$i]}"
@@ -236,7 +195,6 @@ for i in ${!array_users[@]}; do
     fi
 done
 
-# Setup user owner database
 array_users=(${USER_OWNER_DATABASE_DUMP})
 for i in ${!array_users[@]}; do
     username="${array_users[$i]}"

@@ -17,7 +17,7 @@ spec:
     - ${REPO_URL}
   destinations:
     - namespace: ${APP_NAMESPACE}
-      server: https://${CLUSTER_REMOTE1_DOMAIN}:6443
+      server: ${ARGOCD_DEST_SERVER}
   clusterResourceWhitelist:
     - group: "*"
       kind: "*"

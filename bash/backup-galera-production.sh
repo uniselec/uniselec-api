@@ -1,65 +1,25 @@
 #!/bin/bash
-# ============================================================
-# BACKUP MANUAL - MariaDB Galera Cluster (PRODUÇÃO)
-# ============================================================
-# Autor: erivandosena@gmail.com
-# Data: 2025-11-30
-# Versão: 1.0.0
-# ============================================================
-#
-# Script para backup manual de cluster MariaDB Galera em produção
-#
-# IMPORTANTE: Este script executa backup SEM downtime
-#
-# Baseado em:
-# - MariaDB Backup Documentation: https://mariadb.com/kb/en/mariabackup/
-# - Galera Cluster Best Practices
-# - Script de teste validado: test-backup-restore-complete.sh
-#
-# ============================================================
-# INSTRUÇÕES DE USO - BACKUP MANUAL
-# ============================================================
-# 1 Definir senha
-# export MYSQL_ROOT_PASSWORD="password_aqui"
-# 2 Definir namespace
-# export NAMESPACE="uniselec-api-prd"
-# 3 Executar backup
-# bash backup-galera-production.sh
-# ============================================================
 
 set -euo pipefail
 
-# ============================================================
-# CONFIGURAÇÕES
-# ============================================================
-
-# Namespace do cluster
 NAMESPACE="${NAMESPACE:-uniselec-api-prd}"
 
-# Credenciais (via environment variables ou secret)
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-Password123}"
 
-# Diretório de backup com timestamp
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_DIR="/backup/manual-${TIMESTAMP}"
 
-# Pod onde será executado o backup (SEMPRE usar secundário, NUNCA o primário)
 BACKUP_POD="mariadb-1"  # Nó secundário para minimizar impacto
 
-# Configurações de compressão e paralelização
 PARALLEL_THREADS=2
 COMPRESS_THREADS=2
 
-# Cores para output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# ============================================================
-# FUNÇÕES AUXILIARES
-# ============================================================
 
 log_info() {
     echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} [INFO] $1"
@@ -84,13 +44,11 @@ section() {
     echo "================================================================"
 }
 
-# Função para verificar se pod está saudável
 check_pod_health() {
     local pod="$1"
 
     log_info "Verificando saúde do pod $pod..."
 
-    # Verificar se pod existe e está rodando
     if ! kubectl get pod "$pod" -n "$NAMESPACE" &>/dev/null; then
         log_error "Pod $pod não encontrado!"
         return 1
@@ -102,14 +60,12 @@ check_pod_health() {
         return 1
     fi
 
-    # Verificar se MariaDB está respondendo
     if ! kubectl exec -n "$NAMESPACE" "$pod" -- \
         mariadb-admin ping -u root -p"$MYSQL_ROOT_PASSWORD" --silent 2>/dev/null; then
         log_error "MariaDB no pod $pod não está respondendo"
         return 1
     fi
 
-    # Verificar estado do Galera
     local state=$(kubectl exec -n "$NAMESPACE" "$pod" -- \
         mariadb -uroot -p"$MYSQL_ROOT_PASSWORD" -N -e \
         "SHOW STATUS LIKE 'wsrep_local_state_comment'" 2>/dev/null | awk '{print $2}')
@@ -124,40 +80,33 @@ check_pod_health() {
     fi
 
     if [ "$cluster_size" != "3" ]; then
-        log_warning "Cluster size é $cluster_size (esperado: 3)"
+        log_warning "Cluster size � $cluster_size (esperado: 3)"
     fi
 
     log_success "Pod $pod está saudável (estado: $state, cluster_size: $cluster_size)"
     return 0
 }
 
-# ============================================================
-# VALIDAÇÕES PRÉ-BACKUP
-# ============================================================
 
 section "VALIDAÇÕES PRÉ-BACKUP"
 
-# Validar variável de senha
 if [ -z "$MYSQL_ROOT_PASSWORD" ]; then
     log_error "MYSQL_ROOT_PASSWORD não definida!"
     log_error "Execute: export MYSQL_ROOT_PASSWORD=<sua-senha>"
     exit 1
 fi
 
-# Validar que estamos fazendo backup em nó secundário
 if [ "$BACKUP_POD" = "mariadb-0" ]; then
     log_error "NUNCA execute backup no mariadb-0 (nó primário) em produção!"
     log_error "Use mariadb-1 ou mariadb-2 para minimizar impacto"
     exit 1
 fi
 
-# Verificar saúde do pod de backup
 check_pod_health "$BACKUP_POD" || {
     log_error "Pod $BACKUP_POD não está saudável. Abortando backup."
     exit 1
 }
 
-# Verificar espaço disponível
 log_info "Verificando espaço disponível no volume de backup..."
 AVAILABLE_SPACE=$(kubectl exec -n "$NAMESPACE" "$BACKUP_POD" -- \
     df -BG /backup | tail -1 | awk '{print $4}' | sed 's/G//')
@@ -170,7 +119,6 @@ fi
 
 log_success "Espaço disponível: ${AVAILABLE_SPACE}G"
 
-# Listar backups existentes
 log_info "Backups existentes:"
 kubectl exec -n "$NAMESPACE" "$BACKUP_POD" -- bash -c '
     if [ -d /backup ]; then
@@ -178,9 +126,6 @@ kubectl exec -n "$NAMESPACE" "$BACKUP_POD" -- bash -c '
     fi
 '
 
-# ============================================================
-# CONFIRMAÇÃO DO USUÁRIO
-# ============================================================
 
 section "CONFIRMAÇÃO"
 
@@ -204,16 +149,12 @@ if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
     exit 0
 fi
 
-# ============================================================
-# EXECUÇÃO DO BACKUP
-# ============================================================
 
 section "EXECUÇÃO DO BACKUP"
 
 log_info "Criando diretório de backup: $BACKUP_DIR"
 kubectl exec -n "$NAMESPACE" "$BACKUP_POD" -- mkdir -p "$BACKUP_DIR"
 
-# Salvar metadados do cluster ANTES do backup
 log_info "Salvando metadados do cluster Galera..."
 kubectl exec -n "$NAMESPACE" "$BACKUP_POD" -- bash -c "
 cat > $BACKUP_DIR/cluster-info.txt <<'CLUSTER_INFO'
@@ -240,7 +181,6 @@ GROUP BY table_schema;
 
 log_success "Metadados salvos"
 
-# Executar mariadb-backup
 log_info "Executando mariadb-backup (streaming + compressão)..."
 log_info "IMPORTANTE: Este processo NÃO bloqueia o banco de dados"
 
@@ -251,7 +191,6 @@ set -euo pipefail
 
 echo '[BACKUP] Iniciando mariadb-backup...'
 
-# Executar backup com streaming (economia de espaço)
 mariadb-backup \
   --backup \
   --user=root \
@@ -263,10 +202,8 @@ mariadb-backup \
 if [ \$? -eq 0 ]; then
     echo '[BACKUP] Backup stream completado'
 
-    # Calcular checksum para validação
     md5sum $BACKUP_DIR/backup.mbstream > $BACKUP_DIR/backup.mbstream.md5
 
-    # Registrar tamanho do backup
     ls -lh $BACKUP_DIR/backup.mbstream | awk '{print \$5}' > $BACKUP_DIR/backup.size
 
     echo '[BACKUP] Checksum calculado'
@@ -287,9 +224,6 @@ fi
 
 log_success "Backup completado em ${BACKUP_DURATION} segundos"
 
-# ============================================================
-# PREPARAÇÃO DO BACKUP
-# ============================================================
 
 section "PREPARAÇÃO DO BACKUP"
 
@@ -311,7 +245,6 @@ mariadb-backup \
 if [ \$? -eq 0 ]; then
     echo '[PREPARE] Backup preparado'
 
-    # Validar que xtrabackup_checkpoints existe
     if [ -f $BACKUP_DIR/xtrabackup_checkpoints ]; then
         echo '[PREPARE] xtrabackup_checkpoints encontrado'
         cat $BACKUP_DIR/xtrabackup_checkpoints
@@ -332,15 +265,11 @@ fi
 
 log_success "Backup preparado e pronto para restore"
 
-# ============================================================
-# VALIDAÇÃO DO BACKUP
-# ============================================================
 
 section "VALIDAÇÃO DO BACKUP"
 
 log_info "Validando integridade do backup..."
 
-# Validar checksum
 kubectl exec -n "$NAMESPACE" "$BACKUP_POD" -- bash -c "
 cd $BACKUP_DIR
 if md5sum -c backup.mbstream.md5; then
@@ -356,11 +285,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Validar arquivos críticos
 VALIDATION_RESULT=$(kubectl exec -n "$NAMESPACE" "$BACKUP_POD" -- bash -c "
 cd $BACKUP_DIR
 
-# Arquivos obrigatórios
 required_files=(
     'xtrabackup_checkpoints'
     'xtrabackup_info'
@@ -390,9 +317,6 @@ fi
 
 log_success "Backup validado"
 
-# ============================================================
-# INFORMAÇÕES DO BACKUP
-# ============================================================
 
 section "INFORMAÇÕES DO BACKUP"
 
@@ -409,7 +333,6 @@ echo "  Duração:        ${BACKUP_DURATION}s"
 echo "  Checksum MD5:   Validado"
 echo ""
 
-# Salvar informações do backup em arquivo local
 cat > "backup-${TIMESTAMP}.info" <<INFO
 Backup Manual - MariaDB Galera Cluster
 ========================================
@@ -437,9 +360,6 @@ INFO
 
 log_info "Informações salvas em: backup-${TIMESTAMP}.info"
 
-# ============================================================
-# LIMPEZA DE BACKUPS ANTIGOS (OPCIONAL)
-# ============================================================
 
 section "LIMPEZA DE BACKUPS ANTIGOS"
 
@@ -466,9 +386,6 @@ else
     log_info "Nenhum backup antigo encontrado (> 7 dias)"
 fi
 
-# ============================================================
-# RECOMENDAÇÕES FINAIS
-# ============================================================
 
 section "RECOMENDAÇÕES"
 

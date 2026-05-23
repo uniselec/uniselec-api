@@ -71,7 +71,6 @@ spec:
     clientIP:
       timeoutSeconds: 10800
 ---
-# LoadBalancer exposto via MetalLB int-pool
 apiVersion: v1
 kind: Service
 metadata:
@@ -79,7 +78,7 @@ metadata:
   labels:
     app: mariadb
   annotations:
-    metallb.universe.tf/address-pool: int-pool
+    metallb.universe.tf/address-pool: primary-pool
 spec:
   type: LoadBalancer
   externalTrafficPolicy: Cluster
