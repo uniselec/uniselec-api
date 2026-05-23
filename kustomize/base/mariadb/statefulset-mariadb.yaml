@@ -74,7 +74,6 @@ spec:
               if [ ! -f "$GR" ]; then
                   echo "[INFO] Creating initial grastate.dat" >> $LOG
                   cat > "$GR" << 'EOF'
-              # GALERA saved state
               version: 2.1
               uuid: 00000000-0000-0000-0000-000000000000
               seqno: -1
@@ -94,7 +93,6 @@ spec:
                               "mariadb-2.mariadb.${NAMESPACE}.svc.cluster.local"; do
                       echo "[CHECK] Testing $peer:4567" >> $LOG
 
-                      # 3 tentativas com timeout 5s
                       for i in {1..3}; do
                           if nc -z -w 5 "$peer" 4567 2>/dev/null; then
                               echo "[SUCCESS] Peer $peer online (attempt $i)" >> $LOG
@@ -145,12 +143,6 @@ spec:
         - -c
         - |
           #!/bin/bash
-          # ======================================================
-          # CONFIGURAÇÃO INICIAL DO MARIADB:
-          # LOCALE PT-BR, CRIAÇÃO DO BANCO PRINCIPAL,
-          # USUÁRIO DE APLICAÇÃO, USUÁRIO DE REPLICAÇÃO,
-          # E PERMISSÕES DE ACESSO ROOT
-          # ======================================================
 
           set -eo pipefail
 
@@ -293,7 +285,7 @@ spec:
           initialDelaySeconds: 30        # aguarde mais na primeira verificação
           periodSeconds: 10
           timeoutSeconds: 10             # mais tempo para a resposta do banco
-          failureThreshold: 60           # até 10min tolerância total de inicialização
+          failureThreshold: 60           # at� 10min tolerância total de inicialização
 
         readinessProbe:
           exec:
@@ -301,12 +293,10 @@ spec:
             - bash
             - -c
             - |
-              # Verifica conexão
               if ! mariadb-admin ping -u root -p"${MYSQL_ROOT_PASSWORD}" 2>/dev/null; then
                 exit 1
               fi
 
-              # Verifica se está Synced
               STATE=$(mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" \
                 -e "SHOW STATUS LIKE 'wsrep_local_state_comment';" 2>/dev/null | \
                 awk 'NR==2 {print $2}')
@@ -316,18 +306,15 @@ spec:
                 exit 1
               fi
 
-              # Verifica cluster size
               SIZE=$(mariadb -u root -p"${MYSQL_ROOT_PASSWORD}" \
                 -e "SHOW STATUS LIKE 'wsrep_cluster_size';" 2>/dev/null | \
                 awk 'NR==2 {print $2}')
 
-              # mariadb-0 pode ter cluster_size=1 (bootstrap)
               ordinal="${HOSTNAME##*-}"
               if [ "$ordinal" = "0" ] && [ "$SIZE" -ge 1 ]; then
                 exit 0  # mariadb-0 OK com cluster_size >= 1
               fi
 
-              # mariadb-1 e mariadb-2 precisam cluster_size >= 2
               if [ "$SIZE" -lt 2 ]; then
                 echo "Cluster too small: $SIZE"
                 exit 1
@@ -396,7 +383,7 @@ spec:
       resources:
         requests:
           storage: 50Gi
-      storageClassName: nfs-storage-k8s-v1
+      storageClassName: nfs-client
       volumeMode: Filesystem
 
   - metadata:
@@ -410,5 +397,5 @@ spec:
       resources:
         requests:
           storage: 100Gi
-      storageClassName: nfs-storage-k8s-v1
+      storageClassName: nfs-client
       volumeMode: Filesystem

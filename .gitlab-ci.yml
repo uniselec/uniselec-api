@@ -2,7 +2,9 @@
 # GitLab CI/CD Pipeline - GitOps
 # ══════════════════════════════════════════════════════════════════════════════
 # Padrões: GitLab CE CI/CD, GitOps, Kubernetes Best Practices
-# Arquitetura: K8S (Main/Hub ArgoCD), K8S (Remote/Workloads)
+# Arquitetura: Dual-mode GitOps (controlado por GITOPS_MODE)
+#   single-cluster : ArgoCD e workloads no mesmo cluster
+#   hub-spoke      : ArgoCD no Hub (C1) gerencia Spoke remoto (C2)
 # Projeto: cicd-gitops
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -16,6 +18,55 @@ stages:
   - approval
   - production
   - notify
+
+.load_k8s_secrets: &load_k8s_secrets |
+  set -euo pipefail
+
+  read_secret() {
+    kubectl get secret -n "$1" "$2" -o jsonpath="{.data.$3}" | base64 -d
+  }
+
+  export TOKEN_PAT_NAME="$(read_secret ci-cd git-credentials username)"
+  export TOKEN_PAT_ACCESS="$(read_secret ci-cd git-credentials token)"
+  export KUBECONFIG_HA="$(kubectl get secret -n argocd kubeconfig-ha -o jsonpath='{.data.kubeconfig\.yaml}' 2>/dev/null | tr -d '\n')"
+  if [[ -z "${KUBECONFIG_HA}" ]]; then
+    export KUBECONFIG_HA="$(kubectl get secret -n argocd kubeconfig-c2 -o jsonpath='{.data.kubeconfig\.yaml}' | tr -d '\n')"
+  fi
+
+  # Switching GitOps mode: single-cluster | hub-spoke
+  # single-cluster: ArgoCD e workloads no mesmo cluster (kubernetes.default.svc)
+  # hub-spoke:      ArgoCD no Hub gerencia Spoke remoto (HUB_SPOKE_DEST_SERVER)
+  if [[ "${GITOPS_MODE}" == "hub-spoke" ]]; then
+    export ARGOCD_DEST_SERVER="${HUB_SPOKE_DEST_SERVER}"
+    echo "[INFO] GitOps mode: hub-spoke | dest: ${ARGOCD_DEST_SERVER}"
+  else
+    export ARGOCD_DEST_SERVER="https://kubernetes.default.svc"
+    echo "[INFO] GitOps mode: single-cluster | dest: ${ARGOCD_DEST_SERVER}"
+  fi
+
+  # TLS mode: insecure (default) | server-crt (certificado explícito)
+  # Para ativar: definir ARGOCD_TLS_MODE=server-crt e ARGOCD_SERVER_CRT_B64=<base64 do cert>
+  if [[ "${ARGOCD_TLS_MODE}" == "server-crt" ]] && [[ -n "${ARGOCD_SERVER_CRT_B64}" ]]; then
+    echo "${ARGOCD_SERVER_CRT_B64}" | base64 -d > /tmp/argocd-server.crt
+    export ARGOCD_TLS_OPTS="--server-crt /tmp/argocd-server.crt"
+    echo "[INFO] ArgoCD TLS mode: server-crt"
+  else
+    export ARGOCD_TLS_OPTS="${ARGOCD_TLS_OPTS}"
+    echo "[INFO] ArgoCD TLS mode: insecure (default)"
+  fi
+
+  HARBOR_AUTH="$(kubectl get secret -n ci-cd regcred -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d | jq -r --arg reg "$HARBOR_REGISTRY" '.auths[$reg].auth // empty')"
+  if [[ -n "$HARBOR_AUTH" ]]; then
+    DECODED_AUTH="$(echo "$HARBOR_AUTH" | base64 -d)"
+    export HARBOR_USERNAME="${DECODED_AUTH%%:*}"
+    export HARBOR_PASSWORD="${DECODED_AUTH#*:}"
+  fi
+
+  export SONAR_TOKEN="$(read_secret ci-cd sonar-credentials token 2>/dev/null || read_secret ci-cd sonar-credentials login)"
+
+default:
+  before_script:
+    - *load_k8s_secrets
 
 # Globais
 variables:
@@ -33,16 +84,23 @@ variables:
   DOMAIN_STAG: "uniselec-api-staging.unilab.edu.br"
   DOMAIN_PROD: "uniselec-api.unilab.edu.br"
   # Container Registry
-  HARBOR_REGISTRY: "dti-registro.unilab.edu.br"
+  HARBOR_REGISTRY: "harbor.unilab.edu.br"
   DOCKER_IMAGE: "${HARBOR_REGISTRY}/unilab/${APP_NAME}"
-  BASE_IMAGE: "dti-registro.unilab.edu.br/unilab/ubuntu-k8s-tools:latest"
+  BASE_IMAGE: "harbor.unilab.edu.br/unilab/ubuntu-k8s-tools:latest"
   # Kubernetes/ArgoCD
-  ARGOCD_SERVER: "argocd.unilab.edu.br"
-  CLUSTER_REMOTE1_DOMAIN: "10.130.0.45"
+  # Para alternar modo: mudar GITOPS_MODE para "hub-spoke" ou "single-cluster"
+  # ARGOCD_DEST_SERVER e sobrescrito em runtime pelo load_k8s_secrets
+  ARGOCD_SERVER: "gitops.unilab.edu.br"        # Ingress do ArgoCD (Hub/unico cluster)
+  GITOPS_MODE: "single-cluster"                # single-cluster | hub-spoke
+  ARGOCD_DEST_SERVER: "https://kubernetes.default.svc"        # default: single-cluster
+  HUB_SPOKE_DEST_SERVER: "https://k8s-c2.unilab.edu.br:8443" # usado se hub-spoke
+  CLUSTER_REMOTE1_DOMAIN: "k8s-c2.unilab.edu.br"             # dominio do Spoke (C2)
   KUBECONFIG: "/tmp/kubeconfig-${CI_PIPELINE_ID}"
   ARGOCD_TIMEOUT_DEV: "600"   # 10 minutos
   ARGOCD_TIMEOUT_STG: "900"   # 15 minutos
   ARGOCD_TIMEOUT_PRD: "1200"  # 20 minutos
+  ARGOCD_TLS_MODE: "insecure"      # insecure | server-crt
+  ARGOCD_SERVER_CRT_B64: ""        # base64 do cert TLS do ArgoCD (quando server-crt)
 
   # Notificação
   MAIL_PRD: "jefponte@unilab.edu.br"
@@ -83,11 +141,11 @@ validate:environment:
       fi
 
       # Kubernetes
-      if [[ -z "${KUBECONFIG_C2}" ]]; then
-        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] KUBECONFIG_C2 não está definida"
+      if [[ -z "${KUBECONFIG_HA}" ]]; then
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] KUBECONFIG_HA não está definida"
         ERRORS=$((ERRORS+1))
       else
-        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] KUBECONFIG_C2 presente"
+        echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] KUBECONFIG_HA presente"
       fi
 
       # Harbor
@@ -195,6 +253,7 @@ tests:unit:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   before_script:
+    - *load_k8s_secrets
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Iniciando testes unitários"
     - |
       if [ -d .git ] && [ -f .git/shallow ]; then
@@ -243,6 +302,7 @@ tests:dependency_check:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   allow_failure: true
   before_script:
+    - *load_k8s_secrets
     - cd .
   script:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Verificando vulnerabilidades de dependências"
@@ -332,6 +392,7 @@ build:docker:
     - if: '$CI_COMMIT_BRANCH == "develop"'
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   before_script:
+    - *load_k8s_secrets
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Iniciando build Docker"
     - |
       echo "${HARBOR_PASSWORD}" | docker login ${HARBOR_REGISTRY} \
@@ -464,6 +525,7 @@ development:deploy:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
   before_script:
+    - *load_k8s_secrets
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] GitOps Development Deploy - ArgoCD"
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Branch ${CI_COMMIT_BRANCH} | Commit ${CI_COMMIT_SHORT_SHA}"
   script:
@@ -528,7 +590,7 @@ development:deploy:
     - envsubst < argocd/argocd-applicationset.yaml.template > /tmp/argocd-applicationset-${DEPLOY_ENV}.yaml
 
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 4 - Conectar ao Cluster Main K8S"
-    - echo "${KUBECONFIG_C2}" | base64 -d > ${KUBECONFIG}
+    - echo "${KUBECONFIG_HA}" | base64 -d > ${KUBECONFIG}
     - chmod 600 ${KUBECONFIG}
     - export KUBECONFIG=${KUBECONFIG}
     - |
@@ -575,7 +637,7 @@ development:deploy:
         --username admin \
         --password ${ARGOCD_PASSWORD} \
         --grpc-web \
-        --insecure 2>&1)
+        ${ARGOCD_TLS_OPTS} 2>&1)
       if [ $? -eq 0 ]; then
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Login bem-sucedido"
       else
@@ -590,7 +652,7 @@ development:deploy:
         --username ${TOKEN_PAT_NAME} \
         --password ${TOKEN_PAT_ACCESS} \
         --grpc-web \
-        --insecure 2>&1)
+        ${ARGOCD_TLS_OPTS} 2>&1)
 
       echo "${REPO_OUTPUT}" | tee /tmp/repo-add.log
 
@@ -699,6 +761,7 @@ staging:deploy:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   before_script:
+    - *load_k8s_secrets
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] GitOps Staging Deploy - ArgoCD"
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Branch ${CI_COMMIT_BRANCH} | Commit ${CI_COMMIT_SHORT_SHA}"
   script:
@@ -764,7 +827,7 @@ staging:deploy:
     - envsubst < argocd/argocd-applicationset.yaml.template > /tmp/argocd-applicationset-${DEPLOY_ENV}.yaml
 
     - echo "[INFO] ETAPA 4 - Conectar ao Cluster K8S Main"
-    - echo "${KUBECONFIG_C2}" | base64 -d > ${KUBECONFIG}
+    - echo "${KUBECONFIG_HA}" | base64 -d > ${KUBECONFIG}
     - chmod 600 ${KUBECONFIG}
     - export KUBECONFIG=${KUBECONFIG}
     - |
@@ -809,7 +872,7 @@ staging:deploy:
         --username admin \
         --password ${ARGOCD_PASSWORD} \
         --grpc-web \
-        --insecure 2>&1)
+        ${ARGOCD_TLS_OPTS} 2>&1)
       if [ $? -eq 0 ]; then
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Login Ok"
       else
@@ -824,7 +887,7 @@ staging:deploy:
         --username ${TOKEN_PAT_NAME} \
         --password ${TOKEN_PAT_ACCESS} \
         --grpc-web \
-        --insecure 2>&1)
+        ${ARGOCD_TLS_OPTS} 2>&1)
 
       echo "${REPO_OUTPUT}" | tee /tmp/repo-add.log
 
@@ -929,6 +992,7 @@ notification:staging:
   needs:
     - job: staging:deploy
   before_script:
+    - *load_k8s_secrets
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando conclusão de staging"
     - service postfix start
   script:
@@ -1017,6 +1081,7 @@ production:deploy:
     - job: approval:production
       optional: false
   before_script:
+    - *load_k8s_secrets
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] GitOps Production Deploy - ArgoCD"
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Release ${CI_COMMIT_TAG} | Branch ${CI_COMMIT_BRANCH}"
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Usando tag ${CI_COMMIT_TAG} na imagem"
@@ -1081,7 +1146,7 @@ production:deploy:
     - envsubst < argocd/argocd-applicationset.yaml.template > /tmp/argocd-applicationset-${DEPLOY_ENV}.yaml
 
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 4 - Conectar ao Cluster K8S Main"
-    - echo "${KUBECONFIG_C2}" | base64 -d > ${KUBECONFIG}
+    - echo "${KUBECONFIG_HA}" | base64 -d > ${KUBECONFIG}
     - chmod 600 ${KUBECONFIG}
     - export KUBECONFIG=${KUBECONFIG}
     - |
@@ -1125,14 +1190,14 @@ production:deploy:
         --username admin \
         --password ${ARGOCD_PASSWORD} \
         --grpc-web \
-        --insecure 2>&1)
+        ${ARGOCD_TLS_OPTS} 2>&1)
       if [ $? -eq 0 ]; then
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [OK] Login OK"
       else
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Falha no login do ArgoCD"
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [DEBUG] ${LOGIN_OUTPUT}"
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Verificando conectividade"
-        argocd version --server ${ARGOCD_SERVER} --grpc-web --insecure || true
+        argocd version --server ${ARGOCD_SERVER} --grpc-web ${ARGOCD_TLS_OPTS} || true
         exit 1
       fi
 
@@ -1142,7 +1207,7 @@ production:deploy:
         --username ${TOKEN_PAT_NAME} \
         --password ${TOKEN_PAT_ACCESS} \
         --grpc-web \
-        --insecure 2>&1)
+        ${ARGOCD_TLS_OPTS} 2>&1)
       echo "${REPO_OUTPUT}" | tee /tmp/repo-add.log
       if echo "${REPO_OUTPUT}" | grep -q "already exists"; then
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Repositório já existe (ignorando)"
@@ -1244,6 +1309,7 @@ notify:success:
   needs:
     - job: production:deploy
   before_script:
+    - *load_k8s_secrets
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando sucesso em production"
     - service postfix start
   script:
@@ -1281,6 +1347,7 @@ notify:failure:
     - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
       when: on_failure
   before_script:
+    - *load_k8s_secrets
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Notificando e-mail falha"
     - service postfix start
   script:

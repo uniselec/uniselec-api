@@ -1,26 +1,6 @@
 #!/bin/bash
-# ============================================================
-# TESTE DE BACKUP E RESTORE - MariaDB 10.11.15-jammy
-# ============================================================
-# Autor: erivandosena@gmail.com
-# Data: 2025-11-29
-# Versão: 1.0.0
-# ============================================================
-#
-# Este script testa o ciclo completo de backup/restore:
-# 1. Criação de dados de teste
-# 2. Backup manual
-# 3. Simulação de perda de dados
-# 4. Restore com bootstrap Galera
-# 5. Validação de integridade
-#
-# ============================================================
 
 set -euo pipefail
-
-# ============================================================
-# CONFIGURACOES
-# ============================================================
 
 NAMESPACE="${NAMESPACE:-uniselec-api-prd}"
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-Password123}"
@@ -29,23 +9,17 @@ TEST_DB="backup_test_db"
 TEST_TABLE="backup_test_table"
 TEST_ROWS=1000
 
-# Pods do cluster Galera
 PRIMARY_POD="mariadb-0"
 BACKUP_POD="mariadb-0"      # Pod onde será feito o backup
 SECONDARY_POD="mariadb-1"   # Segundo nó
 TERTIARY_POD="mariadb-2"    # Terceiro nó
 
-
-# Cores
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# ============================================================
-# FUNCOES AUXILIARES
-# ============================================================
 
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -121,9 +95,6 @@ wait_for_sync() {
     return 1
 }
 
-# ============================================================
-# FASE 1: PREPARACAO E VALIDACAO INICIAL
-# ============================================================
 
 section "FASE 1: PREPARACAO E VALIDACAO INICIAL"
 
@@ -142,9 +113,6 @@ check_cluster_health || {
 
 log_success "Cluster esta saudavel e pronto para testes!"
 
-# ============================================================
-# FASE 2: CRIACAO DE DADOS DE TESTE
-# ============================================================
 
 section "FASE 2: CRIACAO DE DADOS DE TESTE"
 
@@ -219,9 +187,6 @@ for pod in $SECONDARY_POD $TERTIARY_POD; do
     fi
 done
 
-# ============================================================
-# FASE 3: BACKUP
-# ============================================================
 
 section "FASE 3: EXECUCAO DO BACKUP"
 
@@ -252,9 +217,6 @@ if [ "$backup_size" -lt 1000000 ]; then
 fi
 log_success "Backup validado: $backup_size bytes"
 
-# ============================================================
-# FASE 4: PREPARACAO DO BACKUP
-# ============================================================
 
 section "FASE 4: PREPARACAO DO BACKUP"
 
@@ -275,9 +237,6 @@ else
     exit 1
 fi
 
-# ============================================================
-# FASE 5: SIMULACAO DE PERDA DE DADOS
-# ============================================================
 
 section "FASE 5: SIMULACAO DE PERDA DE DADOS"
 
@@ -295,9 +254,6 @@ for pod in $SECONDARY_POD $TERTIARY_POD; do
     log_warning "$pod: $count registros (corrupcao replicada)"
 done
 
-# ============================================================
-# FASE 6: RESTORE
-# ============================================================
 
 section "FASE 6: EXECUCAO DO RESTORE"
 
@@ -342,7 +298,6 @@ spec:
           echo "Timestamp: \$(date)"
           echo "Source: $BACKUP_DIR"
 
-          # Verificar se backup existe
           if [ ! -f "$BACKUP_DIR/backup.mbstream" ]; then
             echo "ERROR: Arquivo de backup não encontrado!"
             echo "Conteudo do volume /backup:"
@@ -402,9 +357,6 @@ fi
 
 log_success "Restore completado!"
 
-# ============================================================
-# FASE 6.5: PREPARAR BOOTSTRAP DO GALERA CLUSTER
-# ============================================================
 
 section "FASE 6.5: PREPARACAO BOOTSTRAP GALERA"
 
@@ -434,7 +386,6 @@ spec:
         - |
           echo "Criando grastate.dat para bootstrap seguro..."
           cat > /data/grastate.dat <<GRASTATE
-          # WSREP saved state
           version: 2.1
           uuid:    00000000-0000-0000-0000-000000000000
           seqno:   -1
@@ -464,9 +415,6 @@ else
     exit 1
 fi
 
-# ============================================================
-# FASE 7: REINICIAR CLUSTER GALERA
-# ============================================================
 
 section "FASE 7: REINICIANDO CLUSTER GALERA"
 
@@ -525,9 +473,6 @@ check_cluster_health || {
 log_success "Cluster Galera reiniciado e saudavel!"
 
 
-# ============================================================
-# FASE 8: VALIDACAO DE INTEGRIDADE
-# ============================================================
 
 section "FASE 8: VALIDACAO DE INTEGRIDADE"
 
@@ -573,9 +518,6 @@ for pod in $SECONDARY_POD $TERTIARY_POD; do
     fi
 done
 
-# ============================================================
-# FASE 9: LIMPEZA
-# ============================================================
 
 section "FASE 9: LIMPEZA"
 
@@ -599,9 +541,6 @@ else
     log_info "Backup: $BACKUP_DIR"
 fi
 
-# ============================================================
-# FASE 10: RELATORIO FINAL
-# ============================================================
 
 section "FASE 10: RELATORIO FINAL"
 

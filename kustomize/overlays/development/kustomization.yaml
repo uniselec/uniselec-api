@@ -1,18 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Namespace para development
 namespace: uniselec-api-dev
 
-# Recursos base + namespace
 resources:
 - ../../base
 - namespace.yaml
-
-# Patches específicos de development
-
-
-
 
 patches:
 - path: patch-deployment.yaml
@@ -35,8 +28,6 @@ patches:
   target:
     kind: Service
     name: mariadb-lb
-
-# MERGE com valores específicos de DEVELOPMENT
 
 configMapGenerator:
 - behavior: merge
@@ -66,7 +57,6 @@ configMapGenerator:
   options:
     disableNameSuffixHash: true
 
-
 secretGenerator:
 - literals:
   - DB_USERNAME=root
@@ -86,7 +76,7 @@ secretGenerator:
     disableNameSuffixHash: true
 
 images:
-- name: dti-registro.unilab.edu.br/unilab/uniselec-api
+- name: harbor.unilab.edu.br/unilab/uniselec-api
   newTag: dev-af0567de
 
 labels:

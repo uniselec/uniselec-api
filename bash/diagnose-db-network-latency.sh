@@ -1,20 +1,4 @@
 #!/bin/bash
-# ============================================================
-# Script de diagnóstico de latência de conexão app <-> MariaDB
-# Foco: DNS, conexão TCP/MySQL e comparação service x IP direto
-# ============================================================
-# Autor: Jeff / erivandosena@gmail.com
-# Data: 2025-11-27
-# Versão: 1.0.0
-# ============================================================
-# Uso:
-#   ./diagnose-db-network-latency.sh [dev|stg|prd]
-#
-# Padrões:
-#   dev -> namespace uniselec-api-dev
-#   stg -> namespace uniselec-api-stg
-#   prd -> namespace uniselec-api-prd
-# ============================================================
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -34,7 +18,6 @@ fi
 
 NAMESPACE="${NS_MAP[$ENV]}"
 
-# Mesmo padrão do troubleshooting-uniselec.sh
 kubectl_cmd() {
   if [ -n "${KUBECTL_CONTEXT:-}" ]; then
     kubectl --context="$KUBECTL_CONTEXT" "$@"
@@ -43,9 +26,6 @@ kubectl_cmd() {
   fi
 }
 
-# -----------------------------
-# CONFIG
-# -----------------------------
 API_LABEL="${API_LABEL:-app=uniselec-api}"
 DB_LABEL="${DB_LABEL:-app=mariadb}"
 
@@ -121,7 +101,6 @@ measure_mysql_rtt() {
     local TMP_CLIENT="mysql-nettest-$RANDOM"
     local start_time=$(date +%s%3N)
 
-    # Executa o teste e captura apenas stdout limpo
     local result=$(kubectl_cmd run "$TMP_CLIENT" \
       -n "$NAMESPACE" --rm -i --restart=Never \
       --image="$MYSQL_IMAGE" -- \
@@ -149,9 +128,6 @@ measure_mysql_rtt() {
   fi
 }
 
-# -----------------------------
-# 0) CONTEXTO
-# -----------------------------
 echolog "Ambiente selecionado: $ENV  (namespace: $NAMESPACE)"
 
 kubectl_cmd get svc -n "$NAMESPACE" || true
@@ -159,9 +135,6 @@ kubectl_cmd get pods -n "$NAMESPACE" -l "$API_LABEL" -o wide || true
 kubectl_cmd get pods -n "$NAMESPACE" -l "$DB_LABEL" -o wide || true
 kubectl_cmd get endpoints -n "$NAMESPACE" | grep -E 'mariadb|uniselec-api' || true
 
-# -----------------------------
-# LOCALIZAÇÃO DE PODS
-# -----------------------------
 echolog "Localizando pods de API e MariaDB"
 
 API_POD="$(get_api_pod)"
@@ -179,9 +152,6 @@ if [ "${#DB_PODS[@]}" -eq 0 ] || [ -z "$DB_PODS_STR" ]; then
 fi
 echo "DB_PODS: ${DB_PODS[*]}"
 
-# -----------------------------
-# 1) TESTE DE LATÊNCIA DNS
-# -----------------------------
 echolog "1) Teste de latência DNS dentro do pod da API"
 
 measure_dns_from_api "$API_POD" "$DB_SERVICE_APP"       "mariadb-app"
@@ -190,24 +160,17 @@ measure_dns_from_api "$API_POD" "$DB_SERVICE_REPLICAS"  "mariadb-replicas"
 measure_dns_from_api "$API_POD" "$DB_SERVICE_HEADLESS"  "mariadb (headless)"
 measure_dns_from_api "$API_POD" "uniselec-api"          "uniselec-api (service)"
 
-# FQDN de cada pod individualmente (padrão k8s StatefulSet)
-# Formato: <pod-name>.<headless-service>.<namespace>.svc.cluster.local
 echolog "1b) Teste de DNS para FQDNs individuais dos pods"
 for pod in "${DB_PODS[@]}"; do
-  # Pula se for linha vazia
   if [ -z "$pod" ]; then
     continue
   fi
 
-  # StatefulSet pod FQDN pattern
   fqdn="${pod}.${DB_SERVICE_HEADLESS}.${NAMESPACE}.svc.cluster.local"
   echo "Testando FQDN: $fqdn"
   measure_dns_from_api "$API_POD" "$fqdn" "pod ${pod}"
 done
 
-# -----------------------------
-# 2) PHP: TEMPO CONEXÃO x QUERY
-# -----------------------------
 echolog "2) Teste PHP na API: tempo de conexão vs tempo de query (SELECT 1)"
 
 kubectl_cmd exec -n "$NAMESPACE" "$API_POD" -- php -r "
@@ -259,9 +222,6 @@ if (\$success > 0) {
 }
 "
 
-# -----------------------------
-# 3) RTT MySQL via services x IP
-# -----------------------------
 echolog "3) RTT MySQL via serviços (mariadb-app / primary / replicas)"
 
 measure_mysql_rtt "$DB_SERVICE_APP"      "service $DB_SERVICE_APP"
@@ -281,9 +241,6 @@ for pod in "${DB_PODS[@]}"; do
   fi
 done
 
-# -----------------------------
-# 4) TESTE DE PING ENTRE PODS
-# -----------------------------
 echolog "4) Teste de ping entre API e pods MariaDB"
 
 for pod in "${DB_PODS[@]}"; do
@@ -300,9 +257,6 @@ for pod in "${DB_PODS[@]}"; do
   fi
 done
 
-# -----------------------------
-# 5) TESTE DE CONEXÃO TCP (nc)
-# -----------------------------
 echolog "5) Teste de conexão TCP (netcat) para porta 3306"
 
 for pod in "${DB_PODS[@]}"; do
@@ -321,20 +275,15 @@ for pod in "${DB_PODS[@]}"; do
   fi
 done
 
-# -----------------------------
-# 6) ESTATÍSTICAS DE CLUSTER GALERA
-# -----------------------------
 echolog "6) Estatísticas do Cluster Galera"
 
 for pod in "${DB_PODS[@]}"; do
-  # Pula se for linha vazia
   if [ -z "$pod" ]; then
     continue
   fi
 
   echo "Stats do pod: $pod"
 
-  # Usar FQDN completo do pod
   pod_fqdn="${pod}.${DB_SERVICE_HEADLESS}.${NAMESPACE}.svc.cluster.local"
 
   TMP_CLIENT="mysql-stats-$RANDOM"
@@ -354,9 +303,6 @@ for pod in "${DB_PODS[@]}"; do
   echo ""
 done
 
-# -----------------------------
-# 7) RESUMO E RECOMENDAÇÕES
-# -----------------------------
 echolog "7) RESUMO E RECOMENDAÇÕES"
 
 echo "

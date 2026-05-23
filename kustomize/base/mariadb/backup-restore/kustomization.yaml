@@ -7,7 +7,6 @@ resources:
   - cronjob-backup-daily.yaml
   - deployment-restore-admin.yaml
 
-# Configurações comuns
 labels:
 - pairs:
     app.kubernetes.io/name: mariadb

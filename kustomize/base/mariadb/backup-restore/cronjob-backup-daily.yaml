@@ -46,7 +46,6 @@ spec:
               echo "Pod: ${BACKUP_POD}"
               echo ""
 
-              # Verificar pod está Ready
               echo "[1/3] Verificando pod ${BACKUP_POD}..."
               kubectl wait --for=condition=ready pod/${BACKUP_POD} -n ${NAMESPACE} --timeout=300s || {
                 echo "Pod não está Ready"
@@ -54,7 +53,6 @@ spec:
               }
               echo "Pod está Ready"
 
-              # Verificar script existe (montado do ConfigMap)
               echo ""
               echo "[2/3] Verificando script do ConfigMap..."
               if ! kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- test -f /scripts/backup-galera-automated.sh; then
@@ -66,10 +64,6 @@ spec:
               fi
               echo "Script encontrado: /scripts/backup-galera-automated.sh"
 
-              # ============================================================
-              # EXECUTAR SCRIPT DO CONFIGMAP (backup-galera-automated.sh)
-              # Este script já contém TODA a lógica do backup manual!
-              # ============================================================
               echo ""
               echo "[3/3] Executando /scripts/backup-galera-automated.sh..."
               echo "================================================================"
@@ -88,7 +82,6 @@ spec:
                 echo "================================================================"
                 echo ""
 
-                # Mostrar último backup criado
                 echo "Último backup:"
                 kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- \
                   bash -c 'ls -lhtd /backup/auto-* 2>/dev/null | head -1' || echo "Nenhum backup encontrado"
@@ -113,7 +106,6 @@ spec:
                 echo "================================================================"
                 echo ""
 
-                # Mostrar log de erro
                 echo "Log de erro:"
                 kubectl exec ${BACKUP_POD} -n ${NAMESPACE} -- \
                   tail -30 /backup/backup.log 2>/dev/null || echo "Log não disponível"

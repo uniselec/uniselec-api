@@ -69,12 +69,12 @@ kubeseal --validate < base/sealed-secret-regcred.yaml
 ```
 
 ### Pausar ArgoCD
-argocd login argocd.unilab.edu.br --username admin --password "pass" --grpc-web
+argocd login gitops.unilab.edu.br --username admin --password "pass" --grpc-web
 argocd app set uniselec-api-prd --sync-policy none
 
 ### Desprovisionar Deploy
 ```sh
-argocd login argocd.unilab.edu.br --username admin --password "pass" --grpc-web
+argocd login gitops.unilab.edu.br --username admin --password "pass" --grpc-web
 kubectl get applicationset -A
 kubectl -n argocd patch applicationset uniselec-api-dev-as --type='merge' -p '{"spec":{"generators":[{"list":{"elements":[]}}]}}'
 argocd app list | grep uniselec-api-dev

@@ -1,36 +1,23 @@
 #!/bin/bash
-# ============================================================
-# Script para criar Sealed Secrets do projeto UniSelec
-# ============================================================
-# Autor: erivandosena@gmail.com
-# Data: 2025-01-19
-# Versão: 1.0.0
-# ============================================================
 
 set -e
 
-# Cores
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # Sem Color
 
-# Diretórios
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 KUSTOMIZE_DIR="${PROJECT_ROOT}/kustomize"
 CERT_FILE="${PROJECT_ROOT}/public-key-cert.pem"
 
-# Funções de log
 log_info()    { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 log_step()    { echo -e "${BLUE}[STEP]${NC} $1"; }
 
-# ============================================================
-# Função: Verificar dependências do ambiente
-# ============================================================
 check_dependencies() {
     log_step "Verificando dependências..."
     if ! command -v kubectl &> /dev/null; then
@@ -44,17 +31,11 @@ check_dependencies() {
     log_info "Dependências OK ✓"
 }
 
-# ============================================================
-# Função: Gerar senha forte
-# ============================================================
 generate_password() {
     local length=${1:-32}
     openssl rand -base64 $length | tr -d "=+/" | cut -c1-24
 }
 
-# ============================================================
-# Função: Obter certificado público do controlador Sealed Secrets
-# ============================================================
 get_public_cert() {
     log_step "Obtendo certificado público do Sealed Secrets..."
     if [ -f "${CERT_FILE}" ]; then
@@ -69,27 +50,24 @@ get_public_cert() {
     log_info "Certificado público obtido: ${CERT_FILE}"
 }
 
-# ============================================================
-# Função: Criar e selar Secret para Docker Registry
-# ============================================================
 create_regcred_sealed_secret() {
     log_step "Criando Sealed Secret do Docker Registry (cluster-wide)..."
     echo ""
     echo -e "${GREEN}[INFO]${NC} === Credenciais do Docker Registry ==="
 
-    read -p "Digite o Docker Registry Server (padrão: dti-registro.unilab.edu.br): " DOCKER_SERVER
-    DOCKER_SERVER=${DOCKER_SERVER:-dti-registro.unilab.edu.br}
+    read -p "Digite o Docker Registry Server (padrão: harbor.unilab.edu.br): " DOCKER_SERVER
+    DOCKER_SERVER=${DOCKER_SERVER:-harbor.unilab.edu.br}
 
     read -p "Digite o Docker Registry Username: " DOCKER_USERNAME
     if [ -z "$DOCKER_USERNAME" ]; then
-        log_error "Username é obrigatório!"
+        log_error "Username � obrigatório!"
         return 1
     fi
 
     read -sp "Digite o Docker Registry Password: " DOCKER_PASSWORD
     echo ""
     if [ -z "$DOCKER_PASSWORD" ]; then
-        log_error "Password é obrigatório!"
+        log_error "Password � obrigatório!"
         return 1
     fi
 
@@ -134,10 +112,6 @@ EOF
 
     local PASS_FILE="${PROJECT_ROOT}/passwords-regcred.txt"
     cat > "$PASS_FILE" << EOF
-# ============================================================
-# CREDENCIAIS DO DOCKER REGISTRY (CLUSTER-WIDE)
-# Geradas em: $(date)
-# ============================================================
 
 DOCKER_SERVER=${DOCKER_SERVER}
 DOCKER_USERNAME=${DOCKER_USERNAME}
@@ -148,16 +122,12 @@ EOF
     echo -e "${YELLOW}[WARN]${NC} Credenciais salvas em: $PASS_FILE"
 }
 
-# ============================================================
-# Função: Criar e selar Secret do MariaDB por ambiente
-# ============================================================
 create_mariadb_env_sealed_secret() {
     local ENVIRONMENT=$1
     local NAMESPACE=$2
 
     log_step "Criando Sealed Secret do MariaDB para $ENVIRONMENT..."
 
-    # Solicitar senhas
     echo ""
     echo -e "${GREEN}[INFO]${NC} === Senhas para $ENVIRONMENT ==="
 
@@ -227,11 +197,6 @@ EOF
 
     local PASS_FILE="${PROJECT_ROOT}/passwords-mariadb-${ENVIRONMENT}.txt"
     cat > "$PASS_FILE" << EOF
-# ============================================================
-# SENHAS DO MARIADB - ${ENVIRONMENT^^}
-# Namespace: ${NAMESPACE}
-# Geradas em: $(date)
-# ============================================================
 
 DB_USERNAME=root
 DB_PASSWORD=${DB_PASS}
@@ -245,9 +210,6 @@ EOF
     echo -e "${YELLOW}[WARN]${NC} Senhas salvas em: $PASS_FILE"
 }
 
-# ============================================================
-# Função: Criar e selar Secret do Laravel
-# ============================================================
 create_laravel_sealed_secret() {
     local ENVIRONMENT=$1
     local NAMESPACE=$2
@@ -257,7 +219,6 @@ create_laravel_sealed_secret() {
     echo ""
     read -p "Digite APP_KEY do Laravel (ou Enter para gerar): " APP_KEY
     if [ -z "$APP_KEY" ]; then
-        # Gerar APP_KEY no formato Laravel
         APP_KEY="base64:$(openssl rand -base64 32)"
         echo -e "${GREEN}[INFO]${NC} APP_KEY gerada: $APP_KEY"
     fi
@@ -287,11 +248,6 @@ EOF
 
     local PASS_FILE="${PROJECT_ROOT}/passwords-laravel-${ENVIRONMENT}.txt"
     cat > "$PASS_FILE" << EOF
-# ============================================================
-# APP_KEY DO LARAVEL - ${ENVIRONMENT^^}
-# Namespace: ${NAMESPACE}
-# Gerada em: $(date)
-# ============================================================
 
 APP_KEY=${APP_KEY}
 EOF
@@ -299,9 +255,6 @@ EOF
     echo -e "${YELLOW}[WARN]${NC} APP_KEY salva em: $PASS_FILE"
 }
 
-# ============================================================
-# Menu principal
-# ============================================================
 show_menu() {
     echo ""
     echo "=========================================="
@@ -316,9 +269,6 @@ show_menu() {
     echo "=========================================="
 }
 
-# ============================================================
-# Main
-# ============================================================
 main() {
     echo -e "${GREEN}[INFO]${NC} === Criador de Sealed Secrets - UniSelec ==="
     check_dependencies
@@ -371,6 +321,5 @@ main() {
     done
 }
 
-# Executar
 cd "$PROJECT_ROOT"
 main
