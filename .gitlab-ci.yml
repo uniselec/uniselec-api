@@ -34,7 +34,7 @@ stages:
   export TOKEN_PAT_ACCESS="$(read_secret ci-cd git-credentials token)"
   export KUBECONFIG_HA="$(kubectl get secret -n argocd kubeconfig-ha -o jsonpath='{.data.kubeconfig\.yaml}' 2>/dev/null | tr -d '\n')"
   if [[ -z "${KUBECONFIG_HA}" ]]; then
-    export KUBECONFIG_HA="$(kubectl get secret -n argocd kubeconfig-c2 -o jsonpath='{.data.kubeconfig\.yaml}' | tr -d '\n')"
+    export KUBECONFIG_HA="$(kubectl get secret -n argocd kubeconfig-c2 -o jsonpath='{.data.kubeconfig\.yaml}' 2>/dev/null | tr -d '\n')"
   fi
 
   # Switching GitOps mode: single-cluster | hub-spoke
@@ -198,12 +198,12 @@ validate:kustomize:
   script:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Validando kustomize overlays"
     - |
-      if [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
+      if [[ "${CI_COMMIT_BRANCH:-}" == "develop" ]]; then
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [CHECK] Development overlay"
         kubectl kustomize kustomize/overlays/development -o yaml > /tmp/development-manifest.yaml
       fi
     - |
-      if [[ "$CI_COMMIT_BRANCH" == "main" ]] || [[ -n "$CI_COMMIT_TAG" ]]; then
+      if [[ "${CI_COMMIT_BRANCH:-}" == "main" ]] || [[ -n "${CI_COMMIT_TAG:-}" ]]; then
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [CHECK] Staging overlay"
         kubectl kustomize kustomize/overlays/staging -o yaml > /tmp/staging-manifest.yaml
         echo "[$(date '+%d/%m/%Y %H:%M:%S')] [CHECK] Production overlay"
@@ -412,11 +412,11 @@ build:docker:
   script:
     - |
       echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Tag da imagem docker"
-      if [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
+      if [[ "${CI_COMMIT_BRANCH:-}" == "develop" ]]; then
         IMAGE_TAG="dev-${CI_COMMIT_SHORT_SHA}"
         DOCKER_TAGS="--tag ${DOCKER_IMAGE}:${IMAGE_TAG} --tag ${DOCKER_IMAGE}:dev"
-      elif [[ -n "${CI_COMMIT_TAG}" ]]; then
-        IMAGE_TAG="${CI_COMMIT_TAG}"
+      elif [[ -n "${CI_COMMIT_TAG:-}" ]]; then
+        IMAGE_TAG="${CI_COMMIT_TAG:-}"
         DOCKER_TAGS="--tag ${DOCKER_IMAGE}:${IMAGE_TAG}"
       else
         IMAGE_TAG="stg-${CI_COMMIT_SHORT_SHA}"
@@ -436,9 +436,9 @@ build:docker:
 
     - |
       echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Scanning de vulnerabilidades"
-      if [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
+      if [[ "${CI_COMMIT_BRANCH:-}" == "develop" ]]; then
         trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE}:dev || true
-      elif [[ -n "${CI_COMMIT_TAG}" ]]; then
+      elif [[ -n "${CI_COMMIT_TAG:-}" ]]; then
         trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE}:${CI_COMMIT_TAG} || true
       else
         trivy image --severity HIGH,CRITICAL ${DOCKER_IMAGE}:latest || true
@@ -448,16 +448,16 @@ build:docker:
       echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Push para Harbor registry"
       docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
 
-      if [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
+      if [[ "${CI_COMMIT_BRANCH:-}" == "develop" ]]; then
         docker push ${DOCKER_IMAGE}:dev
-      elif [[ "$CI_COMMIT_BRANCH" == "main" ]]; then
+      elif [[ "${CI_COMMIT_BRANCH:-}" == "main" ]]; then
         docker push ${DOCKER_IMAGE}:latest
       fi
 
     - |
-      if [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
+      if [[ "${CI_COMMIT_BRANCH:-}" == "develop" ]]; then
         echo "  • ${DOCKER_IMAGE}:dev (DEVELOPMENT)"
-      elif [[ -n "${CI_COMMIT_TAG}" ]]; then
+      elif [[ -n "${CI_COMMIT_TAG:-}" ]]; then
         echo "  • ${DOCKER_IMAGE}:${CI_COMMIT_TAG} (PRODUCTION)"
       else
         echo "  • ${DOCKER_IMAGE}:latest (STAGING)"
@@ -531,7 +531,7 @@ development:deploy:
   before_script:
     - *load_k8s_secrets
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] GitOps Development Deploy - ArgoCD"
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Branch ${CI_COMMIT_BRANCH} | Commit ${CI_COMMIT_SHORT_SHA}"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Branch ${CI_COMMIT_BRANCH:-} | Commit ${CI_COMMIT_SHORT_SHA}"
   script:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 1 - Atualizar Image Tag dev no Git"
     - cd ${CI_PROJECT_DIR}/${KUSTOMIZE_PATH}
@@ -767,7 +767,7 @@ staging:deploy:
   before_script:
     - *load_k8s_secrets
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] GitOps Staging Deploy - ArgoCD"
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Branch ${CI_COMMIT_BRANCH} | Commit ${CI_COMMIT_SHORT_SHA}"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Branch ${CI_COMMIT_BRANCH:-} | Commit ${CI_COMMIT_SHORT_SHA}"
   script:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 1 - Atualizar Image Tag stg no Git"
     - cd ${CI_PROJECT_DIR}/${KUSTOMIZE_PATH}
@@ -1005,7 +1005,7 @@ notification:staging:
       PIPELINE_URL="${CI_PROJECT_URL}/-/pipelines/${CI_PIPELINE_ID}"
       NEW_TAG_URL="${CI_PROJECT_URL}/-/tags/new?ref=${CI_COMMIT_SHA}"
 
-      if [[ -n "$CI_COMMIT_TAG" ]]; then
+      if [[ -n "${CI_COMMIT_TAG:-}" ]]; then
         DEPLOY_LINK="🚀 Link para aprovação do deploy: $JOB_URL"
         EMAIL_SUBJECT="Pipeline CI/CD - Production - Aprovação para Produção"
         BRANCH_OR_TAG="Tag: <a href='$CI_PROJECT_URL/-/tags'>$CI_COMMIT_TAG</a>"
@@ -1087,7 +1087,7 @@ production:deploy:
   before_script:
     - *load_k8s_secrets
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] GitOps Production Deploy - ArgoCD"
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Release ${CI_COMMIT_TAG} | Branch ${CI_COMMIT_BRANCH}"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Release ${CI_COMMIT_TAG:-} | Branch ${CI_COMMIT_BRANCH:-}"
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Usando tag ${CI_COMMIT_TAG} na imagem"
   script:
     - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] ETAPA 1 - Atualizar Image Tag ${CI_COMMIT_TAG} no Git"
