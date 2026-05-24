@@ -42,7 +42,7 @@ trap 'safe_rm_test_table || true' EXIT
 create_test_table_if_needed() {
   local p=${PODS[0]}
   if ! kubexec_sql "$p" "SHOW DATABASES;" | grep -q "^${TEST_DB}$"; then
-    echo "   📁 Criando banco ${TEST_DB} em ${p}..."
+    echo "    Criando banco ${TEST_DB} em ${p}..."
     kubexec_sql "$p" "CREATE DATABASE IF NOT EXISTS ${TEST_DB};"
   fi
 
@@ -52,9 +52,9 @@ create_test_table_if_needed() {
       created TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP(6),
       payload VARCHAR(255)
     ) ENGINE=InnoDB;" >/dev/null
-    echo "   ✅ Tabela ${TEST_TABLE} criada/verificada no banco ${TEST_DB}."
+    echo "    Tabela ${TEST_TABLE} criada/verificada no banco ${TEST_DB}."
   else
-    echo "   ❌ Falha ao criar banco ${TEST_DB} — pulando criação de tabela de teste."
+    echo "    Falha ao criar banco ${TEST_DB} — pulando criação de tabela de teste."
   fi
 }
 
@@ -62,17 +62,17 @@ for i in 0 1 2; do
   POD="mariadb-$i"
 
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo "📦 POD: $POD"
+  echo " POD: $POD"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
   kubectl get pod "$POD" -n "$NAMESPACE" -o wide
   echo ""
 
-  echo "🔍 Processo MariaDB:"
+  echo " Processo MariaDB:"
   kubectl exec "$POD" -n "$NAMESPACE" -- ps aux | grep -E "mariadbd|mysqld" | grep -v grep | head -3 || true
   echo ""
 
-  echo "🔌 Portas Abertas:"
+  echo " Portas Abertas:"
   kubexec_sh "$POD" "
     if ! command -v netstat >/dev/null 2>&1 && ! command -v ss >/dev/null 2>&1; then
       echo '   Instalando ferramentas de rede (silencioso)...'
@@ -92,15 +92,15 @@ for i in 0 1 2; do
   "
   echo ""
 
-  echo "✅ Teste de Conexão:"
+  echo " Teste de Conexão:"
   if kubexec_sql "$POD" "SELECT 'OK' as status;" | grep -q "OK"; then
-    echo "   ✅ Conexão bem-sucedida"
+    echo "    Conexão bem-sucedida"
   else
-    echo "   ❌ Falha na conexão"
+    echo "    Falha na conexão"
   fi
   echo ""
 
-  echo "🌐 Status Galera (CRÍTICO):"
+  echo " Status Galera (CRÍTICO):"
   kubexec_sql "$POD" "
     SELECT CONCAT('   wsrep_cluster_size: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_cluster_size'
     UNION ALL
@@ -118,7 +118,7 @@ for i in 0 1 2; do
   "
   echo ""
 
-  echo "🔎 M�tricas Galera detalhadas:"
+  echo " Métricas Galera detalhadas:"
   kubexec_sql "$POD" "
     SELECT CONCAT('   wsrep_flow_control_paused: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_flow_control_paused' UNION ALL
     SELECT CONCAT('   wsrep_flow_control_sent: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_flow_control_sent' UNION ALL
@@ -132,23 +132,23 @@ for i in 0 1 2; do
   " 2>/dev/null || true
   echo ""
 
-  echo "📊 Conexões Ativas:"
+  echo " Conexões Ativas:"
   kubexec_sql "$POD" "SELECT CONCAT('   Total: ', COUNT(*)) FROM information_schema.PROCESSLIST;" 2>/dev/null
   echo ""
 
-  echo "🗄️  Bancos de Dados:"
+  echo "  Bancos de Dados:"
   kubexec_sql "$POD" "SHOW DATABASES;" 2>/dev/null | grep -E "uniselec|Database" | sed 's/^/   /' || true
   echo ""
 
-  echo "📋 Tabelas em uniselec_stag:"
+  echo " Tabelas em uniselec_stag:"
   kubexec_sql "$POD" "SELECT COUNT(*) as total_tables FROM information_schema.TABLES WHERE TABLE_SCHEMA='${TEST_DB}';" 2>/dev/null | sed 's/^/   /' || true
   echo ""
 
-  echo "💾 Tamanho dos Dados:"
+  echo " Tamanho dos Dados:"
   kubexec_sql "$POD" "SELECT CONCAT('   ', TABLE_SCHEMA, ': ', ROUND(SUM(data_length + index_length) / 1024 / 1024, 2), ' MB') FROM information_schema.TABLES WHERE TABLE_SCHEMA IN ('${TEST_DB}', 'uniselec_prod') GROUP BY TABLE_SCHEMA;" 2>/dev/null || true
   echo ""
 
-  echo "📡 Latência de rede entre nós (ping - 4 pacotes):"
+  echo " Latência de rede entre nós (ping - 4 pacotes):"
   for target in "${PODS[@]}"; do
     if [ "$target" != "$POD" ]; then
       echo -n "   $POD -> $target : "
@@ -157,7 +157,7 @@ for i in 0 1 2; do
   done
   echo ""
 
-  echo "⏱️ RTT de uma query simples (SELECT 1) medida no cliente (ms):"
+  echo " RTT de uma query simples (SELECT 1) medida no cliente (ms):"
   START_MS=$(ms_now)
   kubexec_sql "$POD" "SELECT 1;" >/dev/null
   END_MS=$(ms_now)
@@ -165,21 +165,21 @@ for i in 0 1 2; do
   echo "   Tempo de ida e volta (cliente) para SELECT 1: ${ELAPSED} ms"
   echo ""
 
-  echo "🔧 Variáveis adicionais (locks/flow/queus etc) — amostra:"
+  echo " Variáveis adicionais (locks/flow/queus etc) — amostra:"
   kubexec_sql "$POD" "SHOW VARIABLES LIKE 'wsrep%';" | sed 's/^/   /' | head -n 40 || true
   echo ""
 
 done
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🌐 SERVICES & ENDPOINTS"
+echo " SERVICES & ENDPOINTS"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 kubectl get svc,endpoints -n "$NAMESPACE" | grep mariadb || true
 echo ""
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🧪 TESTE DE CONECTIVIDADE VIA SERVICE (${LB_TEST_ROUNDS} rodadas)"
+echo " TESTE DE CONECTIVIDADE VIA SERVICE (${LB_TEST_ROUNDS} rodadas)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
@@ -219,7 +219,7 @@ echo ""
 create_test_table_if_needed
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "⚙️  Benchmark de inserts e selects (medições simples)"
+echo "  Benchmark de inserts e selects (medições simples)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
@@ -240,7 +240,7 @@ done
 
 if [ "$successes" -gt 0 ]; then
   avg_insert=$(awk -v s="$total_ms" -v c="$successes" 'BEGIN{printf("%.2f", s/c)}')
-  echo "   Inserts bem-sucedidos: ${successes}/${INSERT_ITERATIONS}, latência m�dia: ${avg_insert} ms"
+  echo "   Inserts bem-sucedidos: ${successes}/${INSERT_ITERATIONS}, latência média: ${avg_insert} ms"
 else
   echo "   Nenhum insert bem-sucedido nos testes sequenciais."
 fi
@@ -264,7 +264,7 @@ done
 
 if [ "$sel_success" -gt 0 ]; then
   avg_sel=$(awk -v s="$total_sel_ms" -v c="$sel_success" 'BEGIN{printf("%.2f", s/c)}')
-  echo "   SELECTs bem-sucedidos: ${sel_success}/${SEL_ROUNDS}, latência m�dia: ${avg_sel} ms"
+  echo "   SELECTs bem-sucedidos: ${sel_success}/${SEL_ROUNDS}, latência média: ${avg_sel} ms"
 else
   echo "   Nenhum SELECT bem-sucedido nos testes."
 fi
@@ -291,7 +291,7 @@ elapsed_total=$((end_total - start_total))
 echo "   Teste de concorrência finalizado em ${elapsed_total} ms (wall-clock)."
 echo ""
 
-echo "🔔 Checando conflitos/aborts e flow control após carga:"
+echo " Checando conflitos/aborts e flow control após carga:"
 for p in "${PODS[@]}"; do
   echo "   Nodo: $p"
   kubexec_sql "$p" "SELECT CONCAT('      wsrep_local_cert_failures: ', VARIABLE_VALUE) FROM information_schema.GLOBAL_STATUS WHERE VARIABLE_NAME='wsrep_local_cert_failures';"
@@ -301,7 +301,7 @@ done
 echo ""
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📊 RESUMO DO CLUSTER"
+echo " RESUMO DO CLUSTER"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 

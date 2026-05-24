@@ -314,7 +314,7 @@ echo "
 │ PHP conexão (bom):   < 30ms                                     │
 │ PHP query (bom):     < 10ms                                     │
 │                                                                 │
-│ ⚠️  ATENÇÃO: PHP conexão observada: ~102ms                      │
+│   ATENÇÃO: PHP conexão observada: ~102ms                      │
 │    Isso indica overhead no handshake MySQL/SSL                 │
 │                                                                 │
 │ Se DNS > 10ms:       Problema no CoreDNS/kube-dns              │
@@ -322,16 +322,16 @@ echo "
 │ Se conexão > query:  Overhead de handshake MySQL               │
 │                                                                 │
 │ RECOMENDAÇÕES PARA SEU AMBIENTE:                                │
-│ ✓ Use connection pooling na aplicação (PgBouncer/ProxySQL)    │
-│ ✓ Configure persistent connections no Laravel (.env):          │
+│  Use connection pooling na aplicação (PgBouncer/ProxySQL)    │
+│  Configure persistent connections no Laravel (.env):          │
 │   DB_PERSISTENT=true                                            │
-│ ✓ Desabilite SSL interno (cluster local confiável):            │
+│  Desabilite SSL interno (cluster local confiável):            │
 │   DB_SSL_MODE=disabled                                          │
-│ ✓ Aumente pool de conexões do Laravel:                         │
+│  Aumente pool de conexões do Laravel:                         │
 │   DB_MAX_CONNECTIONS=100                                        │
-│ ✓ Verifique max_connections do MariaDB (recomendado: 200+)    │
-│ ✓ Monitore wsrep_local_state_comment (deve ser 'Synced')      │
-│ ✓ Cluster size deve ser 3                                      │
+│  Verifique max_connections do MariaDB (recomendado: 200+)    │
+│  Monitore wsrep_local_state_comment (deve ser 'Synced')      │
+│  Cluster size deve ser 3                                      │
 │                                                                 │
 │ FERRAMENTAS AUSENTES NO CONTAINER API:                          │
 │ • ping - Instale: apt-get install iputils-ping                 │
