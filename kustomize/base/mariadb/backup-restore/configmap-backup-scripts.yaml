@@ -652,7 +652,7 @@ data:
     log_info "FASE 1/8: PARANDO CLUSTER MARIADB"
     echo "================================================================"
 
-    log_info "Escalando StatefulSet mariadb para 0 r�plicas..."
+    log_info "Escalando StatefulSet mariadb para 0 réplicas..."
     kubectl scale statefulset mariadb -n "$NAMESPACE" --replicas=0
 
     log_info "Aguardando pods do MariaDB terminarem..."
@@ -810,7 +810,7 @@ data:
     log_info "FASE 4/8: INICIANDO MARIADB-0 (BOOTSTRAP)"
     echo "================================================================"
 
-    log_info "Escalando StatefulSet para 1 r�plica..."
+    log_info "Escalando StatefulSet para 1 réplica..."
     kubectl scale statefulset mariadb -n "$NAMESPACE" --replicas=1
 
     log_info "Aguardando mariadb-0 ficar Ready (timeout: 10min)..."
@@ -844,7 +844,7 @@ data:
     log_info "FASE 6/8: INICIANDO MARIADB-1 (SST AUTOMÁTICO)"
     echo "================================================================"
 
-    log_info "Escalando StatefulSet para 2 r�plicas..."
+    log_info "Escalando StatefulSet para 2 réplicas..."
     log_warning "mariadb-1 fará SST do mariadb-0 (pode demorar 5-15 min)"
     kubectl scale statefulset mariadb -n "$NAMESPACE" --replicas=2
 
@@ -864,7 +864,7 @@ data:
     log_info "FASE 7/8: INICIANDO MARIADB-2 (SST AUTOMÁTICO)"
     echo "================================================================"
 
-    log_info "Escalando StatefulSet para 3 r�plicas..."
+    log_info "Escalando StatefulSet para 3 réplicas..."
     log_warning "mariadb-2 fará SST (pode demorar 5-15 min)"
     kubectl scale statefulset mariadb -n "$NAMESPACE" --replicas=3
 
