@@ -247,7 +247,7 @@ show_usage() {
 Uso: $0 <app-name> [opções]
 
 Opções:
-  --keep-namespace    Mant�m o namespace (não deleta recursos do cluster)
+  --keep-namespace    Mantém o namespace (não deleta recursos do cluster)
   --dry-run           Mostra o que seria feito sem executar
   -h, --help          Mostra esta mensagem de ajuda
 

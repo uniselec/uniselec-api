@@ -107,7 +107,7 @@ variables:
   ARGOCD_SERVER_CRT_B64: ""        # base64 do cert TLS do ArgoCD (quando server-crt)
 
   # Notificação
-  MAIL_PRD: "jefponte@unilab.edu.br"
+  MAIL_PRD: "erivandosena@gmail.com"
 
 # STAGE 1
 validate:environment:

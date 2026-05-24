@@ -184,15 +184,15 @@ kubectl exec -n "$NAMESPACE" "$BACKUP_SOURCE_POD" -- cat "$BACKUP_DIR/xtrabackup
 kubectl exec -n "$NAMESPACE" "$BACKUP_SOURCE_POD" -- cat "$BACKUP_DIR/cluster-info.txt" 2>/dev/null || true
 
 
-section "⚠️  AVISO CRÍTICO DE DOWNTIME ⚠️"
+section "  AVISO CRÍTICO DE DOWNTIME "
 
 echo ""
 log_warning "VOCÊ ESTÁ PRESTES A EXECUTAR UM RESTORE EM PRODUÇÃO"
 echo ""
-echo "  ⚠️  DOWNTIME TOTAL: 15-30 minutos estimados"
-echo "  ⚠️  APLICAÇÃO SERÁ PARADA: $LARAVEL_DEPLOYMENT"
-echo "  ⚠️  CLUSTER MARIADB SERÁ PARADO: 3 nós"
-echo "  ⚠️  DADOS ATUAIS SERÃO SOBRESCRITOS"
+echo "    DOWNTIME TOTAL: 15-30 minutos estimados"
+echo "    APLICAÇÃO SERÁ PARADA: $LARAVEL_DEPLOYMENT"
+echo "    CLUSTER MARIADB SERÁ PARADO: 3 nós"
+echo "    DADOS ATUAIS SERÃO SOBRESCRITOS"
 echo ""
 echo "  Namespace:      $NAMESPACE"
 echo "  Backup Dir:     $BACKUP_DIR"
@@ -209,7 +209,7 @@ echo "  7. Iniciar mariadb-1 e mariadb-2 (SST)"
 echo "  8. Validar cluster"
 echo "  9. Reiniciar aplicação"
 echo ""
-log_warning "Este processo � IRREVERSÍVEL sem um backup"
+log_warning "Este processo é IRREVERSÍVEL sem um backup"
 echo ""
 
 read -p "Você tem certeza ABSOLUTA? Digite 'RESTORE PRODUCTION' para continuar: " -r
@@ -229,7 +229,7 @@ fi
 
 section "FASE 1: PARANDO APLICAÇÃO"
 
-log_info "Escalando $LARAVEL_DEPLOYMENT para 0 r�plicas..."
+log_info "Escalando $LARAVEL_DEPLOYMENT para 0 réplicas..."
 kubectl scale deployment "$LARAVEL_DEPLOYMENT" -n "$NAMESPACE" --replicas=0
 
 log_info "Aguardando pods da aplicação terminarem..."
@@ -271,7 +271,7 @@ log_success "Backup de segurança criado em: $SAFETY_BACKUP_DIR"
 
 section "FASE 3: PARANDO CLUSTER MARIADB"
 
-log_info "Escalando StatefulSet mariadb para 0 r�plicas..."
+log_info "Escalando StatefulSet mariadb para 0 réplicas..."
 kubectl scale statefulset mariadb -n "$NAMESPACE" --replicas=0
 
 log_info "Aguardando pods do MariaDB terminarem..."
@@ -576,7 +576,7 @@ echo ""
 echo "  Backup Restaurado:  $BACKUP_DIR"
 echo "  Namespace:          $NAMESPACE"
 echo "  Cluster MariaDB:    3 nós Synced"
-echo "  Aplicação:          $LARAVEL_DEPLOYMENT (1 r�plica)"
+echo "  Aplicação:          $LARAVEL_DEPLOYMENT (1 réplica)"
 echo ""
 log_info "BACKUP DE SEGURANÇA (para rollback):"
 echo "  $SAFETY_BACKUP_DIR"
@@ -585,7 +585,7 @@ log_info "VALIDAÇÕES FINAIS RECOMENDADAS:"
 echo "  1. Testar login na aplicação"
 echo "  2. Verificar dados críticos no banco"
 echo "  3. Monitorar logs da aplicação"
-echo "  4. Verificar m�tricas de performance"
+echo "  4. Verificar métricas de performance"
 echo ""
 log_info "Para verificar status do cluster:"
 echo "  kubectl exec -n $NAMESPACE mariadb-0 -- mariadb -uroot -p... -e \"SHOW STATUS LIKE 'wsrep%'\""

@@ -285,7 +285,7 @@ spec:
           initialDelaySeconds: 30        # aguarde mais na primeira verificação
           periodSeconds: 10
           timeoutSeconds: 10             # mais tempo para a resposta do banco
-          failureThreshold: 60           # at� 10min tolerância total de inicialização
+          failureThreshold: 60           # até 10min tolerância total de inicialização
 
         readinessProbe:
           exec:

@@ -142,7 +142,7 @@ data:
 
     echo "SUCCESS:$TIMESTAMP:automated:$BACKUP_SIZE" > "/backup/last_backup_status"
 
-    log "Backup finalizado com sucesso"
+    log "Backup finalizado"
 
   list-backups.sh: |
     #!/bin/bash
@@ -165,9 +165,9 @@ data:
         if [ -f "$backup_dir/xtrabackup_checkpoints" ] && \
           [ -f "$backup_dir/ibdata1" ] && \
           [ -f "$backup_dir/backup.mbstream.md5" ]; then
-          status="✓ PRONTO"
+          status=" PRONTO"
         else
-          status="✗ INCOMPLETO"
+          status=" INCOMPLETO"
         fi
 
         echo "$timestamp|$size|AUTO|$status" >> "$tmpfile"
@@ -184,9 +184,9 @@ data:
         if [ -f "$backup_dir/xtrabackup_checkpoints" ] && \
           [ -f "$backup_dir/ibdata1" ] && \
           [ -f "$backup_dir/backup.mbstream.md5" ]; then
-          status="✓ PRONTO"
+          status=" PRONTO"
         else
-          status="✗ INCOMPLETO"
+          status=" INCOMPLETO"
         fi
 
         echo "$timestamp|$size|MANUAL|$status" >> "$tmpfile"
@@ -266,25 +266,25 @@ data:
     if [ -f "$BACKUP_DIR/backup.mbstream.md5" ]; then
       cd "$BACKUP_DIR"
       if md5sum -c backup.mbstream.md5 &>/dev/null; then
-        echo "✓ OK"
+        echo " OK"
       else
-        echo "✗ FALHOU"
+        echo " FALHOU"
         errors=$((errors + 1))
       fi
     else
-      echo "✗ NÃO ENCONTRADO"
+      echo " NÃO ENCONTRADO"
       errors=$((errors + 1))
     fi
 
     echo -n "xtrabackup_checkpoints: "
     if [ -f "$BACKUP_DIR/xtrabackup_checkpoints" ]; then
-      echo "✓ OK"
+      echo " OK"
       backup_type=$(grep backup_type "$BACKUP_DIR/xtrabackup_checkpoints" 2>/dev/null || echo "unknown")
       to_lsn=$(grep to_lsn "$BACKUP_DIR/xtrabackup_checkpoints" 2>/dev/null || echo "unknown")
       echo "  $backup_type"
       echo "  $to_lsn"
     else
-      echo "✗ NÃO ENCONTRADO"
+      echo " NÃO ENCONTRADO"
       errors=$((errors + 1))
     fi
 
@@ -300,9 +300,9 @@ data:
     done
 
     if [ ${#missing_files[@]} -eq 0 ]; then
-      echo "✓ OK"
+      echo " OK"
     else
-      echo "✗ FALTANDO: ${missing_files[*]}"
+      echo " FALTANDO: ${missing_files[*]}"
     fi
 
     echo -n "Tamanho: "
@@ -319,13 +319,13 @@ data:
     echo "========================="
 
     if [ $errors -eq 0 ]; then
-      echo "Status: ✓ PRONTO PARA RESTORE"
+      echo "Status:  PRONTO PARA RESTORE"
       echo ""
       echo "Comando de restore:"
       echo "  /scripts/execute-restore-safe.sh $TIMESTAMP"
       exit 0
     else
-      echo "Status: ✗ BACKUP INCOMPLETO ($errors erros)"
+      echo "Status:  BACKUP INCOMPLETO ($errors erros)"
       exit 1
     fi
 
@@ -433,7 +433,7 @@ data:
       exit 1
     fi
 
-    echo "✓ Backup stream completo"
+    echo " Backup stream completo"
 
     md5sum "$BACKUP_DIR/backup.mbstream" > "$BACKUP_DIR/backup.mbstream.md5"
     ls -lh "$BACKUP_DIR/backup.mbstream" | awk '{print $5}' > "$BACKUP_DIR/backup.size"
@@ -445,7 +445,7 @@ data:
       exit 1
     fi
 
-    echo "✓ Backup extraído"
+    echo " Backup extraído"
 
     echo "[3/4] Preparando backup..."
     if ! mariadb-backup \
@@ -455,7 +455,7 @@ data:
       exit 1
     fi
 
-    echo "✓ Backup preparado"
+    echo " Backup preparado"
 
     echo "[4/4] Validando backup..."
 
@@ -478,7 +478,7 @@ data:
       fi
     done
 
-    echo "✓ Backup validado"
+    echo " Backup validado"
 
     BACKUP_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1 || echo "Unknown")
 
@@ -528,15 +528,15 @@ data:
     }
 
     log_success() {
-      echo -e "${GREEN}[$(date '+%H:%M:%S')]${NC} ✓ $1"
+      echo -e "${GREEN}[$(date '+%H:%M:%S')]${NC}  $1"
     }
 
     log_warning() {
-      echo -e "${YELLOW}[$(date '+%H:%M:%S')]${NC} ⚠ $1"
+      echo -e "${YELLOW}[$(date '+%H:%M:%S')]${NC}  $1"
     }
 
     log_error() {
-      echo -e "${RED}[$(date '+%H:%M:%S')]${NC} ✗ $1"
+      echo -e "${RED}[$(date '+%H:%M:%S')]${NC}  $1"
     }
 
 
@@ -729,18 +729,18 @@ data:
               echo "[1/5] Validando backup: $BACKUP_DIR"
               [ ! -d "$BACKUP_DIR" ] && echo "Backup não encontrado" && exit 1
               [ ! -f "$BACKUP_DIR/xtrabackup_checkpoints" ] && echo "xtrabackup_checkpoints não encontrado" && exit 1
-              echo "✓ Backup validado"
+              echo " Backup validado"
 
               echo "[2/5] Limpando datadir..."
               find /data -mindepth 1 -delete
-              echo "✓ Datadir limpo"
+              echo " Datadir limpo"
 
               echo "[3/5] Executando mariadb-backup --copy-back..."
               if ! mariadb-backup --copy-back --target-dir="$BACKUP_DIR" --datadir=/data 2>&1 | tail -20; then
-                echo "✗ mariadb-backup falhou!"
+                echo " mariadb-backup falhou!"
                 exit 1
               fi
-              echo "✓ Restore completado"
+              echo " Restore completado"
 
               echo "Removendo arquivos de backup do datadir..."
               rm -f /data/backup.mbstream.md5
@@ -754,7 +754,7 @@ data:
 
               echo "[4/5] Corrigindo permissões..."
               chown -R 999:999 /data
-              echo "✓ Permissões corrigidas"
+              echo " Permissões corrigidas"
 
               echo "[5/5] Configurando bootstrap Galera..."
               cat > /data/grastate.dat <<'GRASTATE'
@@ -763,11 +763,11 @@ data:
               seqno: -1
               safe_to_bootstrap: 1
               GRASTATE
-              echo "✓ Bootstrap configurado"
+              echo " Bootstrap configurado"
 
               echo ""
               echo "================================================================"
-              echo "✓✓✓ RESTORE DO MARIADB-0 COMPLETADO ✓✓✓"
+              echo " RESTORE DO MARIADB-0 COMPLETADO "
               echo "================================================================"
               echo "Próxima fase: Iniciar cluster gradualmente (SST automático)"
 
@@ -934,7 +934,7 @@ data:
 
     echo ""
     echo "================================================================"
-    log_success "✓✓✓ RESTORE COMPLETADO COM SUCESSO ✓✓✓"
+    log_success " RESTORE COMPLETADO"
     echo "================================================================"
     echo ""
     echo " Backup Restaurado: $TIMESTAMP ($TIPO)"

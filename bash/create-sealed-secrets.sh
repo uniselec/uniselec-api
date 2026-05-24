@@ -28,7 +28,7 @@ check_dependencies() {
         log_error "kubeseal não encontrado. Instale: https://github.com/bitnami-labs/sealed-secrets"
         exit 1
     fi
-    log_info "Dependências OK ✓"
+    log_info "Dependências OK "
 }
 
 generate_password() {
@@ -60,14 +60,14 @@ create_regcred_sealed_secret() {
 
     read -p "Digite o Docker Registry Username: " DOCKER_USERNAME
     if [ -z "$DOCKER_USERNAME" ]; then
-        log_error "Username � obrigatório!"
+        log_error "Username é obrigatório!"
         return 1
     fi
 
     read -sp "Digite o Docker Registry Password: " DOCKER_PASSWORD
     echo ""
     if [ -z "$DOCKER_PASSWORD" ]; then
-        log_error "Password � obrigatório!"
+        log_error "Password é obrigatório!"
         return 1
     fi
 
