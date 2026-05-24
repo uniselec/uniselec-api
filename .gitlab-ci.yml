@@ -403,7 +403,15 @@ build:docker:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
   before_script:
     - *load_k8s_secrets
-    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Iniciando build Docker"
+    - echo "[$(date '+%d/%m/%Y %H:%M:%S')] [INFO] Iniciando build Docker daemon"
+    - |
+      rm -f /var/run/docker.sock
+      dockerd --host=unix:///var/run/docker.sock \
+              --storage-driver=overlay2 \
+              --config-file=/etc/docker/daemon.json \
+              &>/var/log/dockerd.log &
+      timeout 34 sh -c 'until docker info &>/dev/null 2>&1; do sleep 1; done' \
+        || { echo "[$(date '+%d/%m/%Y %H:%M:%S')] [ERROR] Docker daemon nao iniciou:"; cat /var/log/dockerd.log; exit 1; }
     - |
       echo "${HARBOR_PASSWORD}" | docker login ${HARBOR_REGISTRY} \
         -u "${HARBOR_USERNAME}" \
