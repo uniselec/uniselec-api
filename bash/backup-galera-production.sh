@@ -80,7 +80,7 @@ check_pod_health() {
     fi
 
     if [ "$cluster_size" != "3" ]; then
-        log_warning "Cluster size � $cluster_size (esperado: 3)"
+        log_warning "Cluster size é $cluster_size (esperado: 3)"
     fi
 
     log_success "Pod $pod está saudável (estado: $state, cluster_size: $cluster_size)"
