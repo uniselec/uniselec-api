@@ -54,6 +54,7 @@ data:
     wsrep_cluster_address = _MARIADB_CLUSTER_ADDRESS
     wsrep_node_address = _POD_IP
     wsrep_sst_method = mariabackup
+    wsrep_sst_auth = _SST_USER:_SST_PASSWORD
     wsrep_slave_threads = 4
     wsrep_retry_autocommit = 3
     wsrep_provider_options = "gcache.size=512M;evs.suspect_timeout=PT5S;evs.inactive_timeout=PT15S;evs.install_timeout=PT5S;evs.send_window=512;evs.user_send_window=256"
@@ -63,6 +64,6 @@ data:
     default_storage_engine = InnoDB
     innodb_autoinc_lock_mode = 2
 
-    [xtrabackup]
+    [mariabackup]
     user = _SST_USER
-    password = "_SST_PASSWORD"
+    password = _SST_PASSWORD
