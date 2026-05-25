@@ -15,6 +15,7 @@ use ReflectionClass;
 use Illuminate\Http\Resources\Json\ResourceCollection;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class ApplicationController extends BasicCrudController
 {
@@ -69,6 +70,14 @@ class ApplicationController extends BasicCrudController
             ->where('status', 'active')
             ->firstOrFail();
         $processSelectionId = $processSelection->id;
+
+        $request->validate([
+            'form_data.admission_categories' => [
+                'required',
+                'array',
+                Rule::when(!$processSelection->allows_multiple_admission_categories, ['size:2'], ['min:1']),
+            ],
+        ]);
 
         $start = Carbon::parse($processSelection->start_date);
         $end   = Carbon::parse($processSelection->end_date);

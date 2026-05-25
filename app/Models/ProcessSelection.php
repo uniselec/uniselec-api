@@ -20,6 +20,7 @@ class ProcessSelection extends Model
         'type',
         'courses',
         'admission_categories',
+        'allows_multiple_admission_categories',
         'knowledge_areas',
         'allowed_enem_years',
         'currenty_step',
@@ -39,6 +40,7 @@ class ProcessSelection extends Model
         'bonus_options' => 'array',
         'allowed_enem_years' => 'array',
         'remap_rules'  => 'array',
+        'allows_multiple_admission_categories' => 'boolean',
     ];
 
     public function applications()
