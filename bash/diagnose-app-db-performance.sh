@@ -1,14 +1,5 @@
 #!/bin/bash
 
-# ============================================================
-# Script para diagnóstico de performance entre aplicação e banco de dados
-# Diagnóstico de performance app <-> banco - MariaDB Galera (Kubernetes)
-# ============================================================
-# Autor: erivandosena@gmail.com
-# Data: 2025-11-20
-# Versão: 1.0.0
-# ============================================================
-
 NAMESPACE="uniselec-api-stg"
 MYSQL_USER="root"
 MYSQL_PASS="Password123"

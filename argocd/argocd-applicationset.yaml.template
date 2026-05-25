@@ -18,7 +18,7 @@ spec:
           - name: ${APP_NAME}-${DEPLOY_ENV}
             repoURL: ${REPO_URL}
             path: ${KUSTOMIZE_PATH}
-            cluster: https://${CLUSTER_REMOTE1_DOMAIN}:6443
+            cluster: ${ARGOCD_DEST_SERVER}
             namespace: ${APP_NAMESPACE}
   template:
     metadata:

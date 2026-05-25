@@ -1,17 +1,5 @@
 #!/bin/bash
 
-#######################################################
-# Script health-check
-#
-# Autor: Erivando Sena <erivandoramos@unilab.edu.br>
-# Data: 30/06/2023
-
-# Descrição: 
-# Verifica se os containers init do Vault estão prontos 
-# e se secrets do Vault existem no container principal, 
-# retorna 0 em caso de sucesso e 1 em caso de falhas.
-#######################################################
-
 check_vault_init_containers() {
     status=$(kubectl get pods -n $APP_NAMESPACE -o jsonpath='{.status.initContainerStatuses[*].ready}' | grep -q false && echo "false" || echo "true")
     if [[ $status == "false" ]]; then

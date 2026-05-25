@@ -8,7 +8,7 @@ metadata:
   annotations:
     nfs.io/storage-path: ""
 spec:
-  storageClassName: nfs-storage-k8s-v1
+  storageClassName: nfs-client
   accessModes:
     - ReadWriteMany
   resources:
