@@ -22,10 +22,11 @@ yarn-error.log
 .env-prod
 /docker
 .env
-kustomize/base/secret-regcred.yaml
+*.info
+public-key-cert.pem
 passwords-laravel-*.txt
 passwords-mariadb-*.txt
 passwords-regcred.txt
-public-key-cert.pem
-*.info
-
+kustomize/base/secret-regcred.yaml
+kustomize/overlays/staging/secret-*.yaml
+kustomize/overlays/production/secret-*.yaml
