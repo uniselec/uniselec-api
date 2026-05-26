@@ -1,29 +1,4 @@
 #!/bin/bash
-# ============================================================
-# Script para diagnóstico ponta-a-ponta do ambiente UNISELEC
-# ============================================================
-# Autor: erivandosena@gmail.com
-# Data: 2025-11-20
-# Versão: 1.0.0
-# ============================================================
-
-# troubleshooting-uniselec.sh
-# Automação completa de diagnóstico ponta-a-ponta (HAProxy -> Ingress -> API -> MariaDB Galera)
-# Suporta 3 ambientes: dev, stg, prd
-
-# ✔ HAProxy externo
-# ✔ Ingress Controller
-# ✔ Ingress Hostname (DNS + curl timing)
-# ✔ Pods, Services, Endpoints, Events
-# ✔ HPA (se existir)
-# ✔ Logs
-# ✔ Testes SQL internos e externos
-# ✔ Testes com pod mysql temporário
-# ✔ wsrep cluster status (Galera)
-# ✔ Teste clusterIP e LoadBalancer
-# ✔ curl dentro da API /health
-# ✔ dig e nslookup
-# ✔ top + metrics
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -71,9 +46,6 @@ kubectl_cmd() {
   fi
 }
 
-################################################################################################
-# FASE 1 — TESTES EXTERNOS (Cliente → HAProxy → Ingress)
-################################################################################################
 echolog "FASE 1: Testes externos (cliente -> HAProxy -> Ingress)"
 
 echolog "1.1 Ping e traceroute para HAProxy $HAPROXY_HOST"
@@ -83,9 +55,6 @@ command -v traceroute >/dev/null 2>&1 && traceroute -n "$ING_HOST" || true
 echolog "1.2 curl timing para https://$ING_HOST"
 curl -s -o /dev/null -w "DNS:%{time_namelookup}s TCP:%{time_connect}s SSL:%{time_appconnect}s TTFB:%{time_starttransfer}s TOTAL:%{time_total}s\n" "https://$ING_HOST" || true
 
-################################################################################################
-# FASE 2 — HAProxy Externo
-################################################################################################
 echolog "FASE 2: HAProxy externo"
 
 echolog "2.1 Processos HAProxy"
@@ -119,9 +88,6 @@ if [ -n "$K8S_INGRESS_IP" ]; then
   ssh_exec "nc -zv -w3 $K8S_INGRESS_IP 80 || nc -zv -w3 $K8S_INGRESS_IP 443" || true
 fi
 
-################################################################################################
-# FASE 3 — Kubernetes Interno
-################################################################################################
 echolog "FASE 3: Kubernetes | Namespace $NAMESPACE"
 
 echolog "3.1 Pods, services, endpoints, ingress"
@@ -139,9 +105,6 @@ kubectl_cmd get events -n "$NAMESPACE" --sort-by=.lastTimestamp | tail -n 30 || 
 echolog "3.4 top pods (metrics)"
 kubectl_cmd top pods -n "$NAMESPACE" --containers || true
 
-################################################################################################
-# FASE 4 — MariaDB Galera
-################################################################################################
 echolog "FASE 4: MariaDB Galera"
 echo "MYSQL_ROOT_PASSWORD está setado (oculto)"
 
@@ -149,7 +112,6 @@ set +e
 mapfile -t pods < <(kubectl_cmd get pods -n "$NAMESPACE" -l app=mariadb -o name)
 set -e
 
-# Usar MariaDB 10.6.24 LTS como cliente compatível com o servidor
 MYSQL_IMAGE="mariadb:10.11.15-jammy"
 
 echolog "4.1 wsrep status"
@@ -203,9 +165,6 @@ echolog "4.7 Services e Endpoints"
 kubectl_cmd get svc -n "$NAMESPACE" | grep mariadb || true
 kubectl_cmd get endpoints -n "$NAMESPACE" mariadb-app -o yaml || true
 
-################################################################################################
-# FASE 5 — Ingress e API
-################################################################################################
 echolog "FASE 5: Ingress e API"
 
 echolog "5.1 Ingress YAML"
@@ -226,7 +185,4 @@ fi
 echolog "5.4 Teste externo via ingress (curl)"
 curl -I "https://$ING_HOST" || true
 
-################################################################################################
-# FIM
-################################################################################################
 echolog "DIAGNÓSTICO COMPLETO FINALIZADO PARA O AMBIENTE: $ENV  (namespace=$NAMESPACE)"

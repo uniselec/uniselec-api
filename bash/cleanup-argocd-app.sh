@@ -1,43 +1,17 @@
 #!/bin/bash
 
-#===============================================================================
-# Descrição: Remove Application do ArgoCD
-# Uso: ./cleanup-argocd-app.sh <app-name>
-# argocd app list ou kubectl get applicationset -A
-
-# Sintaxe
-# ./cleanup-argocd-app.sh <app-name> [opções]
-
-# Remover application completa
-# ./cleanup-argocd-app.sh selecoes-stg
-
-# Remover mas manter namespace
-# ./cleanup-argocd-app.sh uniselec-admin-stg --keep-namespace
-
-# Ver o que seria feito (dry-run)
-# ./cleanup-argocd-app.sh selecoes-dev --dry-run
-
-# Ver ajuda
-# ./cleanup-argocd-app.sh --help
-#===============================================================================
-
 set -e
 
-# Cores para output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Configurações
 ARGOCD_NAMESPACE="argocd"
-ARGOCD_SERVER="${ARGOCD_SERVER:-argocd.unilab.edu.br}"
+ARGOCD_SERVER="${ARGOCD_SERVER:-gitops.unilab.edu.br}"
 TIMEOUT=60
 
-#===============================================================================
-# Funções auxiliares
-#===============================================================================
 
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -93,15 +67,12 @@ get_app_info() {
 
     log_info "Coletando informações da Application '$app_name'..."
 
-    # Obter namespace destino
     APP_NAMESPACE=$(kubectl get application "$app_name" -n "$ARGOCD_NAMESPACE" \
         -o jsonpath='{.spec.destination.namespace}' 2>/dev/null)
 
-    # Obter cluster destino
     APP_CLUSTER=$(kubectl get application "$app_name" -n "$ARGOCD_NAMESPACE" \
         -o jsonpath='{.spec.destination.server}' 2>/dev/null)
 
-    # Obter status
     APP_SYNC_STATUS=$(kubectl get application "$app_name" -n "$ARGOCD_NAMESPACE" \
         -o jsonpath='{.status.sync.status}' 2>/dev/null)
 
@@ -119,7 +90,6 @@ remove_application() {
 
     log_info "Removendo Application '$app_name'..."
 
-    # Tentar via ArgoCD CLI primeiro (se disponível)
     if command -v argocd &>/dev/null; then
         log_info "Tentando remover via ArgoCD CLI..."
         if argocd app delete "$app_name" \
@@ -136,19 +106,16 @@ remove_application() {
         fi
     fi
 
-    # Remover finalizers da Application
     log_info "Removendo finalizers da Application..."
     kubectl patch application "$app_name" -n "$ARGOCD_NAMESPACE" \
         -p '{"metadata":{"finalizers":[]}}' \
         --type=merge 2>/dev/null || true
 
-    # Deletar Application
     log_info "Deletando Application..."
     kubectl delete application "$app_name" -n "$ARGOCD_NAMESPACE" \
         --force \
         --grace-period=0 2>/dev/null || true
 
-    # Aguardar remoção
     local count=0
     while kubectl get application "$app_name" -n "$ARGOCD_NAMESPACE" &>/dev/null; do
         if [ $count -ge $TIMEOUT ]; then
@@ -166,7 +133,6 @@ remove_applicationset() {
     local app_name=$1
     local appset_name="${app_name}-as"
 
-    # Verificar se ApplicationSet existe
     if ! kubectl get applicationset "$appset_name" -n "$ARGOCD_NAMESPACE" &>/dev/null; then
         log_info "ApplicationSet '$appset_name' não encontrado (OK)"
         return 0
@@ -174,17 +140,14 @@ remove_applicationset() {
 
     log_info "Removendo ApplicationSet '$appset_name'..."
 
-    # Remover finalizers
     kubectl patch applicationset "$appset_name" -n "$ARGOCD_NAMESPACE" \
         -p '{"metadata":{"finalizers":[]}}' \
         --type=merge 2>/dev/null || true
 
-    # Deletar ApplicationSet
     kubectl delete applicationset "$appset_name" -n "$ARGOCD_NAMESPACE" \
         --force \
         --grace-period=0 2>/dev/null || true
 
-    # Aguardar remoção
     local count=0
     while kubectl get applicationset "$appset_name" -n "$ARGOCD_NAMESPACE" &>/dev/null; do
         if [ $count -ge $TIMEOUT ]; then
@@ -206,7 +169,6 @@ remove_namespace() {
         return 0
     fi
 
-    # Verificar se namespace existe
     if ! kubectl get namespace "$namespace" &>/dev/null; then
         log_info "Namespace '$namespace' não encontrado (OK)"
         return 0
@@ -214,23 +176,19 @@ remove_namespace() {
 
     log_info "Removendo namespace '$namespace'..."
 
-    # Deletar namespace
     kubectl delete namespace "$namespace" --force --grace-period=0 2>/dev/null || true
 
-    # Aguardar e forçar se necessário
     sleep 5
 
     if kubectl get namespace "$namespace" &>/dev/null; then
         log_warn "Namespace em estado Terminating, forçando remoção de finalizers..."
 
-        # Remover finalizers do namespace
         kubectl get namespace "$namespace" -o json | \
             jq '.spec.finalizers = []' | \
             kubectl replace --raw "/api/v1/namespaces/$namespace/finalize" -f - 2>/dev/null || true
 
         sleep 3
 
-        # Verificar novamente
         if kubectl get namespace "$namespace" &>/dev/null; then
             log_error "Namespace '$namespace' ainda existe (pode estar em Terminating)"
             log_info "Execute manualmente: kubectl get namespace $namespace -o yaml"
@@ -250,7 +208,6 @@ verify_cleanup() {
     log_info "Verificando limpeza..."
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    # Verificar Application
     if kubectl get application "$app_name" -n "$ARGOCD_NAMESPACE" &>/dev/null; then
         log_error "Application '$app_name' ainda existe"
         errors=$((errors + 1))
@@ -258,7 +215,6 @@ verify_cleanup() {
         log_success "Application '$app_name' removida"
     fi
 
-    # Verificar ApplicationSet
     if kubectl get applicationset "${app_name}-as" -n "$ARGOCD_NAMESPACE" &>/dev/null; then
         log_error "ApplicationSet '${app_name}-as' ainda existe"
         errors=$((errors + 1))
@@ -266,7 +222,6 @@ verify_cleanup() {
         log_success "ApplicationSet '${app_name}-as' removido"
     fi
 
-    # Verificar Namespace
     if [ -n "$namespace" ]; then
         if kubectl get namespace "$namespace" &>/dev/null; then
             log_error "Namespace '$namespace' ainda existe"
@@ -310,16 +265,12 @@ Descrição:
 EOF
 }
 
-#===============================================================================
-# Main
-#===============================================================================
 
 main() {
     local app_name=""
     local keep_namespace=false
     local dry_run=false
 
-    # Parse argumentos
     while [[ $# -gt 0 ]]; do
         case $1 in
             -h|--help)
@@ -346,7 +297,6 @@ main() {
         esac
     done
 
-    # Validar argumentos
     if [ -z "$app_name" ]; then
         log_error "Nome da Application não fornecido"
         show_usage
@@ -362,15 +312,12 @@ main() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
 
-    # Verificar dependências
     check_dependencies
 
-    # Verificar se Application existe
     if ! verify_app_exists "$app_name"; then
         exit 1
     fi
 
-    # Obter informações da Application
     get_app_info "$app_name"
 
     if [ "$dry_run" = true ]; then
@@ -386,7 +333,6 @@ main() {
         exit 0
     fi
 
-    # Confirmação
     echo ""
     log_warn "ATENÇÃO: Esta operação irá remover:"
     echo "  - Application: $app_name"
@@ -403,31 +349,25 @@ main() {
         exit 0
     fi
 
-    # Executar remoção
     echo ""
     log_info "Iniciando remoção..."
     echo ""
 
-    # 1. Remover Application
     if ! remove_application "$app_name"; then
         log_error "Falha ao remover Application"
         exit 1
     fi
 
-    # 2. Remover ApplicationSet
     remove_applicationset "$app_name"
 
-    # 3. Remover Namespace (se não --keep-namespace)
     if [ "$keep_namespace" = false ]; then
         remove_namespace "$APP_NAMESPACE"
     else
         log_info "Mantendo namespace '$APP_NAMESPACE' conforme solicitado"
     fi
 
-    # 4. Verificar limpeza
     echo ""
     verify_cleanup "$app_name" "$APP_NAMESPACE"
 }
 
-# Executar
 main "$@"
