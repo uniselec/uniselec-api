@@ -36,7 +36,7 @@ data:
   REDIS_PORT: "6379"
 
   MAIL_MAILER: smtp
-  MAIL_HOST: smtp.noreply.unilab.edu.br
+  MAIL_HOST: smtp2.noreply.unilab.edu.br
   MAIL_PORT: "25"
   MAIL_USERNAME:
   MAIL_PASSWORD:
