@@ -23,8 +23,10 @@ yarn-error.log
 /docker
 .env
 *.info
-
-# Secrets locais
-kustomize/**/secret-*.yaml
-passwords-*.txt
 public-key-cert.pem
+passwords-laravel-*.txt
+passwords-mariadb-*.txt
+passwords-regcred.txt
+kustomize/base/secret-regcred.yaml
+kustomize/overlays/staging/secret-*.yaml
+kustomize/overlays/production/secret-*.yaml

@@ -93,18 +93,17 @@ variables:
   BASE_IMAGE: "harbor.unilab.edu.br/unilab/ubuntu-k8s-tools:latest"
   # Kubernetes/ArgoCD
   # Para alternar modo: mudar GITOPS_MODE para "hub-spoke" ou "single-cluster"
-  # ARGOCD_DEST_SERVER e sobrescrito em runtime pelo load_k8s_secrets
-  ARGOCD_SERVER: "gitops.unilab.edu.br"        # Ingress do ArgoCD (Hub/unico cluster)
   GITOPS_MODE: "single-cluster"                # single-cluster | hub-spoke
+  ARGOCD_SERVER: "gitops.unilab.edu.br"        # Ingress do ArgoCD (Hub/unico cluster)
   ARGOCD_DEST_SERVER: "https://kubernetes.default.svc"        # default: single-cluster
-  HUB_SPOKE_DEST_SERVER: "https://k8s-c2.unilab.edu.br:8443" # usado se hub-spoke
-  CLUSTER_REMOTE1_DOMAIN: "k8s-c2.unilab.edu.br"             # dominio do Spoke (C2)
+  HUB_SPOKE_DEST_SERVER: "https://k8s-c2.unilab.edu.br:8443"  # usado se hub-spoke
+  CLUSTER_REMOTE1_DOMAIN: "k8s-c2.unilab.edu.br"              # dominio do Spoke (C2)
   KUBECONFIG: "/tmp/kubeconfig-${CI_PIPELINE_ID}"
   ARGOCD_TIMEOUT_DEV: "600"   # 10 minutos
   ARGOCD_TIMEOUT_STG: "900"   # 15 minutos
-  ARGOCD_TIMEOUT_PRD: "1200"  # 20 minutos
-  ARGOCD_TLS_MODE: "insecure"      # insecure | server-crt
-  ARGOCD_SERVER_CRT_B64: ""        # base64 do cert TLS do ArgoCD (quando server-crt)
+  ARGOCD_TIMEOUT_PRD: "1000"  # ~16,7 min
+  ARGOCD_TLS_MODE: "insecure" # insecure | server-crt
+  ARGOCD_SERVER_CRT_B64: ""
 
   # Notificação
   MAIL_PRD: "jefponte@unilab.edu.br"
@@ -728,6 +727,7 @@ development:deploy:
       argocd app wait ${APP_NAME}-dev \
         --server ${ARGOCD_SERVER} \
         --grpc-web \
+        --operation \
         --timeout ${ARGOCD_TIMEOUT} 2>&1 | tee /tmp/app-wait.log || {
           echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Timeout ao aguardar sync (verificar ArgoCD UI)"
       }
@@ -962,6 +962,7 @@ staging:deploy:
       argocd app wait ${APP_NAME}-stg \
         --server ${ARGOCD_SERVER} \
         --grpc-web \
+        --operation \
         --timeout ${ARGOCD_TIMEOUT} 2>&1 | tee /tmp/app-wait.log || {
           echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Timeout ao aguardar sync (verificar ArgoCD UI)"
       }
@@ -1087,7 +1088,7 @@ production:deploy:
     max: 1
     when:
       - runner_system_failure
-  timeout: 20m
+  timeout: 30m
   variables:
     DEPLOY_ENV: prd
     APP_NAMESPACE: "${APP_NAME}-prd"
@@ -1281,6 +1282,7 @@ production:deploy:
       argocd app wait ${APP_NAME}-prd \
         --server ${ARGOCD_SERVER} \
         --grpc-web \
+        --operation \
         --timeout ${ARGOCD_TIMEOUT} 2>&1 | tee /tmp/app-wait.log || {
           echo "[$(date '+%d/%m/%Y %H:%M:%S')] [WARN] Timeout ao aguardar sync (verificar ArgoCD UI)"
       }
