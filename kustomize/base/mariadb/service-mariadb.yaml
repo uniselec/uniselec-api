@@ -78,7 +78,7 @@ metadata:
   labels:
     app: mariadb
   annotations:
-    metallb.universe.tf/address-pool: primary-pool
+    metallb.io/address-pool: primary-pool
 spec:
   type: LoadBalancer
   externalTrafficPolicy: Cluster

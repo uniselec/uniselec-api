@@ -77,7 +77,7 @@ secretGenerator:
 
 images:
 - name: harbor.unilab.edu.br/unilab/uniselec-api
-  newTag: dev-afb0034d
+  newTag: dev-0ba69434
 
 labels:
 - pairs:
