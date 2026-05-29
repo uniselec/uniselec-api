@@ -7,6 +7,7 @@ use App\Http\Resources\ConvocationListResource;
 use App\Models\ConvocationList;
 use App\Models\ProcessSelection;
 use App\Services\ApplicationGeneratorService;
+use App\Services\ConvocationListService;
 use App\Services\SeatGeneratorService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
@@ -20,18 +21,22 @@ class ConvocationListController extends BasicCrudController
 {
     private SeatGeneratorService $seatGeneratorService;
     private ApplicationGeneratorService $applicationGeneratorService;
+    private ConvocationListService $convocationListService;
+
     public function __construct(
         ApplicationGeneratorService $applicationGeneratorService,
-        SeatGeneratorService       $seatGeneratorService
+        SeatGeneratorService        $seatGeneratorService,
+        ConvocationListService      $convocationListService
     ) {
         $this->applicationGeneratorService = $applicationGeneratorService;
         $this->seatGeneratorService        = $seatGeneratorService;
+        $this->convocationListService      = $convocationListService;
     }
 
     private $rules = [
         'process_selection_id' => 'required|exists:process_selections,id',
         'name'                 => 'required|string|max:255',
-        'status'               => 'nullable|in:draft,published',
+        'status'               => 'nullable|in:draft,published,finalized',
         'published_at'         => 'nullable|date',
 
     ];
@@ -89,6 +94,32 @@ class ConvocationListController extends BasicCrudController
                 'created_applications' => $createdApps,
                 'created_seats'        => $createdSeats,
             ]);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $obj = $this->findOrFail($id);
+
+        $rules = $request->isMethod('PUT') ? $this->rulesUpdate() : $this->rulesPatch();
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $validatedData = $validator->validated();
+
+        if (isset($validatedData['status']) && $validatedData['status'] !== $obj->status) {
+            $result = $this->convocationListService->validateStatusTransition($obj, $validatedData['status']);
+            if ($result->isFailure()) {
+                return response()->json(['message' => $result->getMessage()], 422);
+            }
+        }
+
+        $obj->update($validatedData);
+        $resource = $this->resource();
+        return new $resource($obj);
     }
 
 
