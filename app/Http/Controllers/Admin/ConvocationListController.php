@@ -69,9 +69,18 @@ class ConvocationListController extends BasicCrudController
         if ($ps->convocationLists()->where('status', 'draft')->exists()) {
             return response()->json([
                 'message' => 'Já existe uma lista em rascunho para este processo. '
-                    . 'Publique ou descarte antes de criar outra.'
+                . 'Publique ou descarte antes de criar outra.'
+                ], 422);
+        }
+
+        $latestConvocationList = $ps->convocationLists()->latest()->first();
+        if($latestConvocationList && $latestConvocationList->status !== 'finalized') {
+            return response()->json([
+                'message' => 'Finalize a última lista criada para consguir criar uma nova'
             ], 422);
         }
+
+
 
         // 2) Valida e cria lista + aplicações
         $data = Validator::make($request->all(), $this->rulesStore())->validate();
