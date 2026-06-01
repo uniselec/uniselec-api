@@ -61,7 +61,7 @@ configMapGenerator:
 
 images:
 - name: harbor.unilab.edu.br/unilab/uniselec-api
-  newTag: stg-88099387
+  newTag: stg-b8c5a8e2
 
 labels:
 - pairs:
