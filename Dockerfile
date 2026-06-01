@@ -87,11 +87,13 @@ RUN cp bash/apache/000-default.conf /etc/apache2/sites-available/000-default.con
 RUN adduser --no-create-home --disabled-password --shell /bin/bash --gecos "" --force-badname 3s \
   && echo "3s ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-RUN php artisan config:clear \
-  && php artisan config:cache \
-  && php artisan route:cache \
-  && chmod 777 -R /var/www/html/storage/ \
-  && chown -Rf www-data:www-data /var/www/ \
+RUN mkdir -p storage/framework/cache \
+  && mkdir -p storage/framework/sessions \
+  && mkdir -p storage/framework/views \
+  && mkdir -p storage/logs \
+  && mkdir -p bootstrap/cache \
+  && chown -R www-data:www-data storage bootstrap/cache \
+  && chmod -R 775 storage bootstrap/cache \
   && a2enmod rewrite
 
 # Stage 2 - Prod
@@ -111,13 +113,14 @@ COPY --from=dev /var/www/html /var/www/html
 
 WORKDIR /var/www/html
 
-RUN composer install --prefer-dist --no-interaction --no-dev \
-  && chown -R www-data:www-data /var/www/html/storage \
-  && chmod -R 775 /var/www/html/storage \
-  && php artisan route:cache \
-  && php artisan config:clear \
-  && php artisan view:clear \
-  && php artisan storage:link \
+RUN composer install --prefer-dist --no-interaction --no-dev --no-scripts --optimize-autoloader \
+  && mkdir -p storage/framework/cache \
+  && mkdir -p storage/framework/sessions \
+  && mkdir -p storage/framework/views \
+  && mkdir -p storage/logs \
+  && mkdir -p bootstrap/cache \
+  && chown -R www-data:www-data storage bootstrap/cache \
+  && chmod -R 775 storage bootstrap/cache \
   && a2enmod rewrite
 
 EXPOSE 80
