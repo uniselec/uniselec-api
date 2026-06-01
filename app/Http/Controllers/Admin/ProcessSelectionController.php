@@ -28,6 +28,7 @@ class ProcessSelectionController extends BasicCrudController
         'type' => "",
         'courses' => "",
         'admission_categories' => "",
+        'allows_multiple_admission_categories' => "",
         'knowledge_areas' => "",
         'allowed_enem_years' => "",
         'bonus_options' => "",

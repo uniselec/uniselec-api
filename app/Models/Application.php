@@ -44,4 +44,9 @@ class Application extends Model
     {
         return $this->hasOne(EnemScore::class, 'application_id', 'id');
     }
+
+    public function appeal()
+    {
+        return $this->hasOne(Appeal::class);
+    }
 }

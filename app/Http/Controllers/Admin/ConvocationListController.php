@@ -7,6 +7,7 @@ use App\Http\Resources\ConvocationListResource;
 use App\Models\ConvocationList;
 use App\Models\ProcessSelection;
 use App\Services\ApplicationGeneratorService;
+use App\Services\ConvocationListService;
 use App\Services\SeatGeneratorService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\ResourceCollection;
@@ -20,18 +21,22 @@ class ConvocationListController extends BasicCrudController
 {
     private SeatGeneratorService $seatGeneratorService;
     private ApplicationGeneratorService $applicationGeneratorService;
+    private ConvocationListService $convocationListService;
+
     public function __construct(
         ApplicationGeneratorService $applicationGeneratorService,
-        SeatGeneratorService       $seatGeneratorService
+        SeatGeneratorService        $seatGeneratorService,
+        ConvocationListService      $convocationListService
     ) {
         $this->applicationGeneratorService = $applicationGeneratorService;
         $this->seatGeneratorService        = $seatGeneratorService;
+        $this->convocationListService      = $convocationListService;
     }
 
     private $rules = [
         'process_selection_id' => 'required|exists:process_selections,id',
         'name'                 => 'required|string|max:255',
-        'status'               => 'nullable|in:draft,published',
+        'status'               => 'nullable|in:draft,published,finalized',
         'published_at'         => 'nullable|date',
 
     ];
@@ -64,9 +69,18 @@ class ConvocationListController extends BasicCrudController
         if ($ps->convocationLists()->where('status', 'draft')->exists()) {
             return response()->json([
                 'message' => 'Já existe uma lista em rascunho para este processo. '
-                    . 'Publique ou descarte antes de criar outra.'
+                . 'Publique ou descarte antes de criar outra.'
+                ], 422);
+        }
+
+        $latestConvocationList = $ps->convocationLists()->latest()->first();
+        if($latestConvocationList && $latestConvocationList->status !== 'finalized') {
+            return response()->json([
+                'message' => 'Finalize a última lista criada para consguir criar uma nova'
             ], 422);
         }
+
+
 
         // 2) Valida e cria lista + aplicações
         $data = Validator::make($request->all(), $this->rulesStore())->validate();
@@ -91,6 +105,47 @@ class ConvocationListController extends BasicCrudController
             ]);
     }
 
+    public function update(Request $request, $id)
+    {
+        $obj = $this->findOrFail($id);
+
+        $rules = $request->isMethod('PUT') ? $this->rulesUpdate() : $this->rulesPatch();
+
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $validatedData = $validator->validated();
+
+        if (isset($validatedData['status']) && $validatedData['status'] !== $obj->status) {
+            $result = $this->convocationListService->validateStatusTransition($obj, $validatedData['status']);
+            if ($result->isFailure()) {
+                return response()->json(['message' => $result->getMessage()], 422);
+            }
+        }
+
+        $obj->update($validatedData);
+        $resource = $this->resource();
+        return new $resource($obj);
+    }
+
+
+    public function destroy($id)
+    {
+        $list = $this->findOrFail($id);
+
+        if ($list->status !== 'draft') {
+            return response()->json([
+                'message' => 'Somente listas com status rascunho podem ser excluídas.',
+            ], 422);
+        }
+
+        $list->delete();
+
+        return response()->noContent();
+    }
 
     protected function model()
     {

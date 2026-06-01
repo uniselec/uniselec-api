@@ -45,6 +45,9 @@ class ApplicationResource extends JsonResource
                 'selected_birthdate' => $this->getResolvedValue($this->birthdate_source, 'birthdate'),
                 'selected_cpf'       => $this->getResolvedValue($this->cpf_source, 'cpf'),
             ],
+            'appeal' => $this->appeal
+            ? new AppealResource($this->appeal->load('documents'))
+            : null,
         ];
     }
 
