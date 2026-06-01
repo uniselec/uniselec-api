@@ -1,7 +1,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Recursos específicos do MariaDB
 resources:
   - sa-rbac-mariadb.yaml
   - configmap-mariadb.yaml
@@ -10,13 +9,11 @@ resources:
   - statefulset-mariadb.yaml
   - backup-restore/
 
-# Variáveis de ambiente PÚBLICAS do MariaDB
 configMapGenerator:
   - name: mariadb-env
     options:
       disableNameSuffixHash: true
     literals:
-      # Configurações Galera (comuns a todos os ambientes)
       - MARIADB_AUTO_UPGRADE=1
       - MARIADB_INITDB_SKIP_TZINFO=1
       - MARIADB_GALERA_CLUSTER=ON

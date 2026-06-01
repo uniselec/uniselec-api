@@ -10,6 +10,7 @@ metadata:
     haproxy.org/ssl-redirect-code: "301"
     haproxy.org/websocket: "true"
 spec:
+  ingressClassName: haproxy
   rules:
   - host: dti-app-test-c1.unilab.edu.br # não necessita alteração --- IGNORE ---
     http:

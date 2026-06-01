@@ -39,7 +39,7 @@ spec:
           mountPath: /storage
       containers:
       - name: uniselec-api
-        image: dti-registro.unilab.edu.br/unilab/uniselec-api:latest
+        image: harbor.unilab.edu.br/unilab/uniselec-api:latest
         imagePullPolicy: Always
         command: ["/bin/sh"]
         args:
@@ -47,17 +47,14 @@ spec:
         - |
           echo "Configurando permissões Laravel"
 
-          # Permissões para storage
           chown -R www-data:www-data /var/www/html/storage
           chmod -R 775 /var/www/html/storage
 
-          # Permissões para bootstrap/cache
           chown -R www-data:www-data /var/www/html/bootstrap/cache
           chmod -R 775 /var/www/html/bootstrap/cache
 
           echo "Permissões configuradas. Iniciando Apache..."
 
-          # Iniciar Apache em foreground
           exec apache2-foreground
         resources:
           requests:
